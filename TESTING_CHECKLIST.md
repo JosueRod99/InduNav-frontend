@@ -6,31 +6,33 @@ Este documento contiene un checklist exhaustivo de todas las funcionalidades imp
 ---
 
 ## ✅ Estado General
-- [ ] Backend corriendo en `http://localhost:3000`
-- [ ] Frontend corriendo en `http://localhost:5173`
-- [ ] Base de datos configurada y con datos seed
-- [ ] Variables de entorno configuradas (`.env` con `VITE_API_URL`)
+- [x] Backend corriendo en `http://localhost:3000`
+- [x] Frontend corriendo en `http://localhost:5173`
+- [x] Base de datos configurada y con datos seed
+- [x] Variables de entorno configuradas (`.env` con `VITE_API_URL`)
 
 ---
 
 ## 🔐 1. AUTENTICACIÓN Y NAVEGACIÓN
 
 ### Login
-- [ ] Acceder a `http://localhost:5173` redirecciona a `/login`
-- [ ] Formulario de login visible
-- [ ] Campos: email y password
-- [ ] Validación: campos requeridos
-- [ ] Login con credenciales correctas funciona
-- [ ] Login con credenciales incorrectas muestra error
-- [ ] Toast de error visible
-- [ ] Redirección a `/dashboard` después de login exitoso
-- [ ] Token guardado en localStorage
+- [x] Acceder a `http://localhost:5173` redirecciona a `/login`
+- [x] Formulario de login visible
+- [x] Campos: email y password
+- [x] Validación: campos requeridos
+- [x] Login con credenciales correctas funciona
+- [ ] Login con credenciales incorrectas muestra error (Muestra error pero se quita)
+- [ ] Toast de error visible (Muestra error pero se quita)
+- [x] Redirección a `/dashboard` después de login exitoso
+- [x] Token guardado en localStorage
+
+Notas: al hacer el login, si redirecciona, pero se ve la carga previa del /login
 
 ### Logout
-- [ ] Botón de logout visible en Header
-- [ ] Click en logout cierra sesión
-- [ ] Redirección a `/login` después de logout
-- [ ] Token removido de localStorage
+- [x] Botón de logout visible en Header
+- [x] Click en logout cierra sesión
+- [x] Redirección a `/login` después de logout
+- [x] Token removido de localStorage
 
 ### Navegación
 - [ ] Sidebar visible en todas las páginas protegidas
@@ -47,6 +49,7 @@ Este documento contiene un checklist exhaustivo de todas las funcionalidades imp
 - [ ] Link activo resaltado en sidebar
 - [ ] Navegación entre páginas funciona
 - [ ] URL actualizada correctamente
+- [ ] Responsivo automático lateral y horizontal
 
 ### Protección de Rutas
 - [ ] Intentar acceder a ruta protegida sin login redirecciona a `/login`

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { User } from '../types';
 import { authApi } from '../api/auth';
 
@@ -8,114 +7,107 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  error: string | null;
+  isInitialized: boolean; // Track if auth check has completed
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   setUser: (user: User) => void;
   setToken: (token: string) => void;
-  clearError: () => void;
   checkAuth: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  token: null,
+  isAuthenticated: false,
+  isLoading: false,
+  isInitialized: false,
+
+  login: async (email: string, password: string) => {
+    set({ isLoading: true });
+    try {
+      const response = await authApi.login({ email, password });
+
+      // Save to localStorage manually
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+
+      set({
+        user: response.user,
+        token: response.token,
+        isAuthenticated: true,
+        isInitialized: true,
+        isLoading: false,
+      });
+    } catch (error: any) {
+      set({
+        user: null,
+        token: null,
+        isLoading: false,
+        isAuthenticated: false,
+        isInitialized: true,
+      });
+      throw error;
+    }
+  },
+
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+
+    // Call logout API (optional, for logging purposes)
+    authApi.logout().catch(() => {
+      // Ignore errors on logout
+    });
+
+    set({
       user: null,
       token: null,
       isAuthenticated: false,
-      isLoading: false,
-      error: null,
+    });
+  },
 
-      login: async (email: string, password: string) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await authApi.login({ email, password });
+  setUser: (user: User) => {
+    set({ user, isAuthenticated: true });
+  },
 
-          // Save token to localStorage
-          localStorage.setItem('token', response.token);
+  setToken: (token: string) => {
+    localStorage.setItem('token', token);
+    set({ token });
+  },
 
-          set({
-            user: response.user,
-            token: response.token,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
-        } catch (error: any) {
-          const errorMessage = error.response?.data?.message || 'Login failed';
-          set({
-            error: errorMessage,
-            isLoading: false,
-            isAuthenticated: false,
-          });
-          throw error;
-        }
-      },
+  checkAuth: async () => {
+    const token = localStorage.getItem('token');
 
-      logout: () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-
-        // Call logout API (optional, for logging purposes)
-        authApi.logout().catch(() => {
-          // Ignore errors on logout
-        });
-
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          error: null,
-        });
-      },
-
-      setUser: (user: User) => {
-        set({ user, isAuthenticated: true });
-      },
-
-      setToken: (token: string) => {
-        localStorage.setItem('token', token);
-        set({ token });
-      },
-
-      clearError: () => {
-        set({ error: null });
-      },
-
-      checkAuth: async () => {
-        const token = localStorage.getItem('token');
-
-        if (!token) {
-          set({ isAuthenticated: false, user: null, token: null });
-          return;
-        }
-
-        try {
-          const response = await authApi.getCurrentUser();
-          set({
-            user: response.user,
-            token,
-            isAuthenticated: true,
-          });
-        } catch (error) {
-          // Token is invalid
-          localStorage.removeItem('token');
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-          });
-        }
-      },
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({
-        token: state.token,
-        user: state.user,
-      }),
+    if (!token) {
+      set({ isAuthenticated: false, user: null, token: null, isInitialized: true });
+      return;
     }
-  )
-);
+
+    try {
+      const response = await authApi.getCurrentUser();
+      const user = response.user;
+
+      // Save to localStorage
+      localStorage.setItem('user', JSON.stringify(user));
+
+      set({
+        user,
+        token,
+        isAuthenticated: true,
+        isInitialized: true,
+      });
+    } catch (error) {
+      // Token is invalid
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isInitialized: true,
+      });
+    }
+  },
+}));

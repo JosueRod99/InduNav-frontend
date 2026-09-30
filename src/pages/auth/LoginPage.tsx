@@ -10,13 +10,14 @@ const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    clearError();
+    setLocalError(null);
 
     try {
       await login(email, password);
@@ -24,8 +25,9 @@ const LoginPage = () => {
       // Redirect to dashboard after successful login
       navigate('/dashboard');
     } catch (err: any) {
-      // Show error toast
+      // Show error toast and local error
       const errorMessage = err.response?.data?.message || 'Error al iniciar sesión. Verifica tus credenciales.';
+      setLocalError(errorMessage);
       toast.error(errorMessage);
       console.error('Login error:', err);
     }
@@ -123,7 +125,7 @@ const LoginPage = () => {
             </div>
 
             {/* Error Message */}
-            {error && (
+            {localError && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div className="flex">
                   <svg
@@ -138,7 +140,7 @@ const LoginPage = () => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  <p className="ml-3 text-sm text-red-700">{error}</p>
+                  <p className="ml-3 text-sm text-red-700">{localError}</p>
                 </div>
               </div>
             )}

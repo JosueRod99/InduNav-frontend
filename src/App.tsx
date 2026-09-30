@@ -18,13 +18,25 @@ import OrgChartPage from './pages/org-chart/OrgChartPage';
 import ReportsPage from './pages/reports/ReportsPage';
 
 function App() {
-  const { checkAuth, isAuthenticated } = useAuthStore();
+  const { checkAuth, isAuthenticated, isInitialized } = useAuthStore();
 
   useEffect(() => {
     // Check authentication status on app load (only once)
     checkAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Show loading while checking authentication
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
