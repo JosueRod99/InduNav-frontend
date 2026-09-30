@@ -39,7 +39,11 @@ export interface OrganizationsResponse {
 // Get all organizations with pagination
 export const getOrganizations = async (params?: GetOrganizationsParams): Promise<OrganizationsResponse> => {
   const { data } = await apiClient.get('/organizations', { params });
-  return data;
+  // Backend returns 'data' but we expect 'organizations'
+  return {
+    organizations: data.data,
+    pagination: data.pagination
+  };
 };
 
 // Get organization by ID
