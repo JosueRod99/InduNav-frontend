@@ -402,12 +402,21 @@ function EditingHandler({
         }),
       }).addTo(map);
 
-      // Handle dragging
+      // Store index in marker
+      (marker as any)._pointIndex = index;
+
+      // Handle dragging - update polygon in real-time
       marker.on('drag', () => {
         const allLatLngs = markersRef.current.map(m => m.getLatLng());
         if (polygonRef.current && allLatLngs.length >= 2) {
           polygonRef.current.setLatLngs(allLatLngs);
         }
+      });
+
+      // Handle drag end - update state with new position
+      marker.on('dragend', () => {
+        const allLatLngs = markersRef.current.map(m => m.getLatLng());
+        setPoints(allLatLngs);
       });
 
       markersRef.current.push(marker);
@@ -417,6 +426,34 @@ function EditingHandler({
     updatePolygon(points);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points.length, editMode, map]);
+
+  // Handle map clicks to add new points
+  useEffect(() => {
+    if (!editMode) {
+      return;
+    }
+
+    const handleClick = (e: L.LeafletMouseEvent) => {
+      // Only add point if the click is directly on the map, not on UI elements
+      const target = e.originalEvent.target as HTMLElement;
+
+      // Check if click was on a UI element (button, panel, marker, etc)
+      if (target.closest('.edit-point-marker') ||
+          target.closest('button') ||
+          target.closest('.absolute')) {
+        return;
+      }
+
+      // Add new point at clicked location
+      setPoints(prev => [...prev, e.latlng]);
+    };
+
+    map.on('click', handleClick);
+
+    return () => {
+      map.off('click', handleClick);
+    };
+  }, [editMode, map]);
 
   // Handle delete point button clicks
   useEffect(() => {
@@ -459,6 +496,11 @@ function EditingHandler({
     }
   };
 
+  // Handle undo last point
+  const handleUndo = () => {
+    setPoints(prev => prev.slice(0, -1));
+  };
+
   // Handle cancel
   const handleCancel = () => {
     setPoints([]);
@@ -490,6 +532,7 @@ function EditingHandler({
 
       <div className="space-y-3">
         <div className="text-xs text-gray-600 space-y-1">
+          <p>• <strong>Click</strong> en el mapa para agregar puntos</p>
           <p>• <strong>Arrastra</strong> los puntos para ajustar</p>
           <p>• <strong>Click en ×</strong> para eliminar un punto</p>
           <p>• Mínimo <strong>3 puntos</strong> requeridos</p>
@@ -506,13 +549,15 @@ function EditingHandler({
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              handleCancel();
+              handleUndo();
             }}
+            disabled={points.length === 0}
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="flex-1 gap-1"
           >
-            Cancelar
+            <RotateCcw className="h-3 w-3" />
+            Deshacer
           </Button>
           <Button
             onClick={(e) => {
@@ -528,6 +573,17 @@ function EditingHandler({
             Guardar
           </Button>
         </div>
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCancel();
+          }}
+          variant="outline"
+          size="sm"
+          className="w-full"
+        >
+          Cancelar Edición
+        </Button>
       </div>
     </div>
   );

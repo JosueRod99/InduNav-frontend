@@ -8,7 +8,7 @@ import LayoutMap from './LayoutMap';
 import AreaModal from './AreaModal';
 import LayoutModal from './LayoutModal';
 import { getPlants } from '../../api/plants';
-import { getLayouts, getAreas, deleteArea, type PlantArea } from '../../api/layouts';
+import { getLayouts, getAreas, deleteArea, updateArea, type PlantArea, type CreateAreaRequest } from '../../api/layouts';
 
 const LayoutsPage = () => {
   const [selectedPlantId, setSelectedPlantId] = useState<string>('');
@@ -54,6 +54,20 @@ const LayoutsPage = () => {
     },
   });
 
+  // Update area mutation
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: string; payload: CreateAreaRequest }) =>
+      updateArea(data.id, data.payload),
+    onSuccess: () => {
+      toast.success('Área actualizada exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      setSelectedArea(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Error al actualizar área');
+    },
+  });
+
   const handleAreaClick = (area: PlantArea) => {
     setSelectedArea(area);
   };
@@ -90,10 +104,34 @@ const LayoutsPage = () => {
     setIsAreaModalOpen(true);
   };
 
-  const handleAreaEdited = (coordinates: number[][]) => {
-    setDrawnCoordinates(coordinates);
+  const handleAreaEdited = async (coordinates: number[][]) => {
+    if (!selectedArea) return;
+
+    // Convert coordinates to GeoJSON format
+    const geoJsonCoords = coordinates.map(coord => [coord[1], coord[0]]);
+    const closedCoords = [...geoJsonCoords, geoJsonCoords[0]];
+
+    const updatedGeometry = {
+      type: 'Polygon' as const,
+      coordinates: [closedCoords],
+    };
+
+    // Update area with new geometry directly
+    const payload = {
+      plant_id: selectedArea.plant_id,
+      layout_id: selectedArea.layout_id || undefined,
+      name: selectedArea.name,
+      description: selectedArea.description || '',
+      area_type: selectedArea.area_type,
+      geometry: updatedGeometry,
+      floor_level: selectedArea.floor_level,
+      color: selectedArea.color,
+      capacity: selectedArea.capacity || undefined,
+      square_meters: selectedArea.square_meters || undefined,
+    };
+
+    updateMutation.mutate({ id: selectedArea.id, payload });
     setEditMode(false);
-    setIsAreaModalOpen(true);
   };
 
   const handleCreateArea = () => {
