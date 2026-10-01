@@ -34,22 +34,50 @@ const AreaModal = ({ isOpen, onClose, area, plantId, layoutId, coordinates }: Ar
 
   useEffect(() => {
     if (area) {
+      // If coordinates are provided, it means we're updating geometry
+      const geometryToUse = coordinates
+        ? {
+            type: 'Polygon' as const,
+            coordinates: [
+              (() => {
+                const geoJsonCoords = coordinates.map(coord => [coord[1], coord[0]]);
+                return [...geoJsonCoords, geoJsonCoords[0]];
+              })()
+            ]
+          }
+        : area.geometry;
+
       setFormData({
         plant_id: area.plant_id,
         layout_id: area.layout_id || undefined,
         name: area.name,
         description: area.description || '',
         area_type: area.area_type,
-        geometry: area.geometry,
+        geometry: geometryToUse,
         floor_level: area.floor_level,
         color: area.color || '#3B82F6',
         capacity: area.capacity || undefined,
         square_meters: area.square_meters || undefined,
       });
     } else if (coordinates) {
-      // Convert coordinates to GeoJSON format
+      // Debug: Log received coordinates
+      console.log('📥 AreaModal received coordinates:', {
+        format: 'Leaflet [lat, lng]',
+        coordinates: coordinates,
+        pointsCount: coordinates.length,
+      });
+
+      // coordinates come as [lat, lng] from Leaflet
+      // Convert to GeoJSON format [lng, lat] and close the polygon
       const geoJsonCoords = coordinates.map(coord => [coord[1], coord[0]]);
-      geoJsonCoords.push(geoJsonCoords[0]); // Close the polygon
+      // Close the polygon by adding the first point at the end
+      const closedCoords = [...geoJsonCoords, geoJsonCoords[0]];
+
+      console.log('   → Converted to GeoJSON:', {
+        format: 'GeoJSON [lng, lat]',
+        geoJsonCoords: closedCoords,
+        pointsCount: closedCoords.length,
+      });
 
       setFormData({
         plant_id: plantId,
@@ -59,7 +87,7 @@ const AreaModal = ({ isOpen, onClose, area, plantId, layoutId, coordinates }: Ar
         area_type: 'general',
         geometry: {
           type: 'Polygon',
-          coordinates: [geoJsonCoords],
+          coordinates: [closedCoords],
         },
         floor_level: 0,
         color: '#3B82F6',
@@ -96,6 +124,14 @@ const AreaModal = ({ isOpen, onClose, area, plantId, layoutId, coordinates }: Ar
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Debug: Log coordinates before saving
+    console.log('🔍 Saving area with coordinates:', {
+      type: formData.geometry.type,
+      coordinates: formData.geometry.coordinates,
+      firstPoint: formData.geometry.coordinates[0]?.[0],
+      lastPoint: formData.geometry.coordinates[0]?.[formData.geometry.coordinates[0].length - 1],
+    });
 
     if (isEditing && area) {
       updateMutation.mutate({ id: area.id, payload: formData });

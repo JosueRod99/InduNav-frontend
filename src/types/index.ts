@@ -12,6 +12,7 @@ export interface User {
   created_at: Date;
   updated_at: Date;
   role: Role;
+  permissions?: string[]; // Array of permission strings (e.g., "organizations.create")
 }
 
 export interface Role {

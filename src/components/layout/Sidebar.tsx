@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Building2,
   Factory,
@@ -15,27 +15,44 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { useSidebarStore } from '../../store/sidebarStore';
+import { useAuthStore } from '../../store/authStore';
 
 interface NavItem {
   to: string;
   icon: React.ComponentType<any>;
   label: string;
+  allowedRoles?: string[]; // If undefined, accessible to all authenticated users
 }
 
 const navItems: NavItem[] = [
   { to: '/dashboard', icon: BarChart3, label: 'Dashboard' },
-  { to: '/organizations', icon: Building2, label: 'Organizaciones' },
-  { to: '/plants', icon: Factory, label: 'Plantas' },
+  { to: '/organizations', icon: Building2, label: 'Organizaciones', allowedRoles: ['platform_admin'] },
+  { to: '/users', icon: Users, label: 'Usuarios', allowedRoles: ['platform_admin'] },
+  { to: '/plants', icon: Factory, label: 'Plantas', allowedRoles: ['platform_admin', 'org_owner'] },
   { to: '/tours', icon: Map, label: 'Tours' },
   { to: '/stops', icon: QrCode, label: 'Stops & QR' },
   { to: '/layouts', icon: LayoutGrid, label: 'Layout 2D' },
-  { to: '/employees', icon: Users, label: 'Empleados' },
+  { to: '/employees', icon: Users, label: 'Empleados', allowedRoles: ['platform_admin', 'org_owner'] },
   { to: '/org-chart', icon: Network, label: 'Organigrama' },
   { to: '/reports', icon: FileText, label: 'Reportes' },
 ];
 
 const Sidebar = () => {
   const { isOpen, isMobileMenuOpen, toggleSidebar, closeMobileMenu } = useSidebarStore();
+  const { user } = useAuthStore();
+
+  // Filter nav items based on user role
+  const filteredNavItems = useMemo(() => {
+    if (!user || !user.role) return navItems;
+
+    return navItems.filter(item => {
+      // If no role restriction, show to everyone
+      if (!item.allowedRoles) return true;
+
+      // Check if user's role is in allowed roles
+      return item.allowedRoles.includes(user.role.name);
+    });
+  }, [user]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -111,7 +128,7 @@ const Sidebar = () => {
         {/* Navigation */}
         <nav className="mt-6 px-3 overflow-y-auto max-h-[calc(100vh-8rem)]">
           <div className="space-y-1">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink

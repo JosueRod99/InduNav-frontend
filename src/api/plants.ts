@@ -40,7 +40,12 @@ export interface PlantsResponse {
 // Get all plants with pagination
 export const getPlants = async (params?: GetPlantsParams): Promise<PlantsResponse> => {
   const { data } = await apiClient.get('/plants', { params });
-  return data;
+  // Backend returns { data: [], pagination: {} }
+  // Map to expected format { plants: [], pagination: {} }
+  return {
+    plants: data.data || [],
+    pagination: data.pagination,
+  };
 };
 
 // Get plant by ID

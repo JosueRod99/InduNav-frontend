@@ -103,7 +103,14 @@ export const getEmployees = async (params?: {
   limit?: number;
 }): Promise<EmployeesResponse> => {
   const { data } = await apiClient.get('/employees', { params });
-  return data;
+  // Backend returns { data: [], pagination: {} }
+  // Map to expected format { employees: [], total, page, limit }
+  return {
+    employees: data.data || [],
+    total: data.pagination?.total || 0,
+    page: data.pagination?.page || 1,
+    limit: data.pagination?.limit || 10,
+  };
 };
 
 // Get single employee
@@ -113,8 +120,12 @@ export const getEmployee = async (id: string): Promise<Employee> => {
 };
 
 // Get org chart data
-export const getOrgChart = async (organizationId: string): Promise<OrgChartNode[]> => {
-  const { data } = await apiClient.get(`/employees/org-chart/${organizationId}`);
+export const getOrgChart = async (
+  organizationId: string,
+  plantId?: string
+): Promise<OrgChartNode[]> => {
+  const params = plantId ? { plant_id: plantId } : {};
+  const { data } = await apiClient.get(`/employees/org-chart/${organizationId}`, { params });
   return data.orgChart || data;
 };
 

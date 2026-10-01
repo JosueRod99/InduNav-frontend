@@ -39,7 +39,12 @@ export interface ToursResponse {
 // Get all tours with pagination
 export const getTours = async (params?: GetToursParams): Promise<ToursResponse> => {
   const { data } = await apiClient.get('/tours', { params });
-  return data;
+  // Backend returns { data: [], pagination: {} }
+  // Map to expected format { tours: [], pagination: {} }
+  return {
+    tours: data.data || [],
+    pagination: data.pagination,
+  };
 };
 
 // Get tour by ID

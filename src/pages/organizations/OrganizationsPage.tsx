@@ -6,12 +6,14 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import OrganizationModal from './OrganizationModal';
 import { getOrganizations, deleteOrganization } from '../../api/organizations';
+import { useIsPlatformAdmin } from '../../hooks/usePermissions';
 import type { Organization } from '../../types';
 
 const OrganizationsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
   const queryClient = useQueryClient();
+  const isPlatformAdmin = useIsPlatformAdmin();
 
   // Fetch organizations
   const { data, isLoading, error } = useQuery({
@@ -150,18 +152,24 @@ const OrganizationsPage = () => {
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleEdit(org)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(org.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {isPlatformAdmin && (
+                      <>
+                        <button
+                          onClick={() => handleEdit(org)}
+                          className="text-blue-600 hover:text-blue-900 mr-4"
+                          title="Editar organización"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(org.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Eliminar organización"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

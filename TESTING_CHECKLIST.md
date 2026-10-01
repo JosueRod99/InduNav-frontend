@@ -35,8 +35,8 @@ Notas: al hacer el login, si redirecciona, pero se ve la carga previa del /login
 - [x] Token removido de localStorage
 
 ### Navegación
-- [ ] Sidebar visible en todas las páginas protegidas
-- [ ] Header visible con nombre de usuario
+- [x] Sidebar visible en todas las páginas protegidas
+- [x] Header visible con nombre de usuario
 - [ ] Links del sidebar:
   - [ ] Dashboard
   - [ ] Organizaciones
@@ -49,30 +49,32 @@ Notas: al hacer el login, si redirecciona, pero se ve la carga previa del /login
 - [ ] Link activo resaltado en sidebar
 - [ ] Navegación entre páginas funciona
 - [ ] URL actualizada correctamente
-- [ ] Responsivo automático lateral y horizontal
+- [x] Responsivo automático lateral y horizontal
+- [x] No tiene boton para colapsar
+- [ ] Btn de cerrar sesión no esta visible en movil, igual moverlo al sidebar
 
 ### Protección de Rutas
-- [ ] Intentar acceder a ruta protegida sin login redirecciona a `/login`
-- [ ] Después de login, acceso a todas las rutas protegidas
-- [ ] Ruta inexistente redirecciona apropiadamente
+- [x] Intentar acceder a ruta protegida sin login redirecciona a `/login`
+- [x] Después de login, acceso a todas las rutas protegidas
+- [x] Ruta inexistente redirecciona apropiadamente
 
 ---
 
 ## 🏢 2. MÓDULO DE ORGANIZACIONES
 
 ### Visualización - Lista
-- [ ] Acceder a `/organizations`
-- [ ] Tabla de organizaciones visible
+- [x] Acceder a `/organizations`
+- [x] Tabla de organizaciones visible
 - [ ] Columnas mostradas:
-  - [ ] Logo (placeholder si no tiene)
-  - [ ] Nombre
-  - [ ] Slug
-  - [ ] Plan (badge con color)
-  - [ ] Estado (activo/inactivo badge)
+  - [x] Logo (placeholder si no tiene)
+  - [x] Nombre
+  - [x] Slug
+  - [x] Plan (badge con color)
+  - [x] Estado (activo/inactivo badge)
   - [ ] Acciones (editar/eliminar)
-- [ ] Datos cargados desde API
-- [ ] Loading state mientras carga
-- [ ] Empty state si no hay organizaciones
+- [x] Datos cargados desde API
+- [x] Loading state mientras carga
+- [x] Empty state si no hay organizaciones
 
 ### Crear Organización
 - [ ] Botón "Nueva Organización" visible
@@ -108,18 +110,18 @@ Notas: al hacer el login, si redirecciona, pero se ve la carga previa del /login
 - [ ] Confirmación de eliminación aparece
 - [ ] Cancelar confirmación no elimina
 - [ ] Confirmar eliminación funciona
-- [ ] Toast de éxito
+- [x] Toast de éxito
 - [ ] Organización removida de tabla
 - [ ] Error si organización tiene dependencias
 
 ### Estados y Validaciones
-- [ ] Badge "Activo" en verde
-- [ ] Badge "Inactivo" en rojo
-- [ ] Badge plan "Free" - color default
-- [ ] Badge plan "Pro" - color info
-- [ ] Badge plan "Enterprise" - color warning
-- [ ] Validación de slug único
-- [ ] Manejo de errores de API
+- [x] Badge "Activo" en verde
+- [x] Badge "Inactivo" en rojo
+- [x] Badge plan "Free" - color default
+- [x] Badge plan "Pro" - color info
+- [x] Badge plan "Enterprise" - color warning
+- [x] Validación de slug único
+- [x] Manejo de errores de API
 
 ---
 

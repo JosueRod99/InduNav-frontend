@@ -5,10 +5,12 @@ import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/auth/LoginPage';
 import Dashboard from './pages/Dashboard';
 import PrivateRoute from './components/PrivateRoute';
+import RoleProtectedRoute from './components/RoleProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
 
 // Placeholder pages (we'll create these next)
 import OrganizationsPage from './pages/organizations/OrganizationsPage';
+import UsersPage from './pages/users/UsersPage';
 import PlantsPage from './pages/plants/PlantsPage';
 import ToursPage from './pages/tours/ToursPage';
 import StopsPage from './pages/stops/StopsPage';
@@ -62,12 +64,41 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="organizations" element={<OrganizationsPage />} />
-            <Route path="plants" element={<PlantsPage />} />
+            <Route
+              path="organizations"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin']}>
+                  <OrganizationsPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin']}>
+                  <UsersPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="plants"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <PlantsPage />
+                </RoleProtectedRoute>
+              }
+            />
             <Route path="tours" element={<ToursPage />} />
             <Route path="stops" element={<StopsPage />} />
             <Route path="layouts" element={<LayoutsPage />} />
-            <Route path="employees" element={<EmployeesPage />} />
+            <Route
+              path="employees"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <EmployeesPage />
+                </RoleProtectedRoute>
+              }
+            />
             <Route path="org-chart" element={<OrgChartPage />} />
             <Route path="reports" element={<ReportsPage />} />
           </Route>

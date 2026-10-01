@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Building2, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { OrgChart } from 'd3-org-chart';
 import { getOrganizations } from '../../api/organizations';
+import { getPlants } from '../../api/plants';
 import { getOrgChart, type OrgChartNode } from '../../api/employees';
 import Button from '../../components/ui/Button';
 
 const OrgChartPage = () => {
   const [selectedOrg, setSelectedOrg] = useState<string>('');
+  const [selectedPlant, setSelectedPlant] = useState<string>('');
   const chartRef = useRef<HTMLDivElement>(null);
   const orgChartInstance = useRef<any>(null);
 
@@ -17,10 +19,17 @@ const OrgChartPage = () => {
     queryFn: () => getOrganizations({ limit: 100 }),
   });
 
-  // Fetch org chart data for selected organization
+  // Fetch plants for selected organization
+  const { data: plantsData } = useQuery({
+    queryKey: ['plants', selectedOrg],
+    queryFn: () => getPlants({ limit: 100, organization_id: selectedOrg }),
+    enabled: !!selectedOrg,
+  });
+
+  // Fetch org chart data for selected organization and plant
   const { data: chartData, isLoading } = useQuery({
-    queryKey: ['orgChart', selectedOrg],
-    queryFn: () => getOrgChart(selectedOrg),
+    queryKey: ['orgChart', selectedOrg, selectedPlant],
+    queryFn: () => getOrgChart(selectedOrg, selectedPlant || undefined),
     enabled: !!selectedOrg,
   });
 
@@ -84,6 +93,11 @@ const OrgChartPage = () => {
 
   }, [chartData]);
 
+  // Reset plant when organization changes
+  useEffect(() => {
+    setSelectedPlant('');
+  }, [selectedOrg]);
+
   const handleZoomIn = () => {
     if (orgChartInstance.current) {
       orgChartInstance.current.zoomIn();
@@ -132,24 +146,50 @@ const OrgChartPage = () => {
           )}
         </div>
 
-        {/* Organization selector */}
-        <div className="mt-4 w-64">
-          <label htmlFor="org-select" className="block text-sm font-medium text-gray-700 mb-1">
-            Seleccionar Organización
-          </label>
-          <select
-            id="org-select"
-            value={selectedOrg}
-            onChange={(e) => setSelectedOrg(e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-          >
-            <option value="">Seleccionar organización</option>
-            {organizationsData?.organizations.map((org) => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
+        {/* Filters */}
+        <div className="mt-4 flex gap-4">
+          {/* Organization selector */}
+          <div className="w-64">
+            <label htmlFor="org-select" className="block text-sm font-medium text-gray-700 mb-1">
+              Seleccionar Organización
+            </label>
+            <select
+              id="org-select"
+              value={selectedOrg}
+              onChange={(e) => setSelectedOrg(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            >
+              <option value="">Seleccionar organización</option>
+              {organizationsData?.organizations.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Plant selector */}
+          {selectedOrg && (
+            <div className="w-64">
+              <label htmlFor="plant-select" className="block text-sm font-medium text-gray-700 mb-1">
+                Filtrar por Planta (opcional)
+              </label>
+              <select
+                id="plant-select"
+                value={selectedPlant}
+                onChange={(e) => setSelectedPlant(e.target.value)}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                disabled={!plantsData?.plants || plantsData.plants.length === 0}
+              >
+                <option value="">Todas las plantas</option>
+                {plantsData?.plants.map((plant) => (
+                  <option key={plant.id} value={plant.id}>
+                    {plant.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

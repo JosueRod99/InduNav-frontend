@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Pencil, Trash2, Plus, Square } from 'lucide-react';
+import { MapPin, Pencil, Trash2, Plus, Square, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import LayoutMap from './LayoutMap';
 import AreaModal from './AreaModal';
+import LayoutModal from './LayoutModal';
 import { getPlants } from '../../api/plants';
 import { getLayouts, getAreas, deleteArea, type PlantArea } from '../../api/layouts';
 
@@ -14,7 +15,9 @@ const LayoutsPage = () => {
   const [selectedFloor, setSelectedFloor] = useState<number>(0);
   const [selectedArea, setSelectedArea] = useState<PlantArea | null>(null);
   const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
+  const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
   const queryClient = useQueryClient();
 
@@ -69,12 +72,27 @@ const LayoutsPage = () => {
 
   const handleStartDrawing = () => {
     setDrawMode(true);
+    setEditMode(false);
     setSelectedArea(null);
+  };
+
+  const handleStartEditing = () => {
+    if (selectedArea) {
+      setEditMode(true);
+      setDrawMode(false);
+    }
   };
 
   const handleAreaDrawn = (coordinates: number[][]) => {
     setDrawnCoordinates(coordinates);
     setDrawMode(false);
+    setEditMode(false);
+    setIsAreaModalOpen(true);
+  };
+
+  const handleAreaEdited = (coordinates: number[][]) => {
+    setDrawnCoordinates(coordinates);
+    setEditMode(false);
     setIsAreaModalOpen(true);
   };
 
@@ -106,8 +124,16 @@ const LayoutsPage = () => {
 
           {selectedPlantId && (
             <div className="flex gap-2">
-              {!drawMode ? (
+              {!drawMode && !editMode ? (
                 <>
+                  <Button
+                    onClick={() => setIsLayoutModalOpen(true)}
+                    className="gap-2"
+                    variant={currentLayout ? "outline" : "primary"}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {currentLayout ? 'Editar Layout' : 'Subir Layout'}
+                  </Button>
                   <Button onClick={handleStartDrawing} className="gap-2" variant="outline">
                     <Square className="h-4 w-4" />
                     Dibujar Área
@@ -117,9 +143,13 @@ const LayoutsPage = () => {
                     Nueva Área
                   </Button>
                 </>
-              ) : (
+              ) : drawMode ? (
                 <Button onClick={() => setDrawMode(false)} variant="outline">
                   Cancelar Dibujo
+                </Button>
+              ) : (
+                <Button onClick={() => setEditMode(false)} variant="outline">
+                  Cancelar Edición
                 </Button>
               )}
             </div>
@@ -190,7 +220,12 @@ const LayoutsPage = () => {
               onAreaClick={handleAreaClick}
               selectedAreaId={selectedArea?.id}
               drawMode={drawMode}
+              editMode={editMode}
+              editingArea={editMode ? selectedArea : null}
               onAreaDrawn={handleAreaDrawn}
+              onAreaEdited={handleAreaEdited}
+              onCancelDraw={() => setDrawMode(false)}
+              onCancelEdit={() => setEditMode(false)}
             />
           </div>
 
@@ -254,19 +289,27 @@ const LayoutsPage = () => {
               </div>
             )}
 
-            {selectedArea && (
+            {selectedArea && !drawMode && !editMode && (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">
                   Área Seleccionada
                 </h4>
                 <div className="space-y-2">
                   <Button
+                    onClick={handleStartEditing}
+                    className="w-full gap-2 justify-center"
+                    variant="outline"
+                  >
+                    <Square className="h-4 w-4" />
+                    Editar Puntos
+                  </Button>
+                  <Button
                     onClick={handleEditArea}
                     className="w-full gap-2 justify-center"
                     variant="outline"
                   >
                     <Pencil className="h-4 w-4" />
-                    Editar
+                    Editar Info
                   </Button>
                   <Button
                     onClick={handleDeleteArea}
@@ -290,6 +333,15 @@ const LayoutsPage = () => {
         plantId={selectedPlantId}
         layoutId={currentLayout?.id}
         coordinates={drawnCoordinates || undefined}
+      />
+
+      {/* Layout Modal */}
+      <LayoutModal
+        isOpen={isLayoutModalOpen}
+        onClose={() => setIsLayoutModalOpen(false)}
+        layout={currentLayout}
+        plantId={selectedPlantId}
+        floorLevel={selectedFloor}
       />
     </div>
   );

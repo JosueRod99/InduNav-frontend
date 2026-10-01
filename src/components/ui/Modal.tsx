@@ -32,7 +32,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'md' }: ModalP
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-[9999] overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Backdrop */}
         <div
@@ -42,7 +42,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'md' }: ModalP
 
         {/* Modal */}
         <div
-          className={`relative w-full ${sizeClasses[size]} transform rounded-lg bg-white shadow-xl transition-all`}
+          className={`relative w-full ${sizeClasses[size]} transform rounded-lg bg-white shadow-xl transition-all z-[10000]`}
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
