@@ -3,17 +3,17 @@ import L from 'leaflet';
 import { MapContainer, ImageOverlay, Polygon, useMap } from 'react-leaflet';
 import { Check, RotateCcw, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
-import type { PlantArea } from '../../api/layouts';
+import type { AreaPhysicalRepresentation } from '../../api/areaRepresentations';
 import Button from '../../components/ui/Button';
 
 interface LayoutMapProps {
   imageUrl: string | null;
-  areas: PlantArea[];
-  onAreaClick?: (area: PlantArea) => void;
+  areas: AreaPhysicalRepresentation[];
+  onAreaClick?: (area: AreaPhysicalRepresentation) => void;
   selectedAreaId?: string | null;
   drawMode?: boolean;
   editMode?: boolean;
-  editingArea?: PlantArea | null;
+  editingArea?: AreaPhysicalRepresentation | null;
   onAreaDrawn?: (coordinates: number[][]) => void;
   onAreaEdited?: (coordinates: number[][]) => void;
 }
@@ -292,7 +292,7 @@ function EditingHandler({
   onCancel
 }: {
   editMode: boolean;
-  editingArea: PlantArea | null;
+  editingArea: AreaPhysicalRepresentation | null;
   onAreaEdited?: (coordinates: number[][]) => void;
   onCancel?: () => void;
 }) {
@@ -613,7 +613,7 @@ const LayoutMap = ({
   useEffect(() => {
     if (areas.length > 0) {
       console.log('📍 Areas loaded from DB:', areas.map(area => ({
-        name: area.name,
+        name: area.organizational_area?.name || area.display_name,
         geometryType: area.geometry?.type,
         coordinatesCount: area.geometry?.coordinates?.[0]?.length,
         firstCoord: area.geometry?.coordinates?.[0]?.[0],
@@ -671,7 +671,8 @@ const LayoutMap = ({
           );
 
           // Debug log for comparison
-          if (area.name === 'test2') {
+          const areaName = area.organizational_area?.name || area.display_name;
+          if (areaName === 'test2') {
             console.log('🔍 Converting test2 area:', {
               dbFormat: 'GeoJSON [lng, lat]',
               leafletFormat: 'Leaflet [lat, lng]',
@@ -680,13 +681,16 @@ const LayoutMap = ({
             });
           }
 
+          // Get color from display_color, or fall back to organizational area color
+          const areaColor = area.display_color || area.organizational_area?.color || '#3B82F6';
+
           return (
             <Polygon
               key={area.id}
               positions={coordinates}
               pathOptions={{
-                color: area.color || '#3B82F6',
-                fillColor: area.color || '#3B82F6',
+                color: areaColor,
+                fillColor: areaColor,
                 fillOpacity: selectedAreaId === area.id ? 0.6 : 0.3,
                 weight: selectedAreaId === area.id ? 3 : 2,
               }}
