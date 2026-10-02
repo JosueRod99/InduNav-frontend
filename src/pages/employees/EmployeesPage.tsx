@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Users, MapPin, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -8,6 +8,7 @@ import EmployeeModal from './EmployeeModal';
 import { getEmployees, deleteEmployee, type Employee } from '../../api/employees';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
+import { getEmployeePrimaryArea } from '../../api/areaAssignments';
 
 const EmployeesPage = () => {
   const [selectedOrg, setSelectedOrg] = useState<string>('');
@@ -269,14 +270,14 @@ const EmployeesPage = () => {
                       <Badge variant="default">{employee.department}</Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {employee.plant || employee.area ? (
+                      {employee.plant ? (
                         <div className="flex items-start gap-1 text-sm text-gray-600">
                           <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                           <div>
-                            {employee.plant?.name && <div>{employee.plant.name}</div>}
-                            {employee.area?.name && (
-                              <div className="text-xs text-gray-500">{employee.area.name}</div>
-                            )}
+                            <div>{employee.plant.name}</div>
+                            <div className="text-xs text-gray-500">
+                              Ver áreas en edición
+                            </div>
                           </div>
                         </div>
                       ) : (

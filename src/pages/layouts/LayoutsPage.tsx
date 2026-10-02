@@ -1,25 +1,29 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Pencil, Trash2, Plus, Square, Upload } from 'lucide-react';
+import { MapPin, Pencil, Trash2, Plus, Square, Upload, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import LayoutMap from './LayoutMap';
-import AreaModal from './AreaModal';
+import LinkAreaModal from './LinkAreaModal';
 import LayoutModal from './LayoutModal';
 import { getPlants } from '../../api/plants';
-import { getLayouts, getAreas, deleteArea, updateArea, type PlantArea, type CreateAreaRequest } from '../../api/layouts';
+import { getLayouts } from '../../api/layouts';
+import { getAreasByLayout } from '../../api/areaRepresentations';
+import { deleteRepresentation, updateRepresentation, type AreaPhysicalRepresentation } from '../../api/areaRepresentations';
+import { useAuthStore } from '../../store/authStore';
 
 const LayoutsPage = () => {
   const [selectedPlantId, setSelectedPlantId] = useState<string>('');
   const [selectedFloor, setSelectedFloor] = useState<number>(0);
-  const [selectedArea, setSelectedArea] = useState<PlantArea | null>(null);
-  const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
+  const [selectedArea, setSelectedArea] = useState<AreaPhysicalRepresentation | null>(null);
+  const [isLinkAreaModalOpen, setIsLinkAreaModalOpen] = useState(false);
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   // Fetch plants
   const { data: plantsData } = useQuery({
@@ -34,52 +38,54 @@ const LayoutsPage = () => {
     enabled: !!selectedPlantId,
   });
 
-  // Fetch areas for selected plant
-  const { data: areas = [] } = useQuery({
-    queryKey: ['areas', selectedPlantId, selectedFloor],
-    queryFn: () => getAreas({ plant_id: selectedPlantId || undefined, floor_level: selectedFloor }),
-    enabled: !!selectedPlantId,
+  const currentLayout = layouts?.[0];
+
+  // Get selected plant's organization_id
+  const selectedPlant = plantsData?.plants.find(p => p.id === selectedPlantId);
+  const organizationId = selectedPlant?.organization_id || user?.organization_id || '';
+
+  // Fetch area representations for current layout
+  const { data: areaRepresentations = [] } = useQuery({
+    queryKey: ['layout-areas', currentLayout?.id, selectedFloor],
+    queryFn: () => getAreasByLayout(currentLayout!.id, selectedFloor),
+    enabled: !!currentLayout?.id,
   });
 
-  // Delete area mutation
+  // Delete representation mutation
   const deleteMutation = useMutation({
-    mutationFn: deleteArea,
+    mutationFn: deleteRepresentation,
     onSuccess: () => {
-      toast.success('Área eliminada exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      toast.success('Representación de área eliminada exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['layout-areas'] });
+      queryClient.invalidateQueries({ queryKey: ['area-representations'] });
       setSelectedArea(null);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al eliminar área');
+      toast.error(error.response?.data?.message || 'Error al eliminar representación');
     },
   });
 
-  // Update area mutation
+  // Update representation geometry mutation
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; payload: CreateAreaRequest }) =>
-      updateArea(data.id, data.payload),
+    mutationFn: (data: { id: string; geometry: any }) =>
+      updateRepresentation(data.id, { geometry: data.geometry }),
     onSuccess: () => {
-      toast.success('Área actualizada exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['areas'] });
+      toast.success('Geometría actualizada exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['layout-areas'] });
+      queryClient.invalidateQueries({ queryKey: ['area-representations'] });
       setSelectedArea(null);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al actualizar área');
+      toast.error(error.response?.data?.message || 'Error al actualizar geometría');
     },
   });
 
-  const handleAreaClick = (area: PlantArea) => {
+  const handleAreaClick = (area: AreaPhysicalRepresentation) => {
     setSelectedArea(area);
   };
 
-  const handleEditArea = () => {
-    if (selectedArea) {
-      setIsAreaModalOpen(true);
-    }
-  };
-
   const handleDeleteArea = () => {
-    if (selectedArea && window.confirm('¿Estás seguro de eliminar esta área?')) {
+    if (selectedArea && window.confirm('¿Estás seguro de eliminar esta representación física del área?')) {
       deleteMutation.mutate(selectedArea.id);
     }
   };
@@ -101,13 +107,13 @@ const LayoutsPage = () => {
     setDrawnCoordinates(coordinates);
     setDrawMode(false);
     setEditMode(false);
-    setIsAreaModalOpen(true);
+    setIsLinkAreaModalOpen(true);
   };
 
   const handleAreaEdited = async (coordinates: number[][]) => {
     if (!selectedArea) return;
 
-    // Convert coordinates to GeoJSON format
+    // Convert Leaflet coordinates [lat, lng] to GeoJSON [lng, lat]
     const geoJsonCoords = coordinates.map(coord => [coord[1], coord[0]]);
     const closedCoords = [...geoJsonCoords, geoJsonCoords[0]];
 
@@ -116,37 +122,15 @@ const LayoutsPage = () => {
       coordinates: [closedCoords],
     };
 
-    // Update area with new geometry directly
-    const payload = {
-      plant_id: selectedArea.plant_id,
-      layout_id: selectedArea.layout_id || undefined,
-      name: selectedArea.name,
-      description: selectedArea.description || '',
-      area_type: selectedArea.area_type,
-      geometry: updatedGeometry,
-      floor_level: selectedArea.floor_level,
-      color: selectedArea.color,
-      capacity: selectedArea.capacity || undefined,
-      square_meters: selectedArea.square_meters || undefined,
-    };
-
-    updateMutation.mutate({ id: selectedArea.id, payload });
+    updateMutation.mutate({ id: selectedArea.id, geometry: updatedGeometry });
     setEditMode(false);
   };
 
-  const handleCreateArea = () => {
-    setSelectedArea(null);
-    setDrawnCoordinates(null);
-    setIsAreaModalOpen(true);
-  };
-
   const handleCloseModal = () => {
-    setIsAreaModalOpen(false);
+    setIsLinkAreaModalOpen(false);
     setDrawnCoordinates(null);
     setSelectedArea(null);
   };
-
-  const currentLayout = layouts?.[0];
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
@@ -172,14 +156,12 @@ const LayoutsPage = () => {
                     <Upload className="h-4 w-4" />
                     {currentLayout ? 'Editar Layout' : 'Subir Layout'}
                   </Button>
-                  <Button onClick={handleStartDrawing} className="gap-2" variant="outline">
-                    <Square className="h-4 w-4" />
-                    Dibujar Área
-                  </Button>
-                  <Button onClick={handleCreateArea} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Nueva Área
-                  </Button>
+                  {currentLayout && (
+                    <Button onClick={handleStartDrawing} className="gap-2">
+                      <PenTool className="h-4 w-4" />
+                      Dibujar Área
+                    </Button>
+                  )}
                 </>
               ) : drawMode ? (
                 <Button onClick={() => setDrawMode(false)} variant="outline">
@@ -254,7 +236,7 @@ const LayoutsPage = () => {
           <div className="flex-1 bg-white rounded-lg shadow overflow-hidden">
             <LayoutMap
               imageUrl={currentLayout?.layout_image_url || null}
-              areas={areas}
+              areas={areaRepresentations}
               onAreaClick={handleAreaClick}
               selectedAreaId={selectedArea?.id}
               drawMode={drawMode}
@@ -270,91 +252,101 @@ const LayoutsPage = () => {
           {/* Sidebar */}
           <div className="w-80 bg-white rounded-lg shadow p-4 overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Áreas ({areas.length})
+              Áreas ({areaRepresentations.length})
             </h3>
 
-            {areas.length === 0 ? (
+            {areaRepresentations.length === 0 ? (
               <div className="text-center py-8">
                 <Square className="mx-auto h-8 w-8 text-gray-400" />
                 <p className="mt-2 text-sm text-gray-500">No hay áreas</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Dibuja o crea un área
+                  Dibuja un área para vincularla
                 </p>
               </div>
             ) : (
               <div className="space-y-2">
-                {areas.map((area) => (
-                  <div
-                    key={area.id}
-                    onClick={() => setSelectedArea(area)}
-                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                      selectedArea?.id === area.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <div
-                        className="w-4 h-4 rounded"
-                        style={{ backgroundColor: area.color }}
-                      />
-                      <span className="font-medium text-sm text-gray-900">
-                        {area.name}
-                      </span>
-                    </div>
+                {areaRepresentations.map((areaRep) => {
+                  const area = areaRep.organizational_area;
+                  const displayName = areaRep.display_name || area?.name || 'Sin nombre';
+                  const displayColor = areaRep.display_color || area?.color || '#3B82F6';
 
-                    {area.description && (
-                      <p className="text-xs text-gray-600 mb-2">{area.description}</p>
-                    )}
+                  return (
+                    <div
+                      key={areaRep.id}
+                      onClick={() => setSelectedArea(areaRep)}
+                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedArea?.id === areaRep.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className="w-4 h-4 rounded"
+                          style={{ backgroundColor: displayColor }}
+                        />
+                        <span className="font-medium text-sm text-gray-900">
+                          {displayName}
+                        </span>
+                      </div>
 
-                    <div className="flex items-center gap-2">
-                      <Badge variant="default" className="text-xs">
-                        {area.area_type}
-                      </Badge>
-                      {area.capacity && (
-                        <span className="text-xs text-gray-500">
-                          Cap: {area.capacity}
-                        </span>
+                      {area?.code && (
+                        <p className="text-xs text-gray-600 mb-1">Código: {area.code}</p>
                       )}
-                      {area.square_meters && (
-                        <span className="text-xs text-gray-500">
-                          {area.square_meters}m²
-                        </span>
+
+                      {area && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default" className="text-xs">
+                            {area.area_type}
+                          </Badge>
+                          {area.full_path_name && (
+                            <span className="text-xs text-gray-500 truncate">
+                              {area.full_path_name}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
             {selectedArea && !drawMode && !editMode && (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  Área Seleccionada
+                  Representación Seleccionada
                 </h4>
+
+                {/* Show organizational area info */}
+                {selectedArea.organizational_area && (
+                  <div className="mb-3 p-2 bg-gray-50 rounded text-xs">
+                    <p className="font-medium text-gray-700">
+                      {selectedArea.organizational_area.name}
+                    </p>
+                    {selectedArea.organizational_area.full_path_name && (
+                      <p className="text-gray-500 mt-1">
+                        {selectedArea.organizational_area.full_path_name}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Button
                     onClick={handleStartEditing}
                     className="w-full gap-2 justify-center"
                     variant="outline"
                   >
-                    <Square className="h-4 w-4" />
-                    Editar Puntos
-                  </Button>
-                  <Button
-                    onClick={handleEditArea}
-                    className="w-full gap-2 justify-center"
-                    variant="outline"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    Editar Info
+                    <PenTool className="h-4 w-4" />
+                    Editar Geometría
                   </Button>
                   <Button
                     onClick={handleDeleteArea}
                     className="w-full gap-2 justify-center bg-red-600 hover:bg-red-700"
                   >
                     <Trash2 className="h-4 w-4" />
-                    Eliminar
+                    Eliminar Representación
                   </Button>
                 </div>
               </div>
@@ -363,15 +355,18 @@ const LayoutsPage = () => {
         </div>
       )}
 
-      {/* Area Modal */}
-      <AreaModal
-        isOpen={isAreaModalOpen}
-        onClose={handleCloseModal}
-        area={selectedArea}
-        plantId={selectedPlantId}
-        layoutId={currentLayout?.id}
-        coordinates={drawnCoordinates || undefined}
-      />
+      {/* Link Area Modal */}
+      {drawnCoordinates && organizationId && (
+        <LinkAreaModal
+          isOpen={isLinkAreaModalOpen}
+          onClose={handleCloseModal}
+          organizationId={organizationId}
+          plantId={selectedPlantId}
+          layoutId={currentLayout?.id || null}
+          floorLevel={selectedFloor}
+          coordinates={drawnCoordinates}
+        />
+      )}
 
       {/* Layout Modal */}
       <LayoutModal

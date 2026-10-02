@@ -4,10 +4,11 @@ import toast from 'react-hot-toast';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import EmployeeAreaAssignments from './EmployeeAreaAssignments';
 import { getEmployees, createEmployee, updateEmployee, type CreateEmployeeRequest, type Employee } from '../../api/employees';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
-import { getAreas } from '../../api/layouts';
+import { createAssignment } from '../../api/areaAssignments';
 
 interface EmployeeModalProps {
   isOpen: boolean;
@@ -18,10 +19,11 @@ interface EmployeeModalProps {
 
 const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeModalProps) => {
   const queryClient = useQueryClient();
+  const [primaryAreaId, setPrimaryAreaId] = useState<string | null>(null); // For new employees
   const [formData, setFormData] = useState<CreateEmployeeRequest>({
     organization_id: organizationId || '',
     plant_id: '',
-    area_id: '',
+    area_id: '', // Keep for backward compatibility, but won't be used
     first_name: '',
     last_name: '',
     email: '',
@@ -46,13 +48,6 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
     queryKey: ['plants', formData.organization_id],
     queryFn: () => getPlants({ organization_id: formData.organization_id, limit: 100 }),
     enabled: !!formData.organization_id,
-  });
-
-  // Fetch areas for selected plant
-  const { data: areas } = useQuery({
-    queryKey: ['areas', formData.plant_id],
-    queryFn: () => getAreas({ plant_id: formData.plant_id }),
-    enabled: !!formData.plant_id,
   });
 
   // Fetch employees for manager selection
@@ -84,11 +79,25 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
   }, [employee, organizationId]);
 
   const createMutation = useMutation({
-    mutationFn: createEmployee,
+    mutationFn: async (payload: CreateEmployeeRequest) => {
+      // First create the employee
+      const newEmployee = await createEmployee(payload);
+
+      // Then create primary area assignment if area was selected
+      if (primaryAreaId) {
+        await createAssignment(newEmployee.id, {
+          organizational_area_id: primaryAreaId,
+          assignment_type: 'primary',
+        });
+      }
+
+      return newEmployee;
+    },
     onSuccess: () => {
       toast.success('Empleado creado exitosamente');
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['orgChart'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-assignments'] });
       onClose();
     },
     onError: (error: any) => {
@@ -301,48 +310,25 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
         </div>
 
         {/* Location */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="plant_id" className="block text-sm font-medium text-gray-700 mb-1">
-              Planta
-            </label>
-            <select
-              id="plant_id"
-              name="plant_id"
-              value={formData.plant_id}
-              onChange={handleChange}
-              disabled={!formData.organization_id}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
-            >
-              <option value="">Seleccionar planta</option>
-              {plantsData?.plants.map((plant) => (
-                <option key={plant.id} value={plant.id}>
-                  {plant.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="area_id" className="block text-sm font-medium text-gray-700 mb-1">
-              Área
-            </label>
-            <select
-              id="area_id"
-              name="area_id"
-              value={formData.area_id}
-              onChange={handleChange}
-              disabled={!formData.plant_id}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
-            >
-              <option value="">Seleccionar área</option>
-              {areas?.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label htmlFor="plant_id" className="block text-sm font-medium text-gray-700 mb-1">
+            Planta
+          </label>
+          <select
+            id="plant_id"
+            name="plant_id"
+            value={formData.plant_id}
+            onChange={handleChange}
+            disabled={!formData.organization_id}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
+          >
+            <option value="">Seleccionar planta</option>
+            {plantsData?.plants.map((plant) => (
+              <option key={plant.id} value={plant.id}>
+                {plant.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Reports To */}
@@ -371,6 +357,21 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
             Selecciona el empleado al que reporta este empleado
           </p>
         </div>
+
+        {/* Area Assignments */}
+        {formData.organization_id && formData.plant_id && (
+          <div className="pt-4 border-t border-gray-200">
+            <h3 className="text-md font-semibold text-gray-900 mb-3">
+              Asignaciones de Área
+            </h3>
+            <EmployeeAreaAssignments
+              employeeId={employee?.id}
+              organizationId={formData.organization_id}
+              plantId={formData.plant_id}
+              onPrimaryAreaChange={setPrimaryAreaId}
+            />
+          </div>
+        )}
       </form>
     </Modal>
   );
