@@ -19,6 +19,7 @@ import EmployeesPage from './pages/employees/EmployeesPage';
 import OrgChartPage from './pages/org-chart/OrgChartPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AreasPage from './pages/areas/AreasPage';
+import AreaDetailPage from './pages/areas/AreaDetailPage';
 
 function App() {
   const { checkAuth, isAuthenticated, isInitialized } = useAuthStore();
@@ -105,6 +106,14 @@ function App() {
               element={
                 <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner', 'plant_manager']}>
                   <AreasPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="areas/:areaId"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner', 'plant_manager', 'supervisor']}>
+                  <AreaDetailPage />
                 </RoleProtectedRoute>
               }
             />

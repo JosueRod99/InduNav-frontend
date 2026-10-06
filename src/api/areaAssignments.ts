@@ -74,19 +74,19 @@ export const getAssignmentsByEmployee = async (
 ): Promise<EmployeeAreaAssignment[]> => {
   const params = includeHistory ? { include_history: true } : {};
   const { data } = await apiClient.get(`/employees/${employeeId}/area-assignments`, { params });
-  return data.assignments || data;
+  return Array.isArray(data.assignments) ? data.assignments : (Array.isArray(data) ? data : []);
 };
 
 // Get employee's primary area
 export const getEmployeePrimaryArea = async (employeeId: string): Promise<EmployeeAreaAssignment | null> => {
   const { data } = await apiClient.get(`/employees/${employeeId}/primary-area`);
-  return data.assignment || data || null;
+  return data.primary_area || data.assignment || data || null;
 };
 
 // Get employee's secondary areas
 export const getEmployeeSecondaryAreas = async (employeeId: string): Promise<EmployeeAreaAssignment[]> => {
   const { data } = await apiClient.get(`/employees/${employeeId}/secondary-areas`);
-  return data.assignments || data;
+  return Array.isArray(data.secondary_areas) ? data.secondary_areas : (Array.isArray(data.assignments) ? data.assignments : (Array.isArray(data) ? data : []));
 };
 
 // Get all employees assigned to an area
@@ -96,7 +96,7 @@ export const getEmployeesByArea = async (
 ): Promise<EmployeeAreaAssignment[]> => {
   const params = includeHistory ? { include_history: true } : {};
   const { data } = await apiClient.get(`/organizational-areas/${areaId}/employees`, { params });
-  return data.employees || data;
+  return Array.isArray(data.assignments) ? data.assignments : (Array.isArray(data) ? data : []);
 };
 
 // Get assignment statistics for an area
@@ -149,5 +149,5 @@ export const bulkAssignEmployees = async (
   payload: Omit<BulkAssignRequest, 'organizational_area_id'>
 ): Promise<EmployeeAreaAssignment[]> => {
   const { data } = await apiClient.post(`/organizational-areas/${areaId}/employees/bulk-assign`, payload);
-  return data.assignments || data;
+  return Array.isArray(data.assignments) ? data.assignments : (Array.isArray(data) ? data : []);
 };

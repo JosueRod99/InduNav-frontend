@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Building2, Map, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building2, Map, ExternalLink, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import AreaTreeView from '../../components/areas/AreaTreeView';
@@ -23,6 +23,7 @@ import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 
 const AreasPage = () => {
+  const navigate = useNavigate();
   const [selectedOrg, setSelectedOrg] = useState<string>('');
   const [selectedPlant, setSelectedPlant] = useState<string>('');
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
@@ -404,6 +405,14 @@ const AreasPage = () => {
 
                 {/* Actions */}
                 <div className="pt-4 border-t border-gray-200 space-y-2">
+                  <Button
+                    onClick={() => navigate(`/areas/${selectedAreaId}`)}
+                    variant="primary"
+                    className="w-full gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Ver Detalles Completos
+                  </Button>
                   <Button
                     onClick={handleCreateSubArea}
                     variant="secondary"

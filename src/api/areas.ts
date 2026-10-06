@@ -17,6 +17,13 @@ export interface OrganizationalArea {
   square_meters: number | null;
   cost_center: string | null;
   supervisor_id: string | null;
+
+  // Phase 1 fields
+  shift_schedule?: Record<string, any>;
+  emergency_contact_id?: string | null;
+  quality_manager_id?: string | null;
+  days_without_accident?: number;
+
   metadata: Record<string, any>;
   is_active: boolean;
   created_at: Date;
@@ -40,6 +47,22 @@ export interface OrganizationalArea {
     id: string;
     first_name: string;
     last_name: string;
+    position?: string;
+    email?: string;
+  };
+  emergency_contact?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    position?: string;
+    email?: string;
+  };
+  quality_manager?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    position?: string;
+    email?: string;
   };
 
   // Computed fields
