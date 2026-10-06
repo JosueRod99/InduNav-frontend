@@ -36,6 +36,15 @@ export interface Employee {
     first_name: string;
     last_name: string;
   };
+  // New organizational area system
+  primary_area?: {
+    id: string;
+    name: string;
+    code: string | null;
+    area_type: string;
+    full_path_name?: string;
+    color?: string;
+  };
 }
 
 export interface OrgChartNode {

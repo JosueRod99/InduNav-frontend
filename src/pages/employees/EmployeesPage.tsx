@@ -270,14 +270,25 @@ const EmployeesPage = () => {
                       <Badge variant="default">{employee.department}</Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {employee.plant ? (
+                      {employee.primary_area ? (
+                        <div className="flex items-start gap-1 text-sm">
+                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: employee.primary_area.color || '#3B82F6' }} />
+                          <div>
+                            <div className="text-gray-900 font-medium">{employee.primary_area.name}</div>
+                            {employee.primary_area.code && (
+                              <div className="text-xs text-gray-500">{employee.primary_area.code}</div>
+                            )}
+                            {employee.plant && (
+                              <div className="text-xs text-gray-500 mt-0.5">{employee.plant.name}</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : employee.plant ? (
                         <div className="flex items-start gap-1 text-sm text-gray-600">
                           <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                           <div>
                             <div>{employee.plant.name}</div>
-                            <div className="text-xs text-gray-500">
-                              Ver áreas en edición
-                            </div>
+                            <div className="text-xs text-gray-400">Sin área asignada</div>
                           </div>
                         </div>
                       ) : (
