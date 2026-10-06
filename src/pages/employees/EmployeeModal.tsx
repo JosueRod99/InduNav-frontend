@@ -4,11 +4,13 @@ import toast from 'react-hot-toast';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
 import EmployeeAreaAssignments from './EmployeeAreaAssignments';
 import { getEmployees, createEmployee, updateEmployee, type CreateEmployeeRequest, type Employee } from '../../api/employees';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import { createAssignment } from '../../api/areaAssignments';
+import { DEPARTMENT_OPTIONS } from '../../constants/departments';
 
 interface EmployeeModalProps {
   isOpen: boolean;
@@ -50,12 +52,35 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
     enabled: !!formData.organization_id,
   });
 
-  // Fetch employees for manager selection
-  const { data: managersData } = useQuery({
-    queryKey: ['employees-for-manager', formData.organization_id],
-    queryFn: () => getEmployees({ organization_id: formData.organization_id, limit: 200 }),
+  // Fetch employees for manager selection (filtered by plant if selected)
+  const { data: managersData, isLoading: isLoadingManagers, error: managersError } = useQuery({
+    queryKey: ['employees-for-manager', formData.organization_id, formData.plant_id],
+    queryFn: () => {
+      console.log('🔄 Fetching employees for:', {
+        organizationId: formData.organization_id,
+        plantId: formData.plant_id || 'all plants'
+      });
+      // If plant is selected, filter by plant. Otherwise by organization.
+      return getEmployees({
+        organization_id: formData.organization_id,
+        plant_id: formData.plant_id || undefined,
+        limit: 100
+      });
+    },
     enabled: !!formData.organization_id,
   });
+
+  // Debug: Log query state
+  useEffect(() => {
+    console.log('📊 Managers Query State:', {
+      organizationId: formData.organization_id,
+      enabled: !!formData.organization_id,
+      isLoading: isLoadingManagers,
+      hasData: !!managersData,
+      data: managersData,
+      error: managersError
+    });
+  }, [formData.organization_id, isLoadingManagers, managersData, managersError]);
 
   useEffect(() => {
     if (employee) {
@@ -127,7 +152,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
       plant_id: formData.plant_id || undefined,
       area_id: formData.area_id || undefined,
       phone: formData.phone || undefined,
-      reports_to: formData.reports_to || undefined,
+      reports_to: formData.reports_to === '' ? null : formData.reports_to || null,
     };
 
     if (isEditing && employee) {
@@ -164,25 +189,23 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Organization selector (disabled when editing) */}
         <div>
-          <label htmlFor="organization_id" className="block text-sm font-medium text-gray-700 mb-1">
-            Organización <span className="text-red-500">*</span>
-          </label>
-          <select
+          <Select
             id="organization_id"
             name="organization_id"
+            label="Organización"
             value={formData.organization_id}
             onChange={handleChange}
             disabled={isEditing}
             required
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-          >
-            <option value="">Seleccionar organización</option>
-            {organizationsData?.organizations.map((org) => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'Seleccionar organización' },
+              ...(organizationsData?.organizations.map((org) => ({
+                value: org.id,
+                label: org.name,
+              })) || []),
+            ]}
+            helperText={isEditing ? 'No se puede cambiar la organización al editar' : undefined}
+          />
         </div>
 
         {/* Personal Info */}
@@ -265,15 +288,14 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
           </div>
 
           <div>
-            <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-1">
-              Departamento <span className="text-red-500">*</span>
-            </label>
-            <Input
+            <Select
               id="department"
               name="department"
+              label="Departamento"
               value={formData.department}
               onChange={handleChange}
-              placeholder="Operaciones"
+              options={DEPARTMENT_OPTIONS}
+              placeholder="Selecciona un departamento"
               required
             />
           </div>
@@ -311,51 +333,57 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
 
         {/* Location */}
         <div>
-          <label htmlFor="plant_id" className="block text-sm font-medium text-gray-700 mb-1">
-            Planta
-          </label>
-          <select
+          <Select
             id="plant_id"
             name="plant_id"
+            label="Planta"
             value={formData.plant_id}
             onChange={handleChange}
             disabled={!formData.organization_id}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
-          >
-            <option value="">Seleccionar planta</option>
-            {plantsData?.plants.map((plant) => (
-              <option key={plant.id} value={plant.id}>
-                {plant.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'Seleccionar planta' },
+              ...(plantsData?.plants.map((plant) => ({
+                value: plant.id,
+                label: plant.name,
+              })) || []),
+            ]}
+            helperText="Selecciona la planta donde trabajará el empleado"
+          />
         </div>
 
         {/* Reports To */}
         <div>
-          <label htmlFor="reports_to" className="block text-sm font-medium text-gray-700 mb-1">
-            Reporta a (Manager)
-          </label>
-          <select
+          <Select
             id="reports_to"
             name="reports_to"
+            label="Reporta a (Manager/Supervisor)"
             value={formData.reports_to}
             onChange={handleChange}
             disabled={!formData.organization_id}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm disabled:bg-gray-100"
-          >
-            <option value="">Sin manager (CEO/Director)</option>
-            {managersData?.employees
-              .filter((emp) => emp.id !== employee?.id) // Exclude current employee when editing
-              .map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.first_name} {emp.last_name} - {emp.position}
-                </option>
-              ))}
-          </select>
-          <p className="mt-1 text-xs text-gray-500">
-            Selecciona el empleado al que reporta este empleado
-          </p>
+            options={(() => {
+              const options = [
+                { value: '', label: 'Sin manager (CEO/Director)' },
+                ...(managersData?.employees
+                  ?.filter((emp) => emp.id !== employee?.id) // Exclude current employee when editing
+                  .map((emp) => ({
+                    value: emp.id,
+                    label: `${emp.first_name} ${emp.last_name} - ${emp.position}`,
+                  })) || []),
+              ];
+              console.log('🎯 Manager options generated:', {
+                totalEmployees: managersData?.employees?.length,
+                filteredCount: options.length - 1, // -1 for "Sin manager" option
+                options
+              });
+              return options;
+            })()}
+            helperText={
+              managersData?.employees?.length === 0 ||
+              (managersData?.employees?.length === 1 && isEditing)
+                ? 'Aún no hay otros empleados en esta organización'
+                : 'Selecciona el empleado al que reporta este empleado'
+            }
+          />
         </div>
 
         {/* Area Assignments */}

@@ -36,6 +36,37 @@ const OrgChartPage = () => {
   useEffect(() => {
     if (!chartRef.current || !chartData || chartData.length === 0) return;
 
+    // Count roots (employees without manager)
+    const roots = chartData.filter((n: any) => n.parentId === null);
+    console.log(`📊 Org chart has ${roots.length} root node(s):`, roots.map((r: any) => r.name));
+
+    // If multiple roots, create a virtual root
+    let processedData = chartData;
+    if (roots.length > 1) {
+      console.log('⚠️ Multiple roots detected - creating virtual CEO node');
+      const virtualRoot = {
+        id: '__virtual_root__',
+        name: 'Organización',
+        position: 'Estructura organizacional',
+        department: '',
+        email: '',
+        employee_number: '',
+        parentId: null,
+        plant: '',
+        area: '',
+      };
+
+      // Update all roots to point to virtual root
+      processedData = [
+        virtualRoot,
+        ...chartData.map((node: any) =>
+          roots.some((r: any) => r.id === node.id)
+            ? { ...node, parentId: '__virtual_root__' }
+            : node
+        ),
+      ];
+    }
+
     // Clear existing chart
     chartRef.current.innerHTML = '';
 
@@ -44,48 +75,145 @@ const OrgChartPage = () => {
 
     orgChartInstance.current = chart
       .container(chartRef.current)
-      .data(chartData)
-      .nodeWidth(() => 250)
-      .nodeHeight(() => 120)
-      .childrenMargin(() => 50)
-      .compactMarginBetween(() => 35)
-      .compactMarginPair(() => 30)
-      .neighbourMargin(() => 50)
+      .data(processedData)
+      .nodeWidth(() => 280)
+      .nodeHeight(() => 160)
+      .childrenMargin(() => 60)
+      .compactMarginBetween(() => 40)
+      .compactMarginPair(() => 35)
+      .neighbourMargin(() => 60)
       .nodeContent((d: any) => {
         const node: OrgChartNode = d.data;
+        const isVirtual = node.id === '__virtual_root__';
+
         return `
           <div style="
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 8px;
-            padding: 16px;
+            background: ${isVirtual
+              ? 'linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%)'
+              : 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)'};
+            border-radius: 12px;
+            padding: 0;
             width: 100%;
             height: 100%;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             color: white;
+            overflow: hidden;
+            ${isVirtual ? 'border: 2px dashed rgba(255, 255, 255, 0.4);' : 'border: 1px solid rgba(255, 255, 255, 0.1);'}
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
           ">
-            <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">
-              ${node.name}
-            </div>
-            <div style="font-size: 14px; opacity: 0.9; margin-bottom: 4px;">
-              ${node.position}
-            </div>
-            <div style="font-size: 12px; opacity: 0.8; margin-bottom: 8px;">
-              ${node.department}
-            </div>
-            <div style="font-size: 11px; opacity: 0.7; font-family: monospace;">
-              ${node.employee_number}
-            </div>
-            ${node.plant ? `
+            ${!isVirtual ? `
+              <!-- Header con nombre -->
               <div style="
-                margin-top: 8px;
-                padding-top: 8px;
-                border-top: 1px solid rgba(255, 255, 255, 0.3);
-                font-size: 11px;
-                opacity: 0.8;
+                background: rgba(0, 0, 0, 0.15);
+                padding: 12px 16px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
               ">
-                📍 ${node.plant}${node.area ? ` - ${node.area}` : ''}
+                <div style="
+                  font-size: 17px;
+                  font-weight: 700;
+                  letter-spacing: -0.01em;
+                  line-height: 1.3;
+                  margin-bottom: 2px;
+                  text-overflow: ellipsis;
+                  overflow: hidden;
+                  white-space: nowrap;
+                ">
+                  ${node.name || 'Sin nombre'}
+                </div>
+                <div style="
+                  font-size: 11px;
+                  opacity: 0.75;
+                  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+                  font-weight: 500;
+                  letter-spacing: 0.5px;
+                ">
+                  ${node.employee_number || ''}
+                </div>
               </div>
-            ` : ''}
+
+              <!-- Body con información -->
+              <div style="padding: 14px 16px;">
+                <div style="
+                  font-size: 14px;
+                  font-weight: 600;
+                  margin-bottom: 6px;
+                  opacity: 0.95;
+                  line-height: 1.4;
+                ">
+                  ${node.position || 'Sin puesto'}
+                </div>
+
+                <div style="
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  font-size: 12px;
+                  opacity: 0.85;
+                  margin-bottom: 10px;
+                ">
+                  <span style="
+                    background: rgba(255, 255, 255, 0.2);
+                    padding: 2px 8px;
+                    border-radius: 6px;
+                    font-weight: 500;
+                    font-size: 11px;
+                  ">
+                    ${node.department || 'Sin dpto.'}
+                  </span>
+                </div>
+
+                ${node.plant ? `
+                  <div style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 11px;
+                    opacity: 0.8;
+                    padding-top: 8px;
+                    border-top: 1px solid rgba(255, 255, 255, 0.15);
+                  ">
+                    <span style="font-size: 12px;">📍</span>
+                    <span style="font-weight: 500;">${node.plant}</span>
+                  </div>
+                ` : ''}
+              </div>
+            ` : `
+              <!-- Nodo virtual -->
+              <div style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                padding: 20px;
+                text-align: center;
+              ">
+                <div style="
+                  font-size: 32px;
+                  margin-bottom: 12px;
+                  opacity: 0.9;
+                ">
+                  🏢
+                </div>
+                <div style="
+                  font-size: 18px;
+                  font-weight: 700;
+                  margin-bottom: 8px;
+                ">
+                  ${node.name}
+                </div>
+                <div style="
+                  font-size: 11px;
+                  opacity: 0.7;
+                  font-style: italic;
+                  line-height: 1.4;
+                  max-width: 220px;
+                ">
+                  Empleados sin supervisor asignado
+                </div>
+              </div>
+            `}
           </div>
         `;
       })
