@@ -49,6 +49,7 @@ export interface OrganizationalArea {
     last_name: string;
     position?: string;
     email?: string;
+    phone?: string;
   };
   emergency_contact?: {
     id: string;
@@ -56,6 +57,7 @@ export interface OrganizationalArea {
     last_name: string;
     position?: string;
     email?: string;
+    phone?: string;
   };
   quality_manager?: {
     id: string;
@@ -63,6 +65,7 @@ export interface OrganizationalArea {
     last_name: string;
     position?: string;
     email?: string;
+    phone?: string;
   };
 
   // Computed fields

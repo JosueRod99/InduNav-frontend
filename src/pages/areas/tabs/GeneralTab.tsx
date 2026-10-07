@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Users, Building2, Calendar, User, Shield, Award, Edit } from 'lucide-react';
+import { Users, Building2, Calendar, User, Shield, Award, Edit, Phone } from 'lucide-react';
 import type { OrganizationalArea } from '../../../api/areas';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import EditGeneralInfoModal from '../modals/EditGeneralInfoModal';
+import EmployeeDetailModal from '../../../components/employees/EmployeeDetailModal';
 
 interface GeneralTabProps {
   area: OrganizationalArea;
@@ -11,9 +12,16 @@ interface GeneralTabProps {
 
 const GeneralTab = ({ area }: GeneralTabProps) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 
   // Parse shift schedule if available
   const shiftSchedule = area.shift_schedule as any;
+
+  // Filter out days_without_accident from metadata display
+  const displayMetadata = area.metadata ? (() => {
+    const { days_without_accident, ...rest } = area.metadata;
+    return rest;
+  })() : {};
 
   return (
     <div className="space-y-8">
@@ -85,6 +93,9 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
             name={area.supervisor ? `${area.supervisor.first_name} ${area.supervisor.last_name}` : 'Sin asignar'}
             position={area.supervisor?.position}
             email={area.supervisor?.email}
+            phone={area.supervisor?.phone}
+            employeeId={area.supervisor?.id}
+            onEmployeeClick={() => area.supervisor?.id && setSelectedEmployeeId(area.supervisor.id)}
             icon={<User className="h-5 w-5 text-blue-600" />}
           />
           <ContactCard
@@ -92,6 +103,9 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
             name={area.quality_manager ? `${area.quality_manager.first_name} ${area.quality_manager.last_name}` : 'Sin asignar'}
             position={area.quality_manager?.position}
             email={area.quality_manager?.email}
+            phone={area.quality_manager?.phone}
+            employeeId={area.quality_manager?.id}
+            onEmployeeClick={() => area.quality_manager?.id && setSelectedEmployeeId(area.quality_manager.id)}
             icon={<Award className="h-5 w-5 text-purple-600" />}
           />
           <ContactCard
@@ -99,6 +113,9 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
             name={area.emergency_contact ? `${area.emergency_contact.first_name} ${area.emergency_contact.last_name}` : 'Sin asignar'}
             position={area.emergency_contact?.position}
             email={area.emergency_contact?.email}
+            phone={area.emergency_contact?.phone}
+            employeeId={area.emergency_contact?.id}
+            onEmployeeClick={() => area.emergency_contact?.id && setSelectedEmployeeId(area.emergency_contact.id)}
             icon={<Shield className="h-5 w-5 text-red-600" />}
           />
         </div>
@@ -137,12 +154,12 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
       )}
 
       {/* Metadata */}
-      {area.metadata && Object.keys(area.metadata).length > 0 && (
+      {displayMetadata && Object.keys(displayMetadata).length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Información Adicional</h3>
           <div className="bg-gray-50 rounded-lg p-4">
             <pre className="text-xs text-gray-700 overflow-auto">
-              {JSON.stringify(area.metadata, null, 2)}
+              {JSON.stringify(displayMetadata, null, 2)}
             </pre>
           </div>
         </div>
@@ -153,6 +170,13 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         area={area}
+      />
+
+      {/* Employee Detail Modal */}
+      <EmployeeDetailModal
+        isOpen={!!selectedEmployeeId}
+        onClose={() => setSelectedEmployeeId(null)}
+        employeeId={selectedEmployeeId}
       />
     </div>
   );
@@ -180,28 +204,56 @@ interface ContactCardProps {
   name: string;
   position?: string;
   email?: string;
+  phone?: string;
+  employeeId?: string;
+  onEmployeeClick?: () => void;
   icon: React.ReactNode;
 }
 
-const ContactCard = ({ role, name, position, email, icon }: ContactCardProps) => (
-  <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
-    <div className="flex items-start gap-3 mb-3">
-      {icon}
-      <div>
-        <p className="text-sm font-medium text-gray-500">{role}</p>
-        <p className="mt-1 font-semibold text-gray-900">{name}</p>
+const ContactCard = ({ role, name, position, email, phone, employeeId, onEmployeeClick, icon }: ContactCardProps) => {
+  const hasEmployee = !!employeeId;
+
+  return (
+    <div
+      className={`border border-gray-200 rounded-lg p-4 transition-all ${hasEmployee ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : 'hover:border-gray-300'
+        }`}
+      onClick={hasEmployee ? onEmployeeClick : undefined}
+    >
+      <div className="flex items-start gap-3 mb-3">
+        {icon}
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-500">{role}</p>
+          <p className={`mt-1 font-semibold ${hasEmployee ? 'text-blue-600' : 'text-gray-900'}`}>
+            {name}
+          </p>
+
+        </div>
+      </div>
+      {position && <p className="text-sm text-gray-600 mb-2">{position}</p>}
+      <div className="space-y-1">
+        {email && (
+          <a
+            href={`mailto:${email}`}
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+          >
+            <span>📧</span>
+            {email}
+          </a>
+        )}
+        {phone && (
+          <a
+            href={`tel:${phone}`}
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
+          >
+            <Phone className="h-3 w-3" />
+            {phone}
+          </a>
+        )}
       </div>
     </div>
-    {position && <p className="text-sm text-gray-600 mb-1">{position}</p>}
-    {email && (
-      <a
-        href={`mailto:${email}`}
-        className="text-sm text-blue-600 hover:text-blue-700"
-      >
-        {email}
-      </a>
-    )}
-  </div>
-);
+  );
+};
 
 export default GeneralTab;

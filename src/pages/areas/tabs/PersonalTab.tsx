@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Users, Mail, Phone, MapPin, Award } from 'lucide-react';
 import { getEmployeesByArea } from '../../../api/areaAssignments';
 import Badge from '../../../components/ui/Badge';
+import EmployeeDetailModal from '../../../components/employees/EmployeeDetailModal';
 
 interface PersonalTabProps {
   areaId: string;
@@ -9,6 +11,8 @@ interface PersonalTabProps {
 }
 
 const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+
   const { data: employees, isLoading } = useQuery({
     queryKey: ['area-employees', areaId],
     queryFn: () => getEmployeesByArea(areaId),
@@ -110,7 +114,11 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {primaryEmployees.map((employee) => (
-              <EmployeeCard key={employee.id} employee={employee} />
+              <EmployeeCard
+                key={employee.id}
+                employee={employee}
+                onClick={() => setSelectedEmployeeId(employee.employee_id)}
+              />
             ))}
           </div>
         </div>
@@ -124,7 +132,11 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {secondaryEmployees.map((employee) => (
-              <EmployeeCard key={employee.id} employee={employee} />
+              <EmployeeCard
+                key={employee.id}
+                employee={employee}
+                onClick={() => setSelectedEmployeeId(employee.employee_id)}
+              />
             ))}
           </div>
         </div>
@@ -138,11 +150,22 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {temporaryEmployees.map((employee) => (
-              <EmployeeCard key={employee.id} employee={employee} />
+              <EmployeeCard
+                key={employee.id}
+                employee={employee}
+                onClick={() => setSelectedEmployeeId(employee.employee_id)}
+              />
             ))}
           </div>
         </div>
       )}
+
+      {/* Employee Detail Modal */}
+      <EmployeeDetailModal
+        isOpen={!!selectedEmployeeId}
+        onClose={() => setSelectedEmployeeId(null)}
+        employeeId={selectedEmployeeId}
+      />
     </div>
   );
 };
@@ -171,9 +194,10 @@ const SummaryCard = ({ title, count, variant }: SummaryCardProps) => {
 
 interface EmployeeCardProps {
   employee: any; // Should be typed based on getEmployeesByArea response
+  onClick: () => void;
 }
 
-const EmployeeCard = ({ employee }: EmployeeCardProps) => {
+const EmployeeCard = ({ employee, onClick }: EmployeeCardProps) => {
   const assignmentColor = {
     primary: 'blue',
     secondary: 'purple',
@@ -181,7 +205,10 @@ const EmployeeCard = ({ employee }: EmployeeCardProps) => {
   }[employee.assignment_type] || 'gray';
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-all hover:shadow-md">
+    <div
+      onClick={onClick}
+      className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-all hover:shadow-md cursor-pointer"
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <h4 className="font-semibold text-gray-900">
@@ -209,6 +236,7 @@ const EmployeeCard = ({ employee }: EmployeeCardProps) => {
           <Mail className="h-4 w-4 text-gray-400" />
           <a
             href={`mailto:${employee.email}`}
+            onClick={(e) => e.stopPropagation()}
             className="text-sm text-blue-600 hover:text-blue-700 truncate"
           >
             {employee.email}
@@ -221,6 +249,7 @@ const EmployeeCard = ({ employee }: EmployeeCardProps) => {
           <Phone className="h-4 w-4 text-gray-400" />
           <a
             href={`tel:${employee.phone}`}
+            onClick={(e) => e.stopPropagation()}
             className="text-sm text-gray-700"
           >
             {employee.phone}
