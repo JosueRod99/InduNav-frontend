@@ -70,7 +70,7 @@ const AreaDetailPage = () => {
       case 'documents':
         return <DocumentsTab areaId={areaId!} />;
       case 'gallery':
-        return <GalleryTab areaId={areaId!} />;
+        return <GalleryTab areaId={areaId!} area={area} />;
       default:
         return null;
     }
