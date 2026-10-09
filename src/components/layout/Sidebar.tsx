@@ -14,6 +14,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Boxes,
+  Package,
 } from 'lucide-react';
 import { useSidebarStore } from '../../store/sidebarStore';
 import { useAuthStore } from '../../store/authStore';
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { to: '/layouts', icon: LayoutGrid, label: 'Layout 2D' },
   { to: '/employees', icon: Users, label: 'Empleados', allowedRoles: ['platform_admin', 'org_owner'] },
   { to: '/areas', icon: Boxes, label: 'Áreas', allowedRoles: ['platform_admin', 'org_owner', 'plant_manager'] },
+  { to: '/products', icon: Package, label: 'Productos', allowedRoles: ['platform_admin', 'org_owner'] },
   { to: '/org-chart', icon: Network, label: 'Organigrama' },
   { to: '/reports', icon: FileText, label: 'Reportes' },
 ];

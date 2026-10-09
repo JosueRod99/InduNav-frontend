@@ -20,6 +20,8 @@ import OrgChartPage from './pages/org-chart/OrgChartPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AreasPage from './pages/areas/AreasPage';
 import AreaDetailPage from './pages/areas/AreaDetailPage';
+import ProductsPage from './pages/products/ProductsPage';
+import ProductDetailPage from './pages/products/ProductDetailPage';
 
 function App() {
   const { checkAuth, isAuthenticated, isInitialized } = useAuthStore();
@@ -114,6 +116,22 @@ function App() {
               element={
                 <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner', 'plant_manager', 'supervisor']}>
                   <AreaDetailPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="products"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <ProductsPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="products/:productId"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <ProductDetailPage />
                 </RoleProtectedRoute>
               }
             />
