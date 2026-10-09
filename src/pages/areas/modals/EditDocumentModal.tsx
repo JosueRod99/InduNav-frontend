@@ -402,6 +402,11 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
         document={document}
         organizationId={organizationId}
         plantId={plantId}
+        onVersionCreated={() => {
+          // Cerrar ambos modales cuando se crea exitosamente una nueva versión
+          setIsNewVersionModalOpen(false);
+          onClose();
+        }}
       />
     </div>
   );

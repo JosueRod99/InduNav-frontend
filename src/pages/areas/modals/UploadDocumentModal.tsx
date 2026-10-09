@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Upload, FileText, Check } from 'lucide-react';
+import { X, Upload, FileText, Check, Link } from 'lucide-react';
 import { createDocument, getFileIcon } from '../../../api/areaDocuments';
 import apiClient from '../../../api/client';
 import Button from '../../../components/ui/Button';
@@ -13,11 +13,15 @@ interface UploadDocumentModalProps {
   plantId: string;
 }
 
+type DocumentSourceType = 'uploaded' | 'external_link';
+
 const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId }: UploadDocumentModalProps) => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [documentSource, setDocumentSource] = useState<DocumentSourceType>('uploaded');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [externalUrl, setExternalUrl] = useState('');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -36,7 +40,9 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
   });
 
   const handleClose = () => {
+    setDocumentSource('uploaded');
     setSelectedFile(null);
+    setExternalUrl('');
     setTitle('');
     setCategory('');
     setDescription('');
@@ -85,9 +91,59 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
     }
   };
 
+  const getFileNameFromUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname;
+      const fileName = pathname.substring(pathname.lastIndexOf('/') + 1);
+      return fileName || 'external-document';
+    } catch {
+      return 'external-document';
+    }
+  };
+
+  const getMimeTypeFromUrl = (url: string): string => {
+    const fileName = getFileNameFromUrl(url);
+    const extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+
+    const mimeTypes: Record<string, string> = {
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      gif: 'image/gif',
+    };
+
+    return mimeTypes[extension] || 'application/octet-stream';
+  };
+
   const handleUpload = async () => {
-    if (!selectedFile || !title.trim()) {
-      alert('Por favor selecciona un archivo y proporciona un título.');
+    // Validation
+    if (documentSource === 'uploaded') {
+      if (!selectedFile) {
+        alert('Por favor selecciona un archivo.');
+        return;
+      }
+    } else {
+      if (!externalUrl.trim()) {
+        alert('Por favor ingresa la URL del documento.');
+        return;
+      }
+      // Validate URL format
+      try {
+        new URL(externalUrl.trim());
+      } catch {
+        alert('Por favor ingresa una URL válida.');
+        return;
+      }
+    }
+
+    if (!title.trim()) {
+      alert('Por favor proporciona un título.');
       return;
     }
 
@@ -104,39 +160,62 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
     setUploading(true);
 
     try {
-      // Step 1: Upload file to Cloudinary (using document upload endpoint)
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('organization_id', organizationId);
-      formData.append('plant_id', plantId);
-      formData.append('area_id', areaId);
-
-      const uploadResponse = await apiClient.post('/upload/document', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      // Step 2: Create document record in database
       const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
 
-      await createDocumentMutation.mutateAsync({
-        organizational_area_id: areaId,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        category,
-        tags: tagsArray.length > 0 ? tagsArray : undefined,
-        file_url: uploadResponse.data.url,
-        file_name: selectedFile.name,
-        file_type: selectedFile.type,
-        file_size: selectedFile.size,
-        status: status,
-        is_private: isPrivate,
-        effective_date: effectiveDate || undefined,
-      });
+      if (documentSource === 'uploaded') {
+        // Step 1: Upload file to Cloudinary
+        const formData = new FormData();
+        formData.append('file', selectedFile!);
+        formData.append('organization_id', organizationId);
+        formData.append('plant_id', plantId);
+        formData.append('area_id', areaId);
+
+        const uploadResponse = await apiClient.post('/upload/document', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        // Step 2: Create document record
+        await createDocumentMutation.mutateAsync({
+          organizational_area_id: areaId,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          category,
+          tags: tagsArray.length > 0 ? tagsArray : undefined,
+          document_type: 'uploaded',
+          file_url: uploadResponse.data.url,
+          file_name: selectedFile!.name,
+          file_type: selectedFile!.type,
+          file_size: selectedFile!.size,
+          status: status,
+          is_private: isPrivate,
+          effective_date: effectiveDate || undefined,
+        });
+      } else {
+        // External link - no upload needed
+        const cleanUrl = externalUrl.trim();
+        const fileName = getFileNameFromUrl(cleanUrl);
+        const mimeType = getMimeTypeFromUrl(cleanUrl);
+
+        await createDocumentMutation.mutateAsync({
+          organizational_area_id: areaId,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          category,
+          tags: tagsArray.length > 0 ? tagsArray : undefined,
+          document_type: 'external_link',
+          file_url: cleanUrl,
+          file_name: fileName,
+          file_type: mimeType,
+          status: status,
+          is_private: isPrivate,
+          effective_date: effectiveDate || undefined,
+        });
+      }
     } catch (error: any) {
-      console.error('Error uploading document:', error);
-      alert('Error al subir el documento. Por favor intenta de nuevo.');
+      console.error('Error creating document:', error);
+      alert('Error al crear el documento. Por favor intenta de nuevo.');
       setUploading(false);
     }
   };
@@ -161,65 +240,161 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
         {/* Body - Horizontal Layout */}
         <div className="p-6 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-6">
-            {/* Left Column - File Selection */}
+            {/* Left Column - File Selection or URL Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Archivo <span className="text-red-500">*</span>
-              </label>
+              {documentSource === 'uploaded' ? (
+                <>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Archivo <span className="text-red-500">*</span>
+                  </label>
 
-              {!selectedFile ? (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-[320px] border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                >
-                  <Upload className="h-10 w-10 text-gray-400 mb-3" />
-                  <p className="text-gray-700 font-medium mb-2">Haz clic para seleccionar archivo</p>
-                  <p className="text-sm text-gray-500 text-center px-4">
-                    PDF, Word, Excel o Imágenes
-                    <br />
-                    Máx. 10MB para PDFs, 5MB para otros
-                  </p>
-                </div>
+                  {!selectedFile ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="h-[320px] border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                    >
+                      <Upload className="h-10 w-10 text-gray-400 mb-3" />
+                      <p className="text-gray-700 font-medium mb-2">Haz clic para seleccionar archivo</p>
+                      <p className="text-sm text-gray-500 text-center px-4">
+                        PDF, Word, Excel o Imágenes
+                        <br />
+                        Máx. 10MB para PDFs, 5MB para otros
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="h-[320px] border-2 border-gray-200 rounded-lg flex flex-col items-center justify-center relative bg-gray-50">
+                      <div className="text-6xl mb-4">{getFileIcon(selectedFile.type)}</div>
+                      <p className="text-gray-900 font-medium text-center px-4 mb-2 truncate max-w-full">
+                        {selectedFile.name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                      </p>
+
+                      <button
+                        onClick={() => setSelectedFile(null)}
+                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-2 hover:bg-red-700 transition-colors shadow-lg"
+                        disabled={uploading}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="mt-4 px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                        disabled={uploading}
+                      >
+                        Cambiar Archivo
+                      </button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                </>
               ) : (
-                <div className="h-[320px] border-2 border-gray-200 rounded-lg flex flex-col items-center justify-center relative bg-gray-50">
-                  <div className="text-6xl mb-4">{getFileIcon(selectedFile.type)}</div>
-                  <p className="text-gray-900 font-medium text-center px-4 mb-2 truncate max-w-full">
-                    {selectedFile.name}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                  </p>
-
-                  <button
-                    onClick={() => setSelectedFile(null)}
-                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-2 hover:bg-red-700 transition-colors shadow-lg"
-                    disabled={uploading}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="mt-4 px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-                    disabled={uploading}
-                  >
-                    Cambiar Archivo
-                  </button>
-                </div>
+                <>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    URL del Documento <span className="text-red-500">*</span>
+                  </label>
+                  <div className="h-[320px] flex flex-col">
+                    <input
+                      type="url"
+                      value={externalUrl}
+                      onChange={(e) => setExternalUrl(e.target.value)}
+                      placeholder="https://drive.google.com/file/d/..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={uploading}
+                    />
+                    <div className="flex-1 mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-start gap-2">
+                        <Link className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-blue-900 mb-2">Enlaces Externos Soportados</p>
+                          <ul className="text-xs text-blue-700 space-y-1">
+                            <li>• Google Drive (archivos públicos o compartidos)</li>
+                            <li>• Microsoft OneDrive / SharePoint</li>
+                            <li>• Dropbox</li>
+                            <li>• URLs directas a documentos PDF</li>
+                            <li>• Otros servicios de almacenamiento en la nube</li>
+                          </ul>
+                          <p className="text-xs text-blue-600 mt-3">
+                            <strong>Nota:</strong> Asegúrate de que el enlace sea accesible para todos los usuarios que necesiten ver este documento.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
-                onChange={handleFileSelect}
-                className="hidden"
-                disabled={uploading}
-              />
             </div>
 
             {/* Right Column - Form Fields */}
             <div className="flex flex-col gap-4">
+              {/* Document Source Selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ¿Cómo quieres agregar el documento? <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setDocumentSource('uploaded')}
+                    className={`border-2 rounded-lg p-3 text-left transition-all ${
+                      documentSource === 'uploaded'
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    disabled={uploading}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <Upload className={`h-5 w-5 ${documentSource === 'uploaded' ? 'text-blue-600' : 'text-gray-400'}`} />
+                      {documentSource === 'uploaded' && (
+                        <div className="bg-blue-600 rounded-full p-1">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <p className={`font-semibold text-sm mb-1 ${documentSource === 'uploaded' ? 'text-blue-900' : 'text-gray-900'}`}>
+                      Subir Archivo
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Desde tu computadora
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => setDocumentSource('external_link')}
+                    className={`border-2 rounded-lg p-3 text-left transition-all ${
+                      documentSource === 'external_link'
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    disabled={uploading}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <Link className={`h-5 w-5 ${documentSource === 'external_link' ? 'text-blue-600' : 'text-gray-400'}`} />
+                      {documentSource === 'external_link' && (
+                        <div className="bg-blue-600 rounded-full p-1">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <p className={`font-semibold text-sm mb-1 ${documentSource === 'external_link' ? 'text-blue-900' : 'text-gray-900'}`}>
+                      Link Externo
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Google Drive, etc.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               {/* Title */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -359,18 +534,31 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
           </Button>
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || !title.trim() || uploading}
+            disabled={
+              (documentSource === 'uploaded' ? !selectedFile : !externalUrl.trim()) ||
+              !title.trim() ||
+              uploading
+            }
             className="gap-2"
           >
             {uploading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                Subiendo...
+                {documentSource === 'uploaded' ? 'Subiendo...' : 'Creando...'}
               </>
             ) : (
               <>
-                <Upload className="h-4 w-4" />
-                Subir Documento
+                {documentSource === 'uploaded' ? (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Subir Documento
+                  </>
+                ) : (
+                  <>
+                    <Link className="h-4 w-4" />
+                    Vincular Documento
+                  </>
+                )}
               </>
             )}
           </Button>

@@ -11,6 +11,7 @@ export interface AreaDocument {
   version: string;
   parent_document_id?: string | null;
   is_latest_version: boolean;
+  document_type: 'uploaded' | 'external_link';
   file_url: string;
   file_name: string;
   file_type: string;
@@ -39,6 +40,7 @@ export interface CreateDocumentRequest {
   document_code?: string;
   category: string;
   tags?: string[];
+  document_type?: 'uploaded' | 'external_link';
   file_url: string;
   file_name: string;
   file_type: string;
