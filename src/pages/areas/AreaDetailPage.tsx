@@ -13,8 +13,9 @@ import SafetyTab from './tabs/SafetyTab';
 import CertificationsTab from './tabs/CertificationsTab';
 import DocumentsTab from './tabs/DocumentsTab';
 import GalleryTab from './tabs/GalleryTab';
+import ProductsTab from './tabs/ProductsTab';
 
-type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery';
+type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery' | 'products';
 
 const AreaDetailPage = () => {
   const { areaId } = useParams<{ areaId: string }>();
@@ -51,6 +52,7 @@ const AreaDetailPage = () => {
   const tabs: Array<{ id: TabType; label: string; icon?: string }> = [
     { id: 'general', label: 'General' },
     { id: 'personal', label: 'Personal' },
+    { id: 'products', label: 'Productos' },
     { id: 'safety', label: 'Seguridad' },
     { id: 'certifications', label: 'Certificaciones' },
     { id: 'documents', label: 'Documentos' },
@@ -63,6 +65,8 @@ const AreaDetailPage = () => {
         return <GeneralTab area={area} />;
       case 'personal':
         return <PersonalTab areaId={areaId!} area={area} />;
+      case 'products':
+        return <ProductsTab areaId={areaId!} area={area} />;
       case 'safety':
         return <SafetyTab areaId={areaId!} />;
       case 'certifications':
