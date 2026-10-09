@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Upload, Trash2, Download, Eye, ExternalLink, GitBranch } from 'lucide-react';
 import {
@@ -15,6 +15,7 @@ import Badge from '../../../components/ui/Badge';
 import UploadDocumentModal from '../modals/UploadDocumentModal';
 import EditDocumentModal from '../modals/EditDocumentModal';
 import NewDocumentVersionModal from '../modals/NewDocumentVersionModal';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 interface DocumentsTabProps {
   areaId: string;
@@ -34,21 +35,70 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showPrivate, setShowPrivate] = useState<boolean>(false);
 
-  const { data: documents, isLoading } = useQuery({
-    queryKey: ['area-documents', areaId, categoryFilter, statusFilter, searchQuery, showPrivate],
+  // Debounce search query (500ms)
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
+  // Fetch active documents (no archivados por defecto)
+  const { data: activeDocuments, isLoading: isLoadingActive } = useQuery({
+    queryKey: ['area-documents-active', areaId, showPrivate],
     queryFn: () =>
       getDocumentsByArea(areaId, {
-        category: categoryFilter || undefined,
-        status: statusFilter || undefined,
-        search: searchQuery || undefined,
         includePrivate: showPrivate,
       }),
   });
 
+  // Fetch archived documents (solo cuando se solicitan)
+  const { data: archivedDocuments, isLoading: isLoadingArchived } = useQuery({
+    queryKey: ['area-documents-archived', areaId, showPrivate],
+    queryFn: () =>
+      getDocumentsByArea(areaId, {
+        includePrivate: showPrivate,
+        status: 'archived',
+      }),
+    enabled: statusFilter === 'archived', // Solo ejecutar cuando filtran por archived
+  });
+
+  // Combinar documentos activos y archivados según el filtro
+  const allDocuments = useMemo(() => {
+    if (statusFilter === 'archived') {
+      return archivedDocuments || [];
+    }
+    return activeDocuments || [];
+  }, [activeDocuments, archivedDocuments, statusFilter]);
+
+  const isLoading = statusFilter === 'archived' ? isLoadingArchived : isLoadingActive;
+
+  // Client-side filtering with useMemo
+  const documents = useMemo(() => {
+    if (!allDocuments) return [];
+
+    return allDocuments.filter((doc) => {
+      // Filter by category
+      if (categoryFilter && doc.category !== categoryFilter) return false;
+
+      // Status ya está filtrado por el query correcto (activeDocuments vs archivedDocuments)
+      // No necesitamos filtrar por status aquí
+
+      // Filter by search query (debounced)
+      if (debouncedSearchQuery) {
+        const query = debouncedSearchQuery.toLowerCase();
+        const matchesTitle = doc.title.toLowerCase().includes(query);
+        const matchesDescription = doc.description?.toLowerCase().includes(query);
+        const matchesCode = doc.document_code?.toLowerCase().includes(query);
+
+        if (!matchesTitle && !matchesDescription && !matchesCode) return false;
+      }
+
+      return true;
+    });
+  }, [allDocuments, categoryFilter, debouncedSearchQuery]);
+
   const deleteDocumentMutation = useMutation({
     mutationFn: deleteDocument,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['area-documents', areaId] });
+      // Invalidar ambos queries (active y archived)
+      queryClient.invalidateQueries({ queryKey: ['area-documents-active', areaId] });
+      queryClient.invalidateQueries({ queryKey: ['area-documents-archived', areaId] });
     },
   });
 

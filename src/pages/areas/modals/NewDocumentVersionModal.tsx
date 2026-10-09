@@ -29,7 +29,9 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
   const createVersionMutation = useMutation({
     mutationFn: (data: any) => createDocumentVersion(document!.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['area-documents', document!.organizational_area_id] });
+      // Invalidar ambos queries (active y archived)
+      queryClient.invalidateQueries({ queryKey: ['area-documents-active', document!.organizational_area_id] });
+      queryClient.invalidateQueries({ queryKey: ['area-documents-archived', document!.organizational_area_id] });
       queryClient.invalidateQueries({ queryKey: ['document-versions', document!.id] });
       handleClose();
       // Llamar callback si existe (para cerrar modal padre si viene desde EditDocumentModal)

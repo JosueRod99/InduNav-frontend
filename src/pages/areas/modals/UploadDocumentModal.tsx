@@ -34,7 +34,9 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
   const createDocumentMutation = useMutation({
     mutationFn: (data: any) => createDocument(areaId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['area-documents', areaId] });
+      // Invalidar ambos queries (active y archived)
+      queryClient.invalidateQueries({ queryKey: ['area-documents-active', areaId] });
+      queryClient.invalidateQueries({ queryKey: ['area-documents-archived', areaId] });
       handleClose();
     },
   });
