@@ -118,10 +118,10 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-xl font-semibold text-gray-900">Editar Información General</h2>
           <button
             onClick={onClose}
@@ -132,7 +132,7 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
           {/* Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -368,7 +368,7 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 flex-shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
