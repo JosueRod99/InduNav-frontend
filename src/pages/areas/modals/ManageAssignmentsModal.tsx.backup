@@ -1,0 +1,641 @@
+import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { X, Search, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import {
+  getEmployeesByArea,
+  createAssignment,
+  type AssignmentType,
+} from '../../../api/areaAssignments';
+import apiClient from '../../../api/client';
+import { useDebounce } from '../../../hooks/useDebounce';
+
+interface ManageAssignmentsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  areaId: string;
+  area?: any;
+}
+
+const ManageAssignmentsModal = ({ isOpen, onClose, areaId, area }: ManageAssignmentsModalProps) => {
+  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmingAssignment, setConfirmingAssignment] = useState<{
+    employee: any;
+    type: AssignmentType;
+  } | null>(null);
+
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  // Fetch assigned employees to filter them out
+  const { data: assignedEmployees } = useQuery({
+    queryKey: ['area-employees', areaId],
+    queryFn: () => getEmployeesByArea(areaId),
+    enabled: isOpen,
+  });
+
+  // Fetch all employees
+  const { data: allEmployeesData, isLoading: isLoadingAll } = useQuery({
+    queryKey: ['all-employees'],
+    queryFn: async () => {
+      const response = await apiClient.get('/employees');
+      return response.data;
+    },
+    enabled: isOpen,
+  });
+
+  // Extract employees array from response
+  const allEmployees = useMemo(() => {
+    if (!allEmployeesData) return [];
+    // Handle different response structures
+    if (Array.isArray(allEmployeesData)) return allEmployeesData;
+    if (Array.isArray(allEmployeesData.employees)) return allEmployeesData.employees;
+    if (Array.isArray(allEmployeesData.data)) return allEmployeesData.data;
+    return [];
+  }, [allEmployeesData]);
+
+  // Filter available employees (not already assigned)
+  const availableEmployees = useMemo(() => {
+    if (!allEmployees || !assignedEmployees) return [];
+    if (!Array.isArray(allEmployees)) return [];
+
+    const assignedIds = new Set(assignedEmployees.map((a: any) => a.employee_id));
+    let filtered = allEmployees.filter((e: any) => !assignedIds.has(e.id));
+
+    // Apply search filter
+    if (debouncedSearch) {
+      const query = debouncedSearch.toLowerCase();
+      filtered = filtered.filter((e: any) => {
+        const fullName = `${e.first_name} ${e.last_name}`.toLowerCase();
+        const employeeNumber = e.employee_number?.toLowerCase() || '';
+        const position = e.position?.toLowerCase() || '';
+        return fullName.includes(query) || employeeNumber.includes(query) || position.includes(query);
+      });
+    }
+
+    return filtered;
+  }, [allEmployees, assignedEmployees, debouncedSearch]);
+
+  // Mutation for assigning employees
+  const assignEmployeeMutation = useMutation({
+    mutationFn: ({ employeeId, payload }: { employeeId: string; payload: any }) =>
+      createAssignment(employeeId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['area-employees', areaId] });
+      queryClient.invalidateQueries({ queryKey: ['all-employees'] });
+      setConfirmingAssignment(null);
+      toast.success('Empleado asignado exitosamente');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Error al asignar empleado');
+    },
+  });
+
+  const handleOpenConfirmAssignment = (employee: any, type: AssignmentType) => {
+    setConfirmingAssignment({ employee, type });
+  };
+
+  const handleConfirmAssignment = () => {
+    if (!confirmingAssignment) return;
+
+    assignEmployeeMutation.mutate({
+      employeeId: confirmingAssignment.employee.id,
+      payload: {
+        organizational_area_id: areaId,
+        assignment_type: confirmingAssignment.type,
+        start_date: new Date().toISOString().split('T')[0],
+      },
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg flex-shrink-0">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Asignar Empleados</h2>
+            <p className="text-sm text-gray-600 mt-1">{area?.name || 'Área'}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 overflow-y-auto flex-1">
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar empleados por nombre, número o posición..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Available Employees List */}
+          {isLoadingAll ? (
+            <div className="text-center py-8 text-gray-600">Cargando...</div>
+          ) : availableEmployees.length > 0 ? (
+            <div className="space-y-2">
+              {availableEmployees.map((employee: any) => (
+                <div
+                  key={employee.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900">
+                        {employee.first_name} {employee.last_name}
+                      </h4>
+                      <p className="text-sm text-gray-600">{employee.position}</p>
+                      {employee.employee_number && (
+                        <p className="text-xs text-gray-500 mt-1 font-mono">
+                          {employee.employee_number}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleOpenConfirmAssignment(employee, e.target.value as AssignmentType);
+                            e.target.value = '';
+                          }
+                        }}
+                        className="text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={assignEmployeeMutation.isPending}
+                      >
+                        <option value="">Asignar como...</option>
+                        <option value="primary">Principal</option>
+                        <option value="secondary">Secundario</option>
+                        <option value="temporary">Temporal</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-600">
+                {debouncedSearch
+                  ? 'No se encontraron empleados con ese criterio de búsqueda.'
+                  : 'Todos los empleados ya están asignados a esta área.'}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Confirmation Modal */}
+      {confirmingAssignment && (
+        <ConfirmAssignmentModal
+          employee={confirmingAssignment.employee}
+          assignmentType={confirmingAssignment.type}
+          area={area}
+          onConfirm={handleConfirmAssignment}
+          onCancel={() => setConfirmingAssignment(null)}
+          isLoading={assignEmployeeMutation.isPending}
+        />
+      )}
+    </div>
+  );
+};
+
+// Sub-component: Confirm Assignment Modal
+interface ConfirmAssignmentModalProps {
+  employee: any;
+  assignmentType: AssignmentType;
+  area: any;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+const ConfirmAssignmentModal = ({
+  employee,
+  assignmentType,
+  area,
+  onConfirm,
+  onCancel,
+  isLoading,
+}: ConfirmAssignmentModalProps) => {
+                <div className="text-center py-8 text-gray-600">Cargando...</div>
+              ) : assignedEmployees && assignedEmployees.length > 0 ? (
+                assignedEmployees.map((assignment: any) => {
+                  const typeLabel = {
+                    primary: 'Principal',
+                    secondary: 'Secundario',
+                    temporary: 'Temporal',
+                  }[assignment.assignment_type] || assignment.assignment_type;
+
+                  return (
+                    <div
+                      key={assignment.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-semibold text-gray-900">
+                              {assignment.first_name} {assignment.last_name}
+                            </h4>
+                            <Badge
+                              variant={
+                                assignment.assignment_type === 'primary'
+                                  ? 'primary'
+                                  : assignment.assignment_type === 'secondary'
+                                  ? 'default'
+                                  : 'warning'
+                              }
+                              size="sm"
+                            >
+                              {typeLabel}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">{assignment.position}</p>
+                          {assignment.role_in_area && (
+                            <p className="text-sm text-gray-700 mt-1">
+                              <span className="font-medium">Rol:</span> {assignment.role_in_area}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Desde: {new Date(assignment.start_date).toLocaleDateString()}
+                            </div>
+                            {assignment.end_date && (
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                Hasta: {new Date(assignment.end_date).toLocaleDateString()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingAssignment(assignment)}
+                            disabled={!!assignment.end_date}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          {!assignment.end_date && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEndAssignment(assignment.id)}
+                              disabled={endAssignmentMutation.isPending}
+                            >
+                              <UserMinus className="h-3 w-3" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteAssignment(assignment.id)}
+                            disabled={deleteAssignmentMutation.isPending}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No hay empleados asignados a esta área.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar empleados por nombre, número o posición..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Available Employees List */}
+              {isLoadingAll ? (
+                <div className="text-center py-8 text-gray-600">Cargando...</div>
+              ) : availableEmployees.length > 0 ? (
+                <div className="space-y-2">
+                  {availableEmployees.map((employee: any) => (
+                    <div
+                      key={employee.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">
+                            {employee.first_name} {employee.last_name}
+                          </h4>
+                          <p className="text-sm text-gray-600">{employee.position}</p>
+                          {employee.employee_number && (
+                            <p className="text-xs text-gray-500 mt-1 font-mono">
+                              {employee.employee_number}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleOpenConfirmAssignment(employee, e.target.value as AssignmentType);
+                                e.target.value = '';
+                              }
+                            }}
+                            className="text-sm border border-gray-300 rounded-md px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            disabled={assignEmployeeMutation.isPending}
+                          >
+                            <option value="">Asignar como...</option>
+                            <option value="primary">Principal</option>
+                            <option value="secondary">Secundario</option>
+                            <option value="temporary">Temporal</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">
+                    {searchQuery
+                      ? 'No se encontraron empleados disponibles con ese criterio.'
+                      : 'No hay empleados disponibles para asignar.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gray-50 border-t border-gray-200 px-6 py-3 flex items-center justify-end gap-3 rounded-b-lg flex-shrink-0">
+          <Button onClick={onClose} variant="outline">
+            Cerrar
+          </Button>
+        </div>
+      </div>
+
+      {/* Confirm Assignment Modal */}
+      {confirmingAssignment && (
+        <ConfirmAssignmentModal
+          employee={confirmingAssignment.employee}
+          assignmentType={confirmingAssignment.type}
+          area={area}
+          onConfirm={handleConfirmAssignment}
+          onCancel={() => setConfirmingAssignment(null)}
+          isLoading={assignEmployeeMutation.isPending}
+        />
+      )}
+
+      {/* Edit Assignment Modal (nested modal for editing) */}
+      {editingAssignment && (
+        <EditAssignmentModal
+          assignment={editingAssignment}
+          onClose={() => setEditingAssignment(null)}
+          areaId={areaId}
+        />
+      )}
+    </div>
+  );
+};
+
+// Sub-component: Confirm Assignment Modal
+interface ConfirmAssignmentModalProps {
+  employee: any;
+  assignmentType: AssignmentType;
+  area: any;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+const ConfirmAssignmentModal = ({
+  employee,
+  assignmentType,
+  area,
+  onConfirm,
+  onCancel,
+  isLoading,
+}: ConfirmAssignmentModalProps) => {
+  const typeLabels = {
+    primary: 'Principal',
+    secondary: 'Secundario',
+    temporary: 'Temporal',
+  };
+
+  const typeColors = {
+    primary: 'bg-blue-50 border-blue-200 text-blue-700',
+    secondary: 'bg-purple-50 border-purple-200 text-purple-700',
+    temporary: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Confirmar Asignación</h3>
+          </div>
+          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600" disabled={isLoading}>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-600">
+            Estás a punto de asignar al siguiente empleado:
+          </p>
+
+          {/* Employee Info Card */}
+          <div className="border-2 border-gray-200 rounded-lg p-4 bg-gray-50">
+            <h4 className="font-semibold text-gray-900 text-lg mb-1">
+              {employee.first_name} {employee.last_name}
+            </h4>
+            <p className="text-sm text-gray-600 mb-2">{employee.position}</p>
+            {employee.employee_number && (
+              <p className="text-xs text-gray-500 font-mono">{employee.employee_number}</p>
+            )}
+          </div>
+
+          {/* Assignment Details */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Área:</p>
+              <p className="font-medium text-gray-900">{area?.name || 'Área'}</p>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Tipo de Asignación:</p>
+              <div className={`inline-block px-3 py-1 rounded-full border ${typeColors[assignmentType]}`}>
+                <span className="text-sm font-medium">{typeLabels[assignmentType]}</span>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Fecha de Inicio:</p>
+              <p className="text-sm text-gray-900">{new Date().toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3 rounded-b-lg">
+          <Button onClick={onCancel} variant="outline" disabled={isLoading}>
+            Cancelar
+          </Button>
+          <Button onClick={onConfirm} disabled={isLoading} className="gap-2">
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                Asignando...
+              </>
+            ) : (
+              <>
+                <UserPlus className="h-4 w-4" />
+                Confirmar Asignación
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Sub-component: Edit Assignment Modal
+interface EditAssignmentModalProps {
+  assignment: any;
+  onClose: () => void;
+  areaId: string;
+}
+
+const EditAssignmentModal = ({ assignment, onClose, areaId }: EditAssignmentModalProps) => {
+  const queryClient = useQueryClient();
+  const [assignmentType, setAssignmentType] = useState<AssignmentType>(assignment.assignment_type);
+  const [roleInArea, setRoleInArea] = useState(assignment.role_in_area || '');
+  const [startDate, setStartDate] = useState(
+    assignment.start_date ? new Date(assignment.start_date).toISOString().split('T')[0] : ''
+  );
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: any) => updateAssignment(assignment.id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['area-employees', areaId] });
+      toast.success('Asignación actualizada exitosamente');
+      onClose();
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Error al actualizar la asignación');
+    },
+  });
+
+  const handleSave = () => {
+    updateMutation.mutate({
+      assignment_type: assignmentType,
+      role_in_area: roleInArea || undefined,
+      start_date: startDate,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 !mt-0">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-lg">
+          <h3 className="text-lg font-semibold text-gray-900">Editar Asignación</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          <div>
+            <p className="font-medium text-gray-900 mb-1">
+              {assignment.first_name} {assignment.last_name}
+            </p>
+            <p className="text-sm text-gray-600">{assignment.position}</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Asignación
+            </label>
+            <select
+              value={assignmentType}
+              onChange={(e) => setAssignmentType(e.target.value as AssignmentType)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="primary">Principal</option>
+              <option value="secondary">Secundario</option>
+              <option value="temporary">Temporal</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Rol en el Área (Opcional)
+            </label>
+            <input
+              type="text"
+              value={roleInArea}
+              onChange={(e) => setRoleInArea(e.target.value)}
+              placeholder="Ej: Operador Líder, Supervisor de Turno..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Fecha de Inicio
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-gray-50 border-t border-gray-200 px-6 py-3 flex items-center justify-end gap-3 rounded-b-lg">
+          <Button onClick={onClose} variant="outline" disabled={updateMutation.isPending}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ManageAssignmentsModal;
