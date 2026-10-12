@@ -312,3 +312,108 @@ export const reorderProcessSteps = async (
 ): Promise<void> => {
   await apiClient.put(`/products/${productId}/process-steps/reorder`, { stepOrders });
 };
+
+// ============================================================
+// PRODUCT IMAGES
+// ============================================================
+
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  caption: string | null;
+  display_order: number;
+  is_primary: boolean;
+  file_size: number | null;
+  mime_type: string | null;
+  width: number | null;
+  height: number | null;
+  created_at: Date;
+  updated_at: Date;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface CreateProductImageRequest {
+  image_url: string;
+  caption?: string;
+  display_order?: number;
+  is_primary?: boolean;
+  file_size?: number;
+  mime_type?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface UpdateProductImageRequest {
+  caption?: string;
+  display_order?: number;
+  is_primary?: boolean;
+}
+
+/**
+ * Get all images for a product
+ */
+export const getProductImages = async (productId: string): Promise<ProductImage[]> => {
+  const { data } = await apiClient.get(`/products/${productId}/images`);
+  return data.images || [];
+};
+
+/**
+ * Get primary image for a product
+ */
+export const getPrimaryProductImage = async (productId: string): Promise<ProductImage | null> => {
+  try {
+    const { data } = await apiClient.get(`/products/${productId}/images/primary`);
+    return data.image || null;
+  } catch (error) {
+    return null;
+  }
+};
+
+/**
+ * Create new image for a product
+ */
+export const createProductImage = async (
+  productId: string,
+  payload: CreateProductImageRequest
+): Promise<ProductImage> => {
+  const { data } = await apiClient.post(`/products/${productId}/images`, payload);
+  return data.image;
+};
+
+/**
+ * Update image
+ */
+export const updateProductImage = async (
+  imageId: string,
+  payload: UpdateProductImageRequest
+): Promise<ProductImage> => {
+  const { data } = await apiClient.patch(`/products/images/${imageId}`, payload);
+  return data.image;
+};
+
+/**
+ * Set image as primary
+ */
+export const setPrimaryProductImage = async (imageId: string): Promise<ProductImage> => {
+  const { data } = await apiClient.post(`/products/images/${imageId}/set-primary`);
+  return data.image;
+};
+
+/**
+ * Delete image
+ */
+export const deleteProductImage = async (imageId: string): Promise<void> => {
+  await apiClient.delete(`/products/images/${imageId}`);
+};
+
+/**
+ * Reorder images
+ */
+export const reorderProductImages = async (
+  productId: string,
+  imageOrders: { id: string; display_order: number }[]
+): Promise<void> => {
+  await apiClient.post(`/products/${productId}/images/reorder`, { imageOrders });
+};

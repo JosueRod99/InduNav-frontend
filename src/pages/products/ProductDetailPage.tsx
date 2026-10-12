@@ -11,8 +11,9 @@ import ProductModal from './ProductModal';
 // Tab components
 import GeneralTab from './tabs/GeneralTab';
 import ProcessTab from './tabs/ProcessTab';
+import GalleryTab from './tabs/GalleryTab';
 
-type TabType = 'general' | 'process';
+type TabType = 'general' | 'process' | 'gallery';
 
 const ProductDetailPage = () => {
   const { productId } = useParams<{ productId: string }>();
@@ -50,6 +51,7 @@ const ProductDetailPage = () => {
   const tabs: Array<{ id: TabType; label: string }> = [
     { id: 'general', label: 'General' },
     { id: 'process', label: 'Proceso de Fabricación' },
+    { id: 'gallery', label: 'Galería' },
   ];
 
   const renderTabContent = () => {
@@ -58,6 +60,8 @@ const ProductDetailPage = () => {
         return <GeneralTab product={product} />;
       case 'process':
         return <ProcessTab productId={productId!} />;
+      case 'gallery':
+        return <GalleryTab productId={productId!} product={product} />;
       default:
         return null;
     }

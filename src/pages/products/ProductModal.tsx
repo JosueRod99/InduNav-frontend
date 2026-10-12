@@ -39,7 +39,6 @@ const ProductModal = ({
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<ProductCategory>('component');
   const [status, setStatus] = useState<ProductStatus>('active');
-  const [primaryImageUrl, setPrimaryImageUrl] = useState('');
   const [technicalDocumentUrl, setTechnicalDocumentUrl] = useState('');
   const [tags, setTags] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
@@ -53,7 +52,6 @@ const ProductModal = ({
       setDescription(product.description || '');
       setCategory(product.category);
       setStatus(product.status);
-      setPrimaryImageUrl(product.primary_image_url || '');
       setTechnicalDocumentUrl(product.technical_document_url || '');
       setTags(product.tags?.join(', ') || '');
       setIsPrivate(product.is_private);
@@ -65,7 +63,6 @@ const ProductModal = ({
       setDescription('');
       setCategory('component');
       setStatus('active');
-      setPrimaryImageUrl('');
       setTechnicalDocumentUrl('');
       setTags('');
       setIsPrivate(false);
@@ -124,7 +121,6 @@ const ProductModal = ({
         description: description || undefined,
         category,
         status,
-        primary_image_url: primaryImageUrl || undefined,
         technical_document_url: technicalDocumentUrl || undefined,
         tags: parsedTags.length > 0 ? parsedTags : undefined,
         is_private: isPrivate,
@@ -142,7 +138,6 @@ const ProductModal = ({
         description: description || undefined,
         category,
         status,
-        primary_image_url: primaryImageUrl || undefined,
         technical_document_url: technicalDocumentUrl || undefined,
         tags: parsedTags.length > 0 ? parsedTags : undefined,
         is_private: isPrivate,
@@ -287,19 +282,14 @@ const ProductModal = ({
             </p>
           </div>
 
-          {/* Image URL */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              URL de Imagen Principal
-            </label>
-            <input
-              type="url"
-              value={primaryImageUrl}
-              onChange={(e) => setPrimaryImageUrl(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="https://..."
-            />
-          </div>
+          {/* Note about Images */}
+          {product && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800">
+                💡 <strong>Imágenes del producto:</strong> Gestiona las imágenes desde el tab "Galería" en la página de detalles del producto.
+              </p>
+            </div>
+          )}
 
           {/* Technical Document URL */}
           <div>
