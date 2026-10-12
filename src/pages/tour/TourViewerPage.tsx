@@ -10,10 +10,27 @@ import {
   Shield,
   ChevronDown,
   ChevronUp,
+  FileText,
+  MapPin,
+  Users,
+  BarChart3,
+  Settings,
+  Package,
+  TrendingUp,
+  BookOpen,
 } from 'lucide-react';
 import { getTourBySlug, getText, type DemoArea } from '../../demo/tourData';
+import { getEnhancedAreaData } from '../../demo/enhancedTourData';
+import ResumenTab from './components/ResumenTab';
+import UbicacionTab from './components/UbicacionTab';
+import OrganigramaTab from './components/OrganigramaTab';
+import MetricasTab from './components/MetricasTab';
+import EspecificacionesTab from './components/EspecificacionesTab';
+import ProductosTab from './components/ProductosTab';
+import DocumentacionTab from './components/DocumentacionTab';
+import PredicionesTab from './components/PredicionesTab';
 
-type TabType = 'resumen' | 'ubicacion' | 'organigrama' | 'costos' | 'predicciones';
+type TabType = 'resumen' | 'ubicacion' | 'organigrama' | 'metricas' | 'especificaciones' | 'productos' | 'documentacion' | 'predicciones';
 
 const TourViewerPage = () => {
   const { tourSlug } = useParams<{ tourSlug: string }>();
@@ -24,6 +41,36 @@ const TourViewerPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('resumen');
   const [expandedKeypoint, setExpandedKeypoint] = useState<number | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [isHeaderCompact, setIsHeaderCompact] = useState(false);
+  const [isFaqExpanded, setIsFaqExpanded] = useState(false);
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const handleScroll = () => {
+      // Clear any pending timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      // Debounce the state update
+      timeoutId = setTimeout(() => {
+        const currentScrollY = window.scrollY;
+        const shouldBeCompact = currentScrollY > 150;
+
+        setIsHeaderCompact(shouldBeCompact);
+      }, 50); // 50ms debounce
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []); // Sin dependencias para evitar re-creación del listener
 
   const tour = tourSlug ? getTourBySlug(tourSlug) : null;
 
@@ -39,12 +86,37 @@ const TourViewerPage = () => {
 
   const currentArea = tour.areas[currentAreaIndex];
   const progress = ((currentAreaIndex + 1) / tour.areas.length) * 100;
+  const enhancedData = getEnhancedAreaData(currentArea.id);
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'resumen':
+        return <ResumenTab content={currentArea.tabs.resumen} language={language} />;
+      case 'ubicacion':
+        return <UbicacionTab content={currentArea.tabs.ubicacion} layout={enhancedData.layout} language={language} />;
+      case 'organigrama':
+        return <OrganigramaTab content={currentArea.tabs.organigrama} employees={enhancedData.employees} language={language} />;
+      case 'metricas':
+        return <MetricasTab content={currentArea.tabs.costos} metrics={enhancedData.metrics} chartData={enhancedData.chartData.production} language={language} />;
+      case 'especificaciones':
+        return <EspecificacionesTab specifications={enhancedData.specifications} language={language} />;
+      case 'productos':
+        return <ProductosTab products={enhancedData.products} language={language} />;
+      case 'documentacion':
+        return <DocumentacionTab language={language} />;
+      case 'predicciones':
+        return <PredicionesTab content={currentArea.tabs.predicciones} language={language} />;
+      default:
+        return null;
+    }
+  };
 
   const goToNextArea = () => {
     if (currentAreaIndex < tour.areas.length - 1) {
       setCurrentAreaIndex(currentAreaIndex + 1);
       setActiveTab('resumen');
       setExpandedKeypoint(null);
+      setIsFaqExpanded(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -54,147 +126,180 @@ const TourViewerPage = () => {
       setCurrentAreaIndex(currentAreaIndex - 1);
       setActiveTab('resumen');
       setExpandedKeypoint(null);
+      setIsFaqExpanded(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  const tabs: Array<{ id: TabType; label: { es: string; en: string }; icon: string }> = [
-    { id: 'resumen', label: { es: '📋 Resumen', en: '📋 Summary' }, icon: '📋' },
-    { id: 'ubicacion', label: { es: '📍 Ubicación', en: '📍 Location' }, icon: '📍' },
-    { id: 'organigrama', label: { es: '👥 Organigrama', en: '👥 Organization' }, icon: '👥' },
-    { id: 'costos', label: { es: '💰 Métricas', en: '💰 Metrics' }, icon: '💰' },
-    { id: 'predicciones', label: { es: '📊 Predicciones', en: '📊 Predictions' }, icon: '📊' },
+  const tabs: Array<{ id: TabType; label: { es: string; en: string }; Icon: any }> = [
+    { id: 'resumen', label: { es: 'Resumen', en: 'Summary' }, Icon: FileText },
+    { id: 'ubicacion', label: { es: 'Ubicación', en: 'Location' }, Icon: MapPin },
+    { id: 'organigrama', label: { es: 'Equipo', en: 'Team' }, Icon: Users },
+    { id: 'metricas', label: { es: 'Métricas', en: 'Metrics' }, Icon: BarChart3 },
+    { id: 'especificaciones', label: { es: 'Especificaciones', en: 'Specifications' }, Icon: Settings },
+    { id: 'productos', label: { es: 'Productos', en: 'Products' }, Icon: Package },
+    { id: 'documentacion', label: { es: 'Documentos', en: 'Documents' }, Icon: BookOpen },
+    { id: 'predicciones', label: { es: 'Proyecciones', en: 'Projections' }, Icon: TrendingUp },
   ];
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          {/* Top Row */}
-          <div className="flex items-center justify-between mb-3">
-            <button
-              onClick={() => navigate('/tour')}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">
-                {language === 'es' ? 'Volver al catálogo' : 'Back to catalog'}
-              </span>
-            </button>
-
+      {/* Header - Compact on scroll */}
+      <div className={`bg-white border-b border-slate-200 sticky top-0 z-50 transition-all duration-300 ${
+        isHeaderCompact ? 'shadow-sm' : 'shadow-md'
+      }`}>
+        <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ${
+          isHeaderCompact ? 'py-2' : 'py-4'
+        }`}>
+          {/* Main Row */}
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/tour')}
+                className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className={`text-sm font-medium transition-all duration-300 ${
+                !isHeaderCompact ? 'opacity-100 max-w-20' : 'opacity-0 max-w-0 overflow-hidden'
+              }`}>
+                {language === 'es' ? 'Volver' : 'Back'}
+              </span>
+              </button>
+
+              <div className={`flex items-center gap-3 transition-all duration-300 ${
+                isHeaderCompact ? 'opacity-100 max-w-md' : 'opacity-0 max-w-0 overflow-hidden'
+              }`}>
+                <div className="h-6 w-px bg-slate-300"></div>
+                <span className="text-sm font-semibold text-blue-700 whitespace-nowrap">
+                  {getText(currentArea.name, language)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Progress indicator when compact */}
+              <span className={`text-xs font-medium text-slate-600 transition-all duration-300 ${
+                isHeaderCompact ? 'opacity-100 max-w-20' : 'opacity-0 max-w-0 overflow-hidden'
+              }`}>
+                {currentAreaIndex + 1}/{tour.areas.length}
+              </span>
+
               {/* Audio Toggle */}
               <button
                 onClick={() => setAudioEnabled(!audioEnabled)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
                 title={language === 'es' ? 'Narración automática' : 'Auto narration'}
               >
                 {audioEnabled ? (
-                  <Volume2 className="w-5 h-5 text-blue-600" />
+                  <Volume2 className="w-4 h-4 text-blue-600" />
                 ) : (
-                  <VolumeX className="w-5 h-5 text-gray-400" />
+                  <VolumeX className="w-4 h-4 text-slate-400" />
                 )}
               </button>
 
               {/* Language Selector */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <div className="flex items-center gap-0.5 bg-slate-100 rounded-md p-0.5">
                 <button
                   onClick={() => setLanguage('es')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                     language === 'es'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  🇲🇽 ES
+                  ES
                 </button>
                 <button
                   onClick={() => setLanguage('en')}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                     language === 'en'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  🇺🇸 EN
+                  EN
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Tour Title */}
-          <h1 className="text-xl font-bold text-gray-900 mb-3">
-            {getText(tour.title, language)}
-          </h1>
+          {/* Expanded Header Content */}
+          <div className={`transition-all duration-300 overflow-hidden ${
+            !isHeaderCompact ? 'max-h-20 opacity-100 mt-3' : 'max-h-0 opacity-0'
+          }`}>
+            {/* Tour Title */}
+            <h1 className="text-lg font-bold text-blue-700 mb-2">
+              {getText(tour.title, language)}
+            </h1>
 
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">
-                {language === 'es' ? 'Progreso del tour' : 'Tour progress'}
-              </span>
-              <span className="font-semibold text-blue-600">
-                {currentAreaIndex + 1} / {tour.areas.length} {language === 'es' ? 'áreas' : 'areas'}
-              </span>
-            </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
+            {/* Progress Bar */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-600">
+                  {language === 'es' ? 'Progreso' : 'Progress'}
+                </span>
+                <span className="font-semibold text-slate-900">
+                  {currentAreaIndex + 1} / {tour.areas.length}
+                </span>
+              </div>
+              <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Area Header Card */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
-          <div className="grid md:grid-cols-2 gap-6 p-6">
-            {/* Left: Image */}
-            <div className="relative">
-              <div className="absolute top-4 left-4 z-10">
-                <span className="inline-block px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded-full shadow-lg">
-                  {language === 'es' ? 'Área' : 'Area'} {currentArea.order} {language === 'es' ? 'de' : 'of'} {tour.areas.length}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6 border border-slate-200">
+          <div className="grid md:grid-cols-2 gap-4 p-4">
+            {/* Left: Image - Fixed height */}
+            <div className="relative h-48 md:h-auto md:max-h-96">
+              <div className="absolute top-2 left-2 z-10">
+                <span className="inline-block px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded shadow">
+                  {currentArea.order}/{tour.areas.length}
                 </span>
               </div>
               <img
                 src={currentArea.image}
                 alt={getText(currentArea.name, language)}
-                className="w-full h-64 md:h-full object-cover rounded-lg"
+                className="w-full h-full object-cover rounded"
               />
             </div>
 
             {/* Right: Info */}
-            <div className="flex flex-col justify-between">
+            <div className="flex flex-col justify-start overflow-y-auto max-h-96">
               <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                <h2 className="text-2xl font-bold text-blue-700 mb-2">
                   {getText(currentArea.name, language)}
                 </h2>
 
-                <p className="text-gray-600 mb-4">
+                <p className="text-sm text-slate-600 mb-3">
                   {getText(currentArea.shortDescription, language)}
                 </p>
 
                 {/* Responsible */}
-                <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-3 bg-slate-50 rounded p-3 mb-3 border border-slate-200">
                   <img
                     src={currentArea.responsible.photo}
                     alt={currentArea.responsible.name}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-blue-500"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-blue-200"
                   />
                   <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                      <User className="w-4 h-4" />
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-0.5">
+                      <User className="w-3 h-3" />
                       <span>{language === 'es' ? 'Responsable' : 'Manager'}</span>
                     </div>
-                    <p className="font-semibold text-gray-900">
+                    <p className="font-semibold text-sm text-slate-900">
                       {currentArea.responsible.name}
                     </p>
                     {currentArea.responsible.position && (
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs text-slate-600">
                         {getText(currentArea.responsible.position, language)}
                       </p>
                     )}
@@ -202,16 +307,69 @@ const TourViewerPage = () => {
                 </div>
 
                 {/* Safety Notice */}
-                <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <Shield className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded p-3 mb-3">
+                  <Shield className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-semibold text-yellow-900 mb-1">
-                      {language === 'es' ? 'Normas de Seguridad' : 'Safety Rules'}
+                    <p className="text-xs font-semibold text-amber-900 mb-0.5">
+                      {language === 'es' ? 'Seguridad' : 'Safety'}
                     </p>
-                    <p className="text-sm text-yellow-800">
+                    <p className="text-xs text-amber-800">
                       {getText(currentArea.safety, language)}
                     </p>
                   </div>
+                </div>
+
+                {/* FAQs - Collapsible Panel */}
+                <div className="bg-slate-50 rounded border border-slate-200 overflow-hidden">
+                  <button
+                    onClick={() => setIsFaqExpanded(!isFaqExpanded)}
+                    className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-100 transition-colors"
+                  >
+                    <h3 className="text-xs font-semibold text-slate-900 flex items-center gap-2">
+                      {isFaqExpanded ? (
+                        <ChevronUp className="w-3 h-3 text-blue-600" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3 text-blue-600" />
+                      )}
+                      {language === 'es' ? 'Preguntas Frecuentes' : 'FAQ'}
+                    </h3>
+                    <span className="text-xs text-slate-500">
+                      {currentArea.keypoints.length} {language === 'es' ? 'preguntas' : 'questions'}
+                    </span>
+                  </button>
+
+                  {isFaqExpanded && (
+                    <div className="px-3 pb-3 space-y-2">
+                      {currentArea.keypoints.map((keypoint, index) => (
+                        <div
+                          key={index}
+                          className="bg-white rounded shadow-sm overflow-hidden border border-slate-200"
+                        >
+                          <button
+                            onClick={() => setExpandedKeypoint(expandedKeypoint === index ? null : index)}
+                            className="w-full px-2 py-2 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+                          >
+                            <span className="font-medium text-slate-900 text-xs">
+                              {getText(keypoint.question, language)}
+                            </span>
+                            {expandedKeypoint === index ? (
+                              <ChevronUp className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                            )}
+                          </button>
+
+                          {expandedKeypoint === index && (
+                            <div className="px-2 py-2 bg-slate-50 border-t border-slate-200">
+                              <p className="text-xs text-slate-700">
+                                {getText(keypoint.answer, language)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -219,99 +377,56 @@ const TourViewerPage = () => {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6 border border-slate-200">
           {/* Tab Headers */}
-          <div className="border-b border-gray-200 overflow-x-auto">
+          <div className="border-b border-slate-200 overflow-x-auto">
             <div className="flex">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600 bg-blue-50'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {getText(tab.label, language)}
-                </button>
-              ))}
+              {tabs.map((tab) => {
+                const Icon = tab.Icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${
+                      activeTab === tab.id
+                        ? 'border-blue-600 text-blue-700 bg-blue-50'
+                        : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {getText(tab.label, language)}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Tab Content */}
-          <div className="grid md:grid-cols-3 gap-6 p-6">
-            {/* Left Column: Tab Content */}
-            <div className="md:col-span-2">
-              <div className="prose max-w-none">
-                <p className="text-gray-700 leading-relaxed">
-                  {getText(currentArea.tabs[activeTab], language)}
-                </p>
-              </div>
-            </div>
-
-            {/* Right Column: Keypoints */}
-            <div className="md:col-span-1">
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  {language === 'es' ? '❓ Preguntas Frecuentes' : '❓ Frequently Asked Questions'}
-                </h3>
-
-                <div className="space-y-3">
-                  {currentArea.keypoints.map((keypoint, index) => (
-                    <div
-                      key={index}
-                      className="bg-white rounded-lg shadow-sm overflow-hidden"
-                    >
-                      <button
-                        onClick={() => setExpandedKeypoint(expandedKeypoint === index ? null : index)}
-                        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
-                      >
-                        <span className="font-medium text-gray-900 text-sm">
-                          {getText(keypoint.question, language)}
-                        </span>
-                        {expandedKeypoint === index ? (
-                          <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                        )}
-                      </button>
-
-                      {expandedKeypoint === index && (
-                        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-                          <p className="text-sm text-gray-700">
-                            {getText(keypoint.answer, language)}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          <div className="p-4">
+            {renderTabContent()}
           </div>
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center justify-between bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between bg-white rounded-lg shadow-sm p-4 border border-slate-200">
           <button
             onClick={goToPreviousArea}
             disabled={currentAreaIndex === 0}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-all ${
               currentAreaIndex === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 hover:shadow-md'
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
-            <ChevronLeft className="w-5 h-5" />
-            {language === 'es' ? 'Área Anterior' : 'Previous Area'}
+            <ChevronLeft className="w-4 h-4" />
+            {language === 'es' ? 'Anterior' : 'Previous'}
           </button>
 
           <div className="text-center">
-            <p className="text-sm text-gray-500 mb-1">
+            <p className="text-xs text-slate-500">
               {language === 'es' ? 'Área actual' : 'Current area'}
             </p>
-            <p className="font-semibold text-gray-900">
+            <p className="text-sm font-semibold text-blue-700">
               {getText(currentArea.name, language)}
             </p>
           </div>
@@ -319,34 +434,33 @@ const TourViewerPage = () => {
           <button
             onClick={goToNextArea}
             disabled={currentAreaIndex === tour.areas.length - 1}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-all ${
               currentAreaIndex === tour.areas.length - 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md'
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
           >
-            {language === 'es' ? 'Siguiente Área' : 'Next Area'}
-            <ChevronRight className="w-5 h-5" />
+            {language === 'es' ? 'Siguiente' : 'Next'}
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
         {/* Completion Message */}
         {currentAreaIndex === tour.areas.length - 1 && (
-          <div className="mt-8 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-8 text-center">
-            <div className="text-5xl mb-4">🎉</div>
-            <h3 className="text-2xl font-bold text-green-900 mb-2">
-              {language === 'es' ? '¡Felicidades!' : 'Congratulations!'}
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+            <h3 className="text-xl font-bold text-blue-900 mb-2">
+              {language === 'es' ? '¡Tour Completado!' : 'Tour Completed!'}
             </h3>
-            <p className="text-green-800 mb-4">
+            <p className="text-sm text-slate-700 mb-4">
               {language === 'es'
-                ? 'Has completado el tour completo de nuestras instalaciones.'
-                : 'You have completed the full tour of our facilities.'}
+                ? 'Has completado el recorrido de todas las áreas.'
+                : 'You have completed the tour of all areas.'}
             </p>
             <button
               onClick={() => navigate('/tour')}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+              className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
             >
-              {language === 'es' ? 'Explorar más tours' : 'Explore more tours'}
+              {language === 'es' ? 'Ver más tours' : 'View more tours'}
             </button>
           </div>
         )}
