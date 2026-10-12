@@ -23,6 +23,10 @@ import AreaDetailPage from './pages/areas/AreaDetailPage';
 import ProductsPage from './pages/products/ProductsPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 
+// Tour Demo Pages (Public)
+import TourCatalogPage from './pages/tour/TourCatalogPage';
+import TourViewerPage from './pages/tour/TourViewerPage';
+
 function App() {
   const { checkAuth, isAuthenticated, isInitialized } = useAuthStore();
 
@@ -56,6 +60,10 @@ function App() {
               isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />
             }
           />
+
+          {/* Public Tour Demo Routes */}
+          <Route path="/tour" element={<TourCatalogPage />} />
+          <Route path="/tour/:tourSlug" element={<TourViewerPage />} />
 
           {/* Protected Routes with Layout */}
           <Route
