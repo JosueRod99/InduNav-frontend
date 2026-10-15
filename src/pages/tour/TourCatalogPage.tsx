@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Clock, MapPin, Lock } from 'lucide-react';
+import { Play, Clock, MapPin, Lock, ArrowLeft } from 'lucide-react';
 import { DEMO_TOURS, getText } from '../../demo/tourData';
 
 const TourCatalogPage = () => {
@@ -22,10 +22,21 @@ const TourCatalogPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                {language === 'es' ? '🏭 Tours Virtuales Disponibles' : '🏭 Available Virtual Tours'}
-              </h1>
-              <p className="mt-2 text-gray-600">
+              <div className="flex items-center gap-3">
+                {/* Back to Home Button */}
+                <button
+                  onClick={() => navigate('/')}
+                  className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+
+                <h1 className="text-3xl font-bold text-gray-900">
+                  {language === 'es' ? '🏭 Tours Virtuales Disponibles' : '🏭 Available Virtual Tours'}
+                </h1>
+              </div>
+
+              <p className="mt-2 text-gray-600 ml-7">
                 {language === 'es'
                   ? 'Explora nuestras instalaciones desde cualquier lugar del mundo'
                   : 'Explore our facilities from anywhere in the world'
@@ -37,21 +48,19 @@ const TourCatalogPage = () => {
             <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setLanguage('es')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  language === 'es'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${language === 'es'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
               >
                 🇲🇽 Español
               </button>
               <button
                 onClick={() => setLanguage('en')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  language === 'en'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${language === 'en'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
               >
                 🇺🇸 English
               </button>
@@ -66,9 +75,8 @@ const TourCatalogPage = () => {
           {DEMO_TOURS.map((tour) => (
             <div
               key={tour.id}
-              className={`bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-2xl ${
-                tour.isActive ? 'hover:scale-105 cursor-pointer' : 'opacity-75'
-              }`}
+              className={`bg-white rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-2xl ${tour.isActive ? 'hover:scale-105 cursor-pointer' : 'opacity-75'
+                }`}
               onClick={() => handleStartTour(tour.slug, tour.isActive)}
             >
               {/* Cover Image */}

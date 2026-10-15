@@ -23,7 +23,8 @@ import AreaDetailPage from './pages/areas/AreaDetailPage';
 import ProductsPage from './pages/products/ProductsPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 
-// Tour Demo Pages (Public)
+// Public Pages
+import LandingPage from './pages/LandingPage';
 import TourCatalogPage from './pages/tour/TourCatalogPage';
 import TourViewerPage from './pages/tour/TourViewerPage';
 
@@ -54,6 +55,7 @@ function App() {
       <Router>
         <Routes>
           {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
 
           <Route
             path="/login"
@@ -68,18 +70,12 @@ function App() {
 
           {/* Protected Routes with Layout */}
           <Route
-            path="/"
             element={
               <PrivateRoute>
                 <AppLayout />
               </PrivateRoute>
             }
           >
-            {
-              //<Route index element={<Navigate to="/dashboard" replace />} />
-            }
-            <Route index element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/tour" replace />} />
-
             <Route path="dashboard" element={<Dashboard />} />
             <Route
               path="organizations"
