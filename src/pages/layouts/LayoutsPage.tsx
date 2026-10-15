@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Pencil, Trash2, Plus, Square, Upload, PenTool } from 'lucide-react';
+import { MapPin, Trash2, Square, Upload, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -299,9 +299,9 @@ const LayoutsPage = () => {
                           <Badge variant="default" className="text-xs">
                             {area.area_type}
                           </Badge>
-                          {area.full_path_name && (
+                          {(area as any).full_path_name && (
                             <span className="text-xs text-gray-500 truncate">
-                              {area.full_path_name}
+                              {(area as any).full_path_name}
                             </span>
                           )}
                         </div>
@@ -324,9 +324,9 @@ const LayoutsPage = () => {
                     <p className="font-medium text-gray-700">
                       {selectedArea.organizational_area.name}
                     </p>
-                    {selectedArea.organizational_area.full_path_name && (
+                    {(selectedArea.organizational_area as any).full_path_name && (
                       <p className="text-gray-500 mt-1">
-                        {selectedArea.organizational_area.full_path_name}
+                        {(selectedArea.organizational_area as any).full_path_name}
                       </p>
                     )}
                   </div>

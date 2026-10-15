@@ -10,7 +10,6 @@ import {
   getAreaTree,
   createArea,
   type CreateAreaRequest,
-  type AreaTreeNode,
 } from '../../api/areas';
 import {
   createRepresentation,
@@ -92,7 +91,7 @@ const LinkAreaModal = ({
   });
 
   // Fetch employees for supervisor selection
-  const { data: employeesData } = useQuery({
+  const { data: _employeesData } = useQuery({
     queryKey: ['employees', organizationId, plantId],
     queryFn: () =>
       getEmployees({

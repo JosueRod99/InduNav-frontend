@@ -337,8 +337,8 @@ function EditingHandler({
 
     if (pts.length >= 2) {
       polygonRef.current = L.polygon(pts, {
-        color: editingArea?.color || '#3B82F6',
-        fillColor: editingArea?.color || '#3B82F6',
+        color: (editingArea as any)?.color || '#3B82F6',
+        fillColor: (editingArea as any)?.color || '#3B82F6',
         fillOpacity: 0.3,
         weight: 2,
       }).addTo(map);
@@ -363,7 +363,7 @@ function EditingHandler({
         icon: L.divIcon({
           className: 'edit-point-marker',
           html: `<div style="
-            background: ${editingArea?.color || '#3B82F6'};
+            background: ${(editingArea as any)?.color || '#3B82F6'};
             width: 14px;
             height: 14px;
             border-radius: 50%;
@@ -518,7 +518,7 @@ function EditingHandler({
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-900">Editando Área: {editingArea?.name}</h3>
+        <h3 className="text-sm font-semibold text-gray-900">Editando Área: {(editingArea as any)?.name || 'Sin nombre'}</h3>
         <button
           onClick={(e) => {
             e.stopPropagation();
