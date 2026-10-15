@@ -36,6 +36,10 @@ export interface DemoArea {
   keypoints: DemoKeypoint[];
   products: string[];
   safety: MultiLangText;
+  audioFiles?: {
+    es: string | null;
+    en: string | null;
+  };
 }
 
 export interface DemoTour {
@@ -150,6 +154,10 @@ export const DEMO_TOURS: DemoTour[] = [
           es: 'Uso de casco, calzado de seguridad y chaleco reflectante obligatorio. Prohibido el paso a personal no autorizado.',
           en: 'Hard hat, safety shoes, and reflective vest required. Unauthorized personnel prohibited.',
         },
+        audioFiles: {
+          es: '/audios/proceso-productivo-recepcion-es.mp3',
+          en: '/audios/proceso-productivo-recepcion-en.mp3',
+        },
       },
       {
         id: 'produccion',
@@ -230,6 +238,10 @@ export const DEMO_TOURS: DemoTour[] = [
           es: 'Equipo de protección completo. Líneas amarillas de seguridad. Prohibido cruzar mientras las máquinas están en operación.',
           en: 'Complete protective equipment. Yellow safety lines. Crossing prohibited while machines are in operation.',
         },
+        audioFiles: {
+          es: '/audios/proceso-productivo-produccion-es.mp3',
+          en: null,
+        },
       },
       {
         id: 'calidad',
@@ -299,6 +311,10 @@ export const DEMO_TOURS: DemoTour[] = [
         safety: {
           es: 'Lentes de seguridad y bata de laboratorio obligatorios. Prohibido consumir alimentos.',
           en: 'Safety glasses and lab coat required. Food consumption prohibited.',
+        },
+        audioFiles: {
+          es: '/audios/proceso-productivo-calidad-es.mp3',
+          en: null,
         },
       },
       {
@@ -370,6 +386,10 @@ export const DEMO_TOURS: DemoTour[] = [
           es: 'Casco y calzado de seguridad obligatorio. Respetar señalización de tráfico interno. Prohibido el paso bajo cargas suspendidas.',
           en: 'Hard hat and safety shoes required. Respect internal traffic signage. Passage under suspended loads prohibited.',
         },
+        audioFiles: {
+          es: '/audios/proceso-productivo-almacen-es.mp3',
+          en: null,
+        },
       },
       {
         id: 'embarque',
@@ -439,6 +459,10 @@ export const DEMO_TOURS: DemoTour[] = [
         safety: {
           es: 'Chaleco reflectante obligatorio. Mantener distancia segura durante maniobras. Prohibido el paso mientras se carga/descarga.',
           en: 'Reflective vest required. Maintain safe distance during maneuvers. Passage prohibited during loading/unloading.',
+        },
+        audioFiles: {
+          es: '/audios/proceso-productivo-embarque-es.mp3',
+          en: null,
         },
       },
     ],

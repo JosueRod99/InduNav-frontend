@@ -4,8 +4,8 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Volume2,
-  VolumeX,
+  Play,
+  Pause,
   User,
   Shield,
   ChevronDown,
@@ -18,6 +18,8 @@ import {
   Package,
   TrendingUp,
   BookOpen,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { getTourBySlug, getText, type DemoArea } from '../../demo/tourData';
 import { getEnhancedAreaData } from '../../demo/enhancedTourData';
@@ -40,9 +42,15 @@ const TourViewerPage = () => {
   const [currentAreaIndex, setCurrentAreaIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<TabType>('resumen');
   const [expandedKeypoint, setExpandedKeypoint] = useState<number | null>(null);
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
   const [isHeaderCompact, setIsHeaderCompact] = useState(false);
   const [isFaqExpanded, setIsFaqExpanded] = useState(false);
+  const [narrationText, setNarrationText] = useState('');
+  const [textCopied, setTextCopied] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout | null = null;
@@ -87,6 +95,185 @@ const TourViewerPage = () => {
   const currentArea = tour.areas[currentAreaIndex];
   const progress = ((currentAreaIndex + 1) / tour.areas.length) * 100;
   const enhancedData = getEnhancedAreaData(currentArea.id);
+
+  // Función para generar el texto de narración
+  const generateNarrationText = () => {
+    const areaName = getText(currentArea.name, language);
+    const shortDesc = getText(currentArea.shortDescription, language);
+    const responsibleName = currentArea.responsible.name;
+    const responsiblePosition = getText(currentArea.responsible.position, language);
+    const safetyNotice = getText(currentArea.safety, language);
+    const resumenContent = getText(currentArea.tabs.resumen, language);
+
+    const welcomeText = language === 'es' ? 'Bienvenido a' : 'Welcome to';
+    const responsibleText = language === 'es'
+      ? `Esta área está bajo la responsabilidad de ${responsibleName}, ${responsiblePosition}.`
+      : `This area is managed by ${responsibleName}, ${responsiblePosition}.`;
+    const safetyText = language === 'es' ? 'Importante:' : 'Important:';
+
+    return `${welcomeText} ${areaName}. ${shortDesc} ${responsibleText} ${safetyText} ${safetyNotice} ${resumenContent}`;
+  };
+
+  // Actualizar texto de narración cuando cambie el área o idioma
+  useEffect(() => {
+    // Detener audio anterior si existe
+    if (audioElement) {
+      console.log('⏹️ Deteniendo audio anterior');
+      audioElement.pause();
+      audioElement.src = '';
+    }
+
+    const text = generateNarrationText();
+    setNarrationText(text);
+
+    // Buscar audio pre-generado en los datos del área
+    const savedAudioUrl = currentArea.audioFiles?.[language];
+
+    console.log('🔍 DEBUG - Área:', getText(currentArea.name, language));
+    console.log('🔍 DEBUG - Idioma:', language);
+    console.log('🔍 DEBUG - Audio URL:', savedAudioUrl);
+    console.log('🔍 DEBUG - audioFiles completo:', currentArea.audioFiles);
+
+    if (savedAudioUrl) {
+      // Modo: Audio real pre-generado
+      console.log('✅ Audio encontrado, cargando:', savedAudioUrl);
+      setAudioUrl(savedAudioUrl);
+      const audio = new Audio(savedAudioUrl);
+
+      audio.addEventListener('loadedmetadata', () => {
+        console.log('✅ Metadata cargada - Duración:', Math.floor(audio.duration), 'segundos');
+        setTotalDuration(Math.floor(audio.duration));
+      });
+
+      audio.addEventListener('timeupdate', () => {
+        setCurrentTime(Math.floor(audio.currentTime));
+      });
+
+      audio.addEventListener('ended', () => {
+        console.log('⏹️ Audio terminado');
+        setIsPlaying(false);
+        setCurrentTime(0);
+      });
+
+      audio.addEventListener('error', (e) => {
+        console.error('❌ Error cargando audio:', e);
+        console.error('URL del audio:', savedAudioUrl);
+      });
+
+      audio.addEventListener('canplay', () => {
+        console.log('✅ Audio listo para reproducir');
+      });
+
+      setAudioElement(audio);
+    } else {
+      // Modo: Simulación
+      console.log('⚠️ No hay audio disponible, usando simulación');
+      setAudioUrl(null);
+      setAudioElement(null);
+
+      // Estimar duración basada en palabras (promedio 150 palabras por minuto)
+      const wordCount = text.split(' ').length;
+      const estimatedSeconds = Math.ceil((wordCount / 150) * 60);
+      setTotalDuration(estimatedSeconds);
+    }
+
+    // Resetear estado del reproductor
+    setCurrentTime(0);
+    setIsPlaying(false);
+
+    // Log para facilitar acceso al texto
+    console.log('📝 Texto completo para enviar a OpenAI TTS:');
+    console.log(text);
+
+    // Cleanup
+    return () => {
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.src = '';
+      }
+    };
+  }, [currentAreaIndex, language]);
+
+  // Simulador de progreso de audio (solo cuando NO hay audio real)
+  useEffect(() => {
+    // Si hay audio real, el progreso se maneja con eventos del audio
+    if (audioElement) return;
+
+    let interval: NodeJS.Timeout | null = null;
+
+    if (isPlaying && currentTime < totalDuration) {
+      interval = setInterval(() => {
+        setCurrentTime((prev) => {
+          if (prev >= totalDuration - 1) {
+            setIsPlaying(false);
+            return totalDuration;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlaying, currentTime, totalDuration, audioElement]);
+
+  const togglePlayPause = () => {
+    console.log('🎵 togglePlayPause llamado');
+    console.log('🎵 audioElement existe:', !!audioElement);
+    console.log('🎵 isPlaying actual:', isPlaying);
+
+    if (audioElement) {
+      // Modo: Audio real
+      console.log('🎵 Usando audio real');
+      if (isPlaying) {
+        console.log('⏸️ Pausando audio');
+        audioElement.pause();
+      } else {
+        if (currentTime >= totalDuration) {
+          console.log('🔄 Reiniciando audio desde el inicio');
+          audioElement.currentTime = 0;
+        }
+        console.log('▶️ Reproduciendo audio desde:', audioElement.currentTime);
+        audioElement.play()
+          .then(() => {
+            console.log('✅ Audio reproduciendo exitosamente');
+          })
+          .catch((error) => {
+            console.error('❌ Error al reproducir audio:', error);
+          });
+      }
+      setIsPlaying(!isPlaying);
+    } else {
+      // Modo: Simulación
+      console.log('⚠️ Usando simulación (no hay audio real)');
+      if (currentTime >= totalDuration) {
+        setCurrentTime(0);
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const copyNarrationText = async () => {
+    try {
+      await navigator.clipboard.writeText(narrationText);
+      setTextCopied(true);
+      console.log('📋 Texto de narración copiado al portapapeles:');
+      console.log(narrationText);
+      setTimeout(() => setTextCopied(false), 2000);
+    } catch (err) {
+      console.error('Error al copiar texto:', err);
+      // Fallback: mostrar el texto en consola
+      console.log('📋 Texto de narración para copiar manualmente:');
+      console.log(narrationText);
+    }
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -184,18 +371,53 @@ const TourViewerPage = () => {
                 {currentAreaIndex + 1}/{tour.areas.length}
               </span>
 
-              {/* Audio Toggle */}
-              <button
-                onClick={() => setAudioEnabled(!audioEnabled)}
-                className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                title={language === 'es' ? 'Narración automática' : 'Auto narration'}
-              >
-                {audioEnabled ? (
-                  <Volume2 className="w-4 h-4 text-blue-600" />
-                ) : (
-                  <VolumeX className="w-4 h-4 text-slate-400" />
-                )}
-              </button>
+              {/* Audio Player */}
+              <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-1.5 border border-slate-200">
+                {/* Play/Pause Button */}
+                <button
+                  onClick={togglePlayPause}
+                  className="p-1 rounded-full hover:bg-blue-100 transition-colors group"
+                  title={
+                    audioElement
+                      ? language === 'es' ? 'Reproducir narración' : 'Play narration'
+                      : language === 'es' ? 'Vista previa (simulación)' : 'Preview (simulation)'
+                  }
+                >
+                  {isPlaying ? (
+                    <Pause className="w-4 h-4 text-blue-600" />
+                  ) : (
+                    <Play className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                  )}
+                </button>
+
+                {/* Time Display */}
+                <div className="flex items-center gap-1 text-xs font-mono text-slate-600 min-w-[80px]">
+                  <span>{formatTime(currentTime)}</span>
+                  <span className="text-slate-400">/</span>
+                  <span>{formatTime(totalDuration)}</span>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="relative w-24 h-1 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="absolute h-full bg-blue-600 rounded-full transition-all duration-300"
+                    style={{ width: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%` }}
+                  />
+                </div>
+
+                {/* Copy Text Button */}
+                <button
+                  onClick={copyNarrationText}
+                  className="p-1 rounded-full hover:bg-green-100 transition-colors group"
+                  title={language === 'es' ? 'Copiar texto de narración' : 'Copy narration text'}
+                >
+                  {textCopied ? (
+                    <Check className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-slate-500 group-hover:text-green-600" />
+                  )}
+                </button>
+              </div>
 
               {/* Language Selector */}
               <div className="flex items-center gap-0.5 bg-slate-100 rounded-md p-0.5">

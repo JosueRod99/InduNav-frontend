@@ -28,6 +28,10 @@ dist-ssr
 .env.local
 .env.*.local
 
+# IMPORTANTE: NO ignorar archivos de audio en public/
+# Los archivos .mp3 en public/audios/ deben subirse a git
+!public/audios/*.mp3
+
 # Testing
 coverage
 .nyc_output
