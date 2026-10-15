@@ -105,7 +105,7 @@ const Sidebar = () => {
                 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}
               `}
             >
-              InduNav
+              INAU
             </h1>
 
             {/* Logo colapsado (IN) */}
@@ -146,10 +146,9 @@ const Sidebar = () => {
                     }
                   }}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? 'bg-gray-800 text-white'
-                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${isActive
+                      ? 'bg-gray-800 text-white'
+                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
                     }`
                   }
                   title={item.label}

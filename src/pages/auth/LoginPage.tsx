@@ -38,7 +38,7 @@ const LoginPage = () => {
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900">InduNav</h1>
+          <h1 className="text-4xl font-bold text-gray-900">INAU</h1>
           <p className="mt-2 text-sm text-gray-600">
             Sistema de gestión de auditorías y visitas industriales
           </p>
@@ -174,7 +174,7 @@ const LoginPage = () => {
 
         {/* Version Info */}
         <p className="text-center text-xs text-gray-500">
-          InduNav v0.1.0 - Sistema de tours virtuales y auditorías industriales
+          INAU v0.1.0 - Sistema de tours virtuales y auditorías industriales
         </p>
       </div>
     </div>

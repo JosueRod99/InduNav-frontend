@@ -12,7 +12,7 @@ const Dashboard = () => {
           Bienvenido, {user?.first_name}!
         </h2>
         <p className="mt-1 text-sm text-gray-600">
-          Panel de control - InduNav
+          Panel de control - INAU
         </p>
       </div>
 
