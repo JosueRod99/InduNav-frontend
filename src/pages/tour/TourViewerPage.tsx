@@ -21,7 +21,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { getTourBySlug, getText, type DemoArea } from '../../demo/tourData';
+import { getTourBySlug, getText } from '../../demo/tourData';
 import { getEnhancedAreaData } from '../../demo/enhancedTourData';
 import ResumenTab from './components/ResumenTab';
 import UbicacionTab from './components/UbicacionTab';
@@ -49,11 +49,10 @@ const TourViewerPage = () => {
   const [isFaqExpanded, setIsFaqExpanded] = useState(false);
   const [narrationText, setNarrationText] = useState('');
   const [textCopied, setTextCopied] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
+    let timeoutId: number | null = null;
 
     const handleScroll = () => {
       // Clear any pending timeout
@@ -137,7 +136,6 @@ const TourViewerPage = () => {
     if (savedAudioUrl) {
       // Modo: Audio real pre-generado
       console.log('✅ Audio encontrado, cargando:', savedAudioUrl);
-      setAudioUrl(savedAudioUrl);
       const audio = new Audio(savedAudioUrl);
 
       audio.addEventListener('loadedmetadata', () => {
@@ -168,7 +166,6 @@ const TourViewerPage = () => {
     } else {
       // Modo: Simulación
       console.log('⚠️ No hay audio disponible, usando simulación');
-      setAudioUrl(null);
       setAudioElement(null);
 
       // Estimar duración basada en palabras (promedio 150 palabras por minuto)
@@ -199,7 +196,7 @@ const TourViewerPage = () => {
     // Si hay audio real, el progreso se maneja con eventos del audio
     if (audioElement) return;
 
-    let interval: NodeJS.Timeout | null = null;
+    let interval: number | null = null;
 
     if (isPlaying && currentTime < totalDuration) {
       interval = setInterval(() => {
