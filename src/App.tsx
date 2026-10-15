@@ -54,6 +54,7 @@ function App() {
       <Router>
         <Routes>
           {/* Public Routes */}
+
           <Route
             path="/login"
             element={
@@ -74,7 +75,11 @@ function App() {
               </PrivateRoute>
             }
           >
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            {
+              //<Route index element={<Navigate to="/dashboard" replace />} />
+            }
+            <Route index element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/tour" replace />} />
+
             <Route path="dashboard" element={<Dashboard />} />
             <Route
               path="organizations"
@@ -148,9 +153,16 @@ function App() {
           </Route>
 
           {/* 404 - Redirect to dashboard or login */}
+          {/* 
           <Route
             path="*"
             element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />}
+          />
+          */}
+
+          <Route
+            path="*"
+            element={<Navigate to={isAuthenticated ? '/dashboard' : '/tour'} replace />}
           />
         </Routes>
       </Router>
