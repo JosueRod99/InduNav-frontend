@@ -113,6 +113,7 @@ async function generateAudio() {
     console.log('✨ ¡Listo! Ahora puedes escuchar el audio para validar calidad y voz.');
   } catch (error) {
     console.error('❌ Error generando audio:', error);
+
     process.exit(1);
   }
 }
