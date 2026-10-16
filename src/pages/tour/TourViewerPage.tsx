@@ -598,7 +598,7 @@ const TourViewerPage = () => {
         {/* Tabs */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6 border border-slate-200">
           {/* Tab Headers */}
-          <div className="border-b border-slate-200 overflow-x-auto">
+          <div className="border-b border-slate-200 overflow-x-auto" style={{ touchAction: 'pan-x' }}>
             <div className="flex">
               {tabs.map((tab) => {
                 const Icon = tab.Icon;
