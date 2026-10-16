@@ -304,6 +304,13 @@ export const deleteProcessStep = async (stepId: string): Promise<void> => {
 };
 
 /**
+ * Move process step up or down
+ */
+export const moveProcessStep = async (stepId: string, direction: 'up' | 'down'): Promise<void> => {
+  await apiClient.patch(`/products/process-steps/${stepId}/move`, { direction });
+};
+
+/**
  * Reorder process steps
  */
 export const reorderProcessSteps = async (
@@ -416,4 +423,102 @@ export const reorderProductImages = async (
   imageOrders: { id: string; display_order: number }[]
 ): Promise<void> => {
   await apiClient.post(`/products/${productId}/images/reorder`, { imageOrders });
+};
+
+// ============================================================
+// PRODUCT DOCUMENTS
+// ============================================================
+
+export interface ProductDocument {
+  id: string;
+  product_id: string;
+  document_name: string;
+  document_url: string;
+  document_type: string | null;
+  description: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  display_order: number;
+  uploaded_date: Date | null;
+  created_at: Date;
+  updated_at: Date;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface CreateProductDocumentRequest {
+  document_name: string;
+  document_url: string;
+  document_type?: string;
+  description?: string;
+  file_size?: number;
+  mime_type?: string;
+  display_order?: number;
+  uploaded_date?: Date;
+}
+
+export interface UpdateProductDocumentRequest {
+  document_name?: string;
+  document_url?: string;
+  document_type?: string;
+  description?: string;
+  file_size?: number;
+  mime_type?: string;
+  display_order?: number;
+  uploaded_date?: Date;
+}
+
+/**
+ * Get all documents for a product
+ */
+export const getProductDocuments = async (productId: string): Promise<ProductDocument[]> => {
+  const { data } = await apiClient.get(`/products/${productId}/documents`);
+  return data.documents || [];
+};
+
+/**
+ * Get document by ID
+ */
+export const getProductDocument = async (documentId: string): Promise<ProductDocument> => {
+  const { data } = await apiClient.get(`/products/documents/${documentId}`);
+  return data.document;
+};
+
+/**
+ * Create new document for a product
+ */
+export const createProductDocument = async (
+  productId: string,
+  payload: CreateProductDocumentRequest
+): Promise<ProductDocument> => {
+  const { data } = await apiClient.post(`/products/${productId}/documents`, payload);
+  return data.document;
+};
+
+/**
+ * Update document
+ */
+export const updateProductDocument = async (
+  documentId: string,
+  payload: UpdateProductDocumentRequest
+): Promise<ProductDocument> => {
+  const { data } = await apiClient.patch(`/products/documents/${documentId}`, payload);
+  return data.document;
+};
+
+/**
+ * Delete document
+ */
+export const deleteProductDocument = async (documentId: string): Promise<void> => {
+  await apiClient.delete(`/products/documents/${documentId}`);
+};
+
+/**
+ * Reorder documents
+ */
+export const reorderProductDocuments = async (
+  productId: string,
+  documentOrders: { id: string; display_order: number }[]
+): Promise<void> => {
+  await apiClient.post(`/products/${productId}/documents/reorder`, { documentOrders });
 };

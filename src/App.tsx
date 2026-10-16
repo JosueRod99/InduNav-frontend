@@ -22,6 +22,8 @@ import AreasPage from './pages/areas/AreasPage';
 import AreaDetailPage from './pages/areas/AreaDetailPage';
 import ProductsPage from './pages/products/ProductsPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
+import EquipmentPage from './pages/equipment/EquipmentPage';
+import EquipmentDetailPage from './pages/equipment/EquipmentDetailPage';
 
 // Public Pages
 import LandingPage from './pages/LandingPage';
@@ -141,6 +143,22 @@ function App() {
               element={
                 <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
                   <ProductDetailPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="equipment"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <EquipmentPage />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="equipment/:id"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <EquipmentDetailPage />
                 </RoleProtectedRoute>
               }
             />

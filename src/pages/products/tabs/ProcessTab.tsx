@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, MapPin, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, MapPin, Clock, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
 import {
   getProcessSteps,
   deleteProcessStep,
+  moveProcessStep,
   type ProductProcessStep,
 } from '../../../api/products';
 import ProcessStepModal from '../modals/ProcessStepModal';
@@ -18,6 +19,7 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<ProductProcessStep | null>(null);
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
 
   // Fetch process steps
   const { data: processSteps = [], isLoading } = useQuery({
@@ -35,6 +37,19 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Error al eliminar paso');
+    },
+  });
+
+  // Move mutation
+  const moveMutation = useMutation({
+    mutationFn: ({ stepId, direction }: { stepId: string; direction: 'up' | 'down' }) =>
+      moveProcessStep(stepId, direction),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['process-steps', productId] });
+      queryClient.invalidateQueries({ queryKey: ['product', productId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Error al mover paso');
     },
   });
 
@@ -59,6 +74,26 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
     setEditingStep(null);
   };
 
+  const toggleStep = (stepId: string) => {
+    setExpandedSteps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(stepId)) {
+        newSet.delete(stepId);
+      } else {
+        newSet.add(stepId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleMoveUp = (stepId: string) => {
+    moveMutation.mutate({ stepId, direction: 'up' });
+  };
+
+  const handleMoveDown = (stepId: string) => {
+    moveMutation.mutate({ stepId, direction: 'down' });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -68,7 +103,7 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -100,95 +135,126 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-200">
-          {processSteps.map((step, index) => (
-            <div key={step.id} className="p-6">
-              <div className="flex items-start justify-between">
-                {/* Step Info */}
-                <div className="flex items-start gap-4 flex-1">
-                  {/* Step Number */}
-                  <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-semibold">
+          {processSteps.map((step) => {
+            const isExpanded = expandedSteps.has(step.id);
+            const hasDetails = step.description || step.notes;
+
+            return (
+              <div key={step.id}>
+                <div className="p-3">
+                  {/* Compact Header - Always Visible */}
+                  <div className="flex items-center gap-3">
+                    {/* Step Number */}
+                    <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-semibold">
                       {step.step_number}
                     </div>
-                  </div>
 
-                  {/* Step Details */}
-                  <div className="flex-1">
-                    <h4 className="text-base font-medium text-gray-900 mb-1">
-                      {step.step_name}
-                    </h4>
-
-                    {/* Area */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">
-                        {step.area_name || 'Área no especificada'}
-                        {step.area_code && (
-                          <span className="text-gray-400 ml-1">({step.area_code})</span>
+                    {/* Expand/Collapse Button */}
+                    {hasDetails && (
+                      <button
+                        onClick={() => toggleStep(step.id)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title={isExpanded ? 'Colapsar' : 'Expandir'}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-gray-500" />
                         )}
-                      </span>
-                      {step.area_color && (
-                        <div
-                          className="h-3 w-3 rounded-full"
-                          style={{ backgroundColor: step.area_color }}
-                        />
-                      )}
+                      </button>
+                    )}
+
+                    {/* Step Name & Area */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h4 className="text-sm font-medium text-gray-900">
+                          {step.step_name}
+                        </h4>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                          <MapPin className="h-3 w-3 text-gray-400" />
+                          <span>
+                            {step.area_name || 'Sin área'}
+                            {step.area_code && (
+                              <span className="text-gray-400 ml-1">({step.area_code})</span>
+                            )}
+                          </span>
+                          {step.area_color && (
+                            <div
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: step.area_color }}
+                            />
+                          )}
+                        </div>
+                        {/* Duration - Always visible */}
+                        {step.estimated_duration_hours && (
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                            <Clock className="h-3 w-3 text-gray-400" />
+                            <span>{step.estimated_duration_hours} hrs</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Duration */}
-                    {step.estimated_duration_hours && (
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                          {step.estimated_duration_hours} horas estimadas
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Description */}
-                    {step.description && (
-                      <p className="text-sm text-gray-600 mt-2">{step.description}</p>
-                    )}
-
-                    {/* Notes */}
-                    {step.notes && (
-                      <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <p className="text-sm text-yellow-800">
-                          <span className="font-medium">Notas:</span> {step.notes}
-                        </p>
-                      </div>
-                    )}
+                    {/* Actions */}
+                    <div className="flex items-center gap-1">
+                      {/* Move Up */}
+                      <button
+                        onClick={() => handleMoveUp(step.id)}
+                        disabled={step.step_number === 1 || moveMutation.isPending}
+                        className="p-1.5 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Mover arriba"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      {/* Move Down */}
+                      <button
+                        onClick={() => handleMoveDown(step.id)}
+                        disabled={step.step_number === processSteps.length || moveMutation.isPending}
+                        className="p-1.5 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Mover abajo"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                      {/* Edit */}
+                      <button
+                        onClick={() => handleEdit(step)}
+                        className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                        title="Editar"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      {/* Delete */}
+                      <button
+                        onClick={() => handleDelete(step)}
+                        disabled={deleteMutation.isPending}
+                        className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 ml-4">
-                  <button
-                    onClick={() => handleEdit(step)}
-                    className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Editar"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(step)}
-                    disabled={deleteMutation.isPending}
-                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {/* Expanded Details */}
+                  {isExpanded && hasDetails && (
+                    <div className="mt-2 ml-11 space-y-1.5">
+                      {/* Description */}
+                      {step.description && (
+                        <p className="text-xs text-gray-600">{step.description}</p>
+                      )}
+
+                      {/* Notes - Subtle secondary text */}
+                      {step.notes && (
+                        <p className="text-xs text-gray-500 italic">
+                          {step.notes}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Connection Arrow (except for last step) */}
-              {index < processSteps.length - 1 && (
-                <div className="flex items-center justify-center py-4">
-                  <div className="h-8 w-0.5 bg-gray-300"></div>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

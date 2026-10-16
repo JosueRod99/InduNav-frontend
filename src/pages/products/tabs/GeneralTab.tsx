@@ -1,7 +1,8 @@
-import { ExternalLink, FileText, Image as ImageIcon, Tag } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import { type Product, PRODUCT_CATEGORY_LABELS, PRODUCT_STATUS_LABELS } from '../../../api/products';
 import Badge from '../../../components/ui/Badge';
 import SpecificationsEditor from '../components/SpecificationsEditor';
+import ProductDocuments from '../components/ProductDocuments';
 
 interface GeneralTabProps {
   product: Product;
@@ -10,26 +11,9 @@ interface GeneralTabProps {
 const GeneralTab = ({ product }: GeneralTabProps) => {
 
   return (
-    <div className="space-y-6">
-      {/* Product Image */}
-      {product.primary_image_url && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-            <ImageIcon className="h-5 w-5" />
-            Imagen del Producto
-          </h3>
-          <div className="flex justify-center">
-            <img
-              src={product.primary_image_url}
-              alt={product.name}
-              className="max-w-md w-full h-auto rounded-lg shadow-sm"
-            />
-          </div>
-        </div>
-      )}
-
+    <div className="space-y-4">
       {/* Basic Information */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Información Básica</h3>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div>
@@ -91,7 +75,7 @@ const GeneralTab = ({ product }: GeneralTabProps) => {
 
       {/* Tags */}
       {product.tags && product.tags.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
           <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
             <Tag className="h-5 w-5" />
             Etiquetas
@@ -112,27 +96,15 @@ const GeneralTab = ({ product }: GeneralTabProps) => {
         specifications={product.specifications || {}}
       />
 
-      {/* Technical Document */}
-      {product.technical_document_url && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Documento Técnico
-          </h3>
-          <a
-            href={product.technical_document_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Abrir documento técnico
-          </a>
-        </div>
-      )}
+      {/* Product Documents */}
+      <ProductDocuments
+        productId={product.id}
+        organizationId={product.organization_id}
+        plantId={product.plant_id}
+      />
 
       {/* Audit Information */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Información de Auditoría</h3>
         <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div>
