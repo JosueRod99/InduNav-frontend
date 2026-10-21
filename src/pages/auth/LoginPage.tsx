@@ -5,12 +5,14 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import ContactModal from '../../components/ContactModal';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isContactOpen, setIsContactOpen] = useState(false);
 
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
@@ -162,12 +164,13 @@ const LoginPage = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               ¿Necesitas ayuda?{' '}
-              <a
-                href="#"
+              <button
+                type="button"
+                onClick={() => setIsContactOpen(true)}
                 className="font-medium text-primary-600 hover:text-primary-500"
               >
                 Contacta con soporte
-              </a>
+              </button>
             </p>
           </div>
         </div>
@@ -177,6 +180,12 @@ const LoginPage = () => {
           INAU v0.1.0 - Sistema de tours virtuales y auditorías industriales
         </p>
       </div>
+
+      <ContactModal
+        isOpen={isContactOpen}
+        onClose={() => setIsContactOpen(false)}
+        subject="Soporte - INAU"
+      />
     </div>
   );
 };

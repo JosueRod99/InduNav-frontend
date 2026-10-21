@@ -41,13 +41,11 @@ const DocumentacionTab = ({ language }: DocumentacionTabProps) => {
     },
   ];
 
-  const handleView = (docId: number) => {
-    console.log('Viewing document:', docId);
+  const handleView = (_docId: number) => {
     // Aquí se implementaría la lógica para abrir el documento
   };
 
-  const handleDownload = (docId: number) => {
-    console.log('Downloading document:', docId);
+  const handleDownload = (_docId: number) => {
     // Aquí se implementaría la lógica para descargar el documento
   };
 

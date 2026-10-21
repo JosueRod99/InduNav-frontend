@@ -52,29 +52,43 @@ const TourViewerPage = () => {
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    let timeoutId: number | null = null;
+    // Histéresis: se compacta al pasar 150px y solo se expande al volver casi arriba (< 20px).
+    // El hueco es mayor que el cambio de altura del header, así el reflow no lo hace rebotar.
+    const COMPACT_AT = 150;
+    const EXPAND_AT = 20;
+    // Tras cada cambio se ignora el scroll mientras dura la transición (300ms) + margen
+    const LOCK_MS = 450;
+
+    let isCompact = false;
+    let lockedUntil = 0;
+    let rafId: number | null = null;
+
+    const update = () => {
+      rafId = null;
+      if (performance.now() < lockedUntil) return;
+
+      const y = window.scrollY;
+      const next = isCompact ? y > EXPAND_AT : y > COMPACT_AT;
+      if (next === isCompact) return;
+
+      isCompact = next;
+      lockedUntil = performance.now() + LOCK_MS;
+      setIsHeaderCompact(next);
+      // Re-evaluar al terminar el bloqueo por si el usuario siguió haciendo scroll
+      window.setTimeout(() => {
+        if (rafId === null) rafId = requestAnimationFrame(update);
+      }, LOCK_MS);
+    };
 
     const handleScroll = () => {
-      // Clear any pending timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-
-      // Debounce the state update
-      timeoutId = setTimeout(() => {
-        const currentScrollY = window.scrollY;
-        const shouldBeCompact = currentScrollY > 150;
-
-        setIsHeaderCompact(shouldBeCompact);
-      }, 50); // 50ms debounce
+      if (rafId === null) rafId = requestAnimationFrame(update);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      lockedUntil = Infinity;
       window.removeEventListener('scroll', handleScroll);
     };
   }, []); // Sin dependencias para evitar re-creación del listener
@@ -117,7 +131,6 @@ const TourViewerPage = () => {
   useEffect(() => {
     // Detener audio anterior si existe
     if (audioElement) {
-      console.log('⏹️ Deteniendo audio anterior');
       audioElement.pause();
       audioElement.src = '';
     }
@@ -128,18 +141,12 @@ const TourViewerPage = () => {
     // Buscar audio pre-generado en los datos del área
     const savedAudioUrl = currentArea.audioFiles?.[language];
 
-    console.log('🔍 DEBUG - Área:', getText(currentArea.name, language));
-    console.log('🔍 DEBUG - Idioma:', language);
-    console.log('🔍 DEBUG - Audio URL:', savedAudioUrl);
-    console.log('🔍 DEBUG - audioFiles completo:', currentArea.audioFiles);
 
     if (savedAudioUrl) {
       // Modo: Audio real pre-generado
-      console.log('✅ Audio encontrado, cargando:', savedAudioUrl);
       const audio = new Audio(savedAudioUrl);
 
       audio.addEventListener('loadedmetadata', () => {
-        console.log('✅ Metadata cargada - Duración:', Math.floor(audio.duration), 'segundos');
         setTotalDuration(Math.floor(audio.duration));
       });
 
@@ -148,7 +155,6 @@ const TourViewerPage = () => {
       });
 
       audio.addEventListener('ended', () => {
-        console.log('⏹️ Audio terminado');
         setIsPlaying(false);
         setCurrentTime(0);
       });
@@ -158,14 +164,9 @@ const TourViewerPage = () => {
         console.error('URL del audio:', savedAudioUrl);
       });
 
-      audio.addEventListener('canplay', () => {
-        console.log('✅ Audio listo para reproducir');
-      });
-
       setAudioElement(audio);
     } else {
       // Modo: Simulación
-      console.log('⚠️ No hay audio disponible, usando simulación');
       setAudioElement(null);
 
       // Estimar duración basada en palabras (promedio 150 palabras por minuto)
@@ -177,10 +178,6 @@ const TourViewerPage = () => {
     // Resetear estado del reproductor
     setCurrentTime(0);
     setIsPlaying(false);
-
-    // Log para facilitar acceso al texto
-    console.log('📝 Texto completo para enviar a OpenAI TTS:');
-    console.log(text);
 
     // Cleanup
     return () => {
@@ -216,26 +213,15 @@ const TourViewerPage = () => {
   }, [isPlaying, currentTime, totalDuration, audioElement]);
 
   const togglePlayPause = () => {
-    console.log('🎵 togglePlayPause llamado');
-    console.log('🎵 audioElement existe:', !!audioElement);
-    console.log('🎵 isPlaying actual:', isPlaying);
-
     if (audioElement) {
       // Modo: Audio real
-      console.log('🎵 Usando audio real');
       if (isPlaying) {
-        console.log('⏸️ Pausando audio');
         audioElement.pause();
       } else {
         if (currentTime >= totalDuration) {
-          console.log('🔄 Reiniciando audio desde el inicio');
           audioElement.currentTime = 0;
         }
-        console.log('▶️ Reproduciendo audio desde:', audioElement.currentTime);
         audioElement.play()
-          .then(() => {
-            console.log('✅ Audio reproduciendo exitosamente');
-          })
           .catch((error) => {
             console.error('❌ Error al reproducir audio:', error);
           });
@@ -243,7 +229,6 @@ const TourViewerPage = () => {
       setIsPlaying(!isPlaying);
     } else {
       // Modo: Simulación
-      console.log('⚠️ Usando simulación (no hay audio real)');
       if (currentTime >= totalDuration) {
         setCurrentTime(0);
       }
@@ -261,14 +246,9 @@ const TourViewerPage = () => {
     try {
       await navigator.clipboard.writeText(narrationText);
       setTextCopied(true);
-      console.log('📋 Texto de narración copiado al portapapeles:');
-      console.log(narrationText);
       setTimeout(() => setTextCopied(false), 2000);
     } catch (err) {
       console.error('Error al copiar texto:', err);
-      // Fallback: mostrar el texto en consola
-      console.log('📋 Texto de narración para copiar manualmente:');
-      console.log(narrationText);
     }
   };
 

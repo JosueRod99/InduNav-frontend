@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MapPin,
@@ -7,11 +8,15 @@ import {
   Globe,
   Play,
   ChevronRight,
-  CheckCircle
+  CheckCircle,
+  Mail
 } from 'lucide-react';
+import { CONTACT_EMAIL } from '../constants/contact';
+import ContactModal from '../components/ContactModal';
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [isContactOpen, setIsContactOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -25,12 +30,21 @@ const LandingPage = () => {
               </div>
               <span className="text-xl font-bold text-slate-900">INAU</span>
             </div>
-            <button
-              onClick={() => navigate('/login')}
-              className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-blue-700 transition-colors"
-            >
-              Iniciar Sesión
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsContactOpen(true)}
+                className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-blue-700 transition-colors"
+              >
+                Contacto
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-4 py-2 text-sm font-medium text-slate-700 hover:text-blue-700 transition-colors"
+              >
+                Iniciar Sesión
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -255,6 +269,14 @@ const LandingPage = () => {
             >
               Comenzar Ahora
             </button>
+            <button
+              type="button"
+              onClick={() => setIsContactOpen(true)}
+              className="px-8 py-4 bg-slate-800 text-white rounded-lg font-semibold text-lg border-2 border-slate-700 hover:border-slate-600 transition-all flex items-center justify-center gap-2"
+            >
+              <Mail className="w-5 h-5" />
+              Contáctanos
+            </button>
           </div>
         </div>
       </section>
@@ -269,12 +291,22 @@ const LandingPage = () => {
               </div>
               <span className="text-white font-semibold">INAU</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsContactOpen(true)}
+              className="text-sm hover:text-white transition-colors flex items-center gap-2"
+            >
+              <Mail className="w-4 h-4" />
+              {CONTACT_EMAIL}
+            </button>
             <p className="text-sm">
               © 2026 INAU. Información industrial organizada y accesible.
             </p>
           </div>
         </div>
       </footer>
+
+      <ContactModal isOpen={isContactOpen} onClose={() => setIsContactOpen(false)} />
     </div>
   );
 };
