@@ -92,7 +92,11 @@ export interface EquipmentAreaAssignment {
   // Populated from joins
   equipment_code?: string;
   equipment_name?: string;
-  equipment_type?: string;
+  equipment_type?: EquipmentType;
+  equipment_status?: EquipmentStatus;
+  equipment_manufacturer?: string | null;
+  equipment_model?: string | null;
+  equipment_image_url?: string | null;
   area_name?: string;
   area_code?: string;
 }

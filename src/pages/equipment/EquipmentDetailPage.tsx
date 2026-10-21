@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge';
 import EquipmentModal from './EquipmentModal';
 import EquipmentGalleryTab from './tabs/EquipmentGalleryTab';
 import EquipmentDocumentsTab from './tabs/EquipmentDocumentsTab';
+import EquipmentAssignmentsTab from './tabs/EquipmentAssignmentsTab';
 import EquipmentSpecificationsEditor from './components/EquipmentSpecificationsEditor';
 import {
   getEquipmentById,
@@ -183,7 +184,9 @@ const EquipmentDetailPage = () => {
                           ? 'success'
                           : equipment.status === 'maintenance'
                           ? 'warning'
-                          : 'error'
+                          : equipment.status === 'out_of_service'
+                          ? 'error'
+                          : 'default'
                       }
                     >
                       {EQUIPMENT_STATUS_LABELS[equipment.status]}
@@ -289,9 +292,7 @@ const EquipmentDetailPage = () => {
         )}
 
         {activeTab === 'assignments' && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <p className="text-gray-600">Asignaciones de área - Próximamente</p>
-          </div>
+          <EquipmentAssignmentsTab equipmentId={id!} equipment={equipment} />
         )}
       </div>
 
