@@ -138,13 +138,23 @@ const AreaSelector = ({
 
         <div className="flex items-center gap-1 flex-shrink-0">
           {allowClear && selectedArea && !disabled && (
-            <button
+            // Not a <button>: it lives inside the selector button and nested buttons are invalid HTML
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Limpiar selección"
               onClick={handleClear}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onSelect(null);
+                }
+              }}
               className="p-0.5 hover:bg-gray-200 rounded transition-colors"
-              type="button"
             >
               <X className="w-4 h-4 text-gray-500" />
-            </button>
+            </span>
           )}
           <ChevronDown
             className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'transform rotate-180' : ''}`}

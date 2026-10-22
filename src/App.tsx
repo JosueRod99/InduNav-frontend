@@ -13,6 +13,8 @@ import OrganizationsPage from './pages/organizations/OrganizationsPage';
 import UsersPage from './pages/users/UsersPage';
 import PlantsPage from './pages/plants/PlantsPage';
 import ToursPage from './pages/tours/ToursPage';
+import TourEditorPage from './pages/tours/TourEditorPage';
+import TourViewerRealPage from './pages/tourViewer/TourViewerRealPage';
 import StopsPage from './pages/stops/StopsPage';
 import LayoutsPage from './pages/layouts/LayoutsPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
@@ -70,6 +72,18 @@ function App() {
           <Route path="/tour" element={<TourCatalogPage />} />
           <Route path="/tour/:tourSlug" element={<TourViewerPage />} />
 
+          {/* Real tours: draft preview (full screen, outside the app layout; demo above is separate) */}
+          <Route
+            path="/preview/tours/:tourId"
+            element={
+              <PrivateRoute>
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <TourViewerRealPage />
+                </RoleProtectedRoute>
+              </PrivateRoute>
+            }
+          />
+
           {/* Protected Routes with Layout */}
           <Route
             element={
@@ -104,6 +118,14 @@ function App() {
               }
             />
             <Route path="tours" element={<ToursPage />} />
+            <Route
+              path="tours/:tourId/edit"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <TourEditorPage />
+                </RoleProtectedRoute>
+              }
+            />
             <Route path="stops" element={<StopsPage />} />
             <Route path="layouts" element={<LayoutsPage />} />
             <Route

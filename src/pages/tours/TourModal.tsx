@@ -12,9 +12,10 @@ interface TourModalProps {
   isOpen: boolean;
   onClose: () => void;
   tour?: Tour | null;
+  onCreated?: (tour: Tour) => void; // e.g. open the tour editor
 }
 
-const TourModal = ({ isOpen, onClose, tour }: TourModalProps) => {
+const TourModal = ({ isOpen, onClose, tour, onCreated }: TourModalProps) => {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<CreateTourRequest>({
     plant_id: '',
@@ -54,10 +55,11 @@ const TourModal = ({ isOpen, onClose, tour }: TourModalProps) => {
 
   const createMutation = useMutation({
     mutationFn: createTour,
-    onSuccess: () => {
+    onSuccess: (created) => {
       toast.success('Tour creado exitosamente');
       queryClient.invalidateQueries({ queryKey: ['tours'] });
       onClose();
+      onCreated?.(created);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Error al crear tour');

@@ -53,6 +53,7 @@ interface LayoutMapProps {
   highlightedId?: string | null; // area or footprint highlighted from outside (e.g. a side list)
   onShapeHover?: (id: string | null) => void;
   scrollWheelZoom?: boolean; // disable inside scrollable pages (public tour)
+  route?: number[][] | null; // dashed path through points, GeoJSON [x, y] (e.g. tour stop order)
   drawMode?: boolean;
   drawTitle?: string;
   editMode?: boolean;
@@ -648,6 +649,7 @@ const LayoutMap = ({
   highlightedId = null,
   onShapeHover,
   scrollWheelZoom = true,
+  route = null,
   drawMode,
   drawTitle,
   editMode,
@@ -786,6 +788,15 @@ const LayoutMap = ({
             </Polygon>
           );
         })}
+
+        {/* Route through the areas (tour order) */}
+        {route && route.length >= 2 && (
+          <Polyline
+            positions={toLeaflet(route)}
+            pathOptions={{ color: '#1D4ED8', weight: 3, dashArray: '6 8', lineCap: 'round' }}
+            interactive={false}
+          />
+        )}
 
         {/* Equipment footprints: dark solid border + label, drawn above areas */}
         {footprints.map((fp) => {
