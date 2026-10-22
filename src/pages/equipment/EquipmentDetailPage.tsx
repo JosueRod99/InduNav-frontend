@@ -8,6 +8,7 @@ import EquipmentModal from './EquipmentModal';
 import EquipmentGalleryTab from './tabs/EquipmentGalleryTab';
 import EquipmentDocumentsTab from './tabs/EquipmentDocumentsTab';
 import EquipmentAssignmentsTab from './tabs/EquipmentAssignmentsTab';
+import EquipmentProductsTab from './tabs/EquipmentProductsTab';
 import EquipmentSpecificationsEditor from './components/EquipmentSpecificationsEditor';
 import {
   getEquipmentById,
@@ -18,7 +19,7 @@ import {
 const EquipmentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'general' | 'gallery' | 'documents' | 'assignments'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'gallery' | 'documents' | 'assignments' | 'products'>('general');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: equipment, isLoading } = useQuery({
@@ -146,6 +147,16 @@ const EquipmentDetailPage = () => {
             }`}
           >
             Asignaciones
+          </button>
+          <button
+            onClick={() => setActiveTab('products')}
+            className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'products'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Productos
           </button>
         </div>
       </div>
@@ -292,6 +303,10 @@ const EquipmentDetailPage = () => {
 
         {activeTab === 'assignments' && (
           <EquipmentAssignmentsTab equipmentId={id!} equipment={equipment} />
+        )}
+
+        {activeTab === 'products' && (
+          <EquipmentProductsTab equipmentId={id!} equipment={equipment} />
         )}
       </div>
 

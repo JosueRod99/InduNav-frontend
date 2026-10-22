@@ -116,6 +116,8 @@ const EquipmentModal = ({
         queryClient.invalidateQueries({ queryKey: ['equipment-assignments', equipment?.id] });
         queryClient.invalidateQueries({ queryKey: ['area-equipment'] });
         queryClient.invalidateQueries({ queryKey: ['layout-footprints'] });
+        queryClient.invalidateQueries({ queryKey: ['product-equipment'] });
+        queryClient.invalidateQueries({ queryKey: ['equipment-products', equipment?.id] });
       }
       onClose();
     },
@@ -145,7 +147,7 @@ const EquipmentModal = ({
     if (
       plantChanged &&
       !window.confirm(
-        'Al cambiar de planta, el equipo se retirará de su área actual y se borrará su dibujo en el layout. ¿Continuar?'
+        'Al cambiar de planta, el equipo se retirará de su área actual, se borrará su dibujo en el layout y se quitará de los pasos de producto donde se usa. ¿Continuar?'
       )
     ) {
       return;
@@ -203,7 +205,8 @@ const EquipmentModal = ({
           </select>
           {plantChanged && (
             <p className="mt-1 text-xs text-amber-700">
-              Cambiar de planta retira el equipo de su área actual y borra su dibujo en el layout.
+              Cambiar de planta retira el equipo de su área actual, borra su dibujo en el layout y lo quita de
+              los pasos de producto donde se usa.
             </p>
           )}
         </div>

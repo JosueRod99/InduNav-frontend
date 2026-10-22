@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, MapPin, Clock, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import { Plus, Edit, Trash2, MapPin, Clock, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
 import {
@@ -10,6 +10,18 @@ import {
   type ProductProcessStep,
 } from '../../../api/products';
 import ProcessStepModal from '../modals/ProcessStepModal';
+import StepEquipmentModal from '../modals/StepEquipmentModal';
+import { useAuthStore } from '../../../store/authStore';
+import { EQUIPMENT_STATUS_COLORS, EQUIPMENT_STATUS_LABELS } from '../../../api/equipment';
+import {
+  getProductEquipment,
+  deleteStepEquipment,
+  USAGE_TYPE_LABELS,
+  type ProductStepEquipment,
+} from '../../../api/productStepEquipment';
+
+// Same roles the backend requires to link equipment to steps
+const EQUIPMENT_EDITOR_ROLES = ['platform_admin', 'org_owner'];
 
 interface ProcessTabProps {
   productId: string;
@@ -20,6 +32,38 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<ProductProcessStep | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  const [equipmentStep, setEquipmentStep] = useState<ProductProcessStep | null>(null);
+  const { user } = useAuthStore();
+  const canEditEquipment = !!user?.role && EQUIPMENT_EDITOR_ROLES.includes(user.role.name);
+
+  // Equipment used in each step
+  const { data: stepEquipment = [] } = useQuery({
+    queryKey: ['product-equipment', productId],
+    queryFn: () => getProductEquipment(productId),
+  });
+  const equipmentByStep = stepEquipment.reduce<Record<string, ProductStepEquipment[]>>((acc, link) => {
+    (acc[link.process_step_id] ||= []).push(link);
+    return acc;
+  }, {});
+
+  const unlinkMutation = useMutation({
+    mutationFn: deleteStepEquipment,
+    onSuccess: () => {
+      toast.success('Equipo desvinculado del paso');
+      queryClient.invalidateQueries({ queryKey: ['product-equipment', productId] });
+      queryClient.invalidateQueries({ queryKey: ['step-equipment-candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-products'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Error al desvincular equipo');
+    },
+  });
+
+  const handleUnlink = (link: ProductStepEquipment) => {
+    if (window.confirm(`¿Quitar "${link.equipment_name}" del paso "${link.step_name}"?`)) {
+      unlinkMutation.mutate(link.id);
+    }
+  };
 
   // Fetch process steps
   const { data: processSteps = [], isLoading } = useQuery({
@@ -33,6 +77,7 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
     onSuccess: () => {
       toast.success('Paso eliminado exitosamente');
       queryClient.invalidateQueries({ queryKey: ['process-steps', productId] });
+      queryClient.invalidateQueries({ queryKey: ['product-equipment', productId] });
       queryClient.invalidateQueries({ queryKey: ['product', productId] });
     },
     onError: (error: any) => {
@@ -235,6 +280,56 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
                     </div>
                   </div>
 
+                  {/* Equipment used in this step */}
+                  {((equipmentByStep[step.id]?.length ?? 0) > 0 || canEditEquipment) && (
+                    <div className="mt-2 ml-11 flex flex-wrap items-center gap-1.5">
+                      {(equipmentByStep[step.id] || []).map((link) => (
+                        <span
+                          key={link.id}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${
+                            link.usage_type === 'required'
+                              ? 'border-slate-300 bg-white text-gray-800'
+                              : 'border-dashed border-slate-300 bg-slate-50 text-gray-600'
+                          }`}
+                          title={[
+                            `${USAGE_TYPE_LABELS[link.usage_type]} · ${EQUIPMENT_STATUS_LABELS[link.equipment_status]}`,
+                            !link.in_step_area &&
+                              `No está en el área del paso (actual: ${link.current_area_name || 'sin área'})`,
+                            link.notes,
+                          ]
+                            .filter(Boolean)
+                            .join('\n')}
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: EQUIPMENT_STATUS_COLORS[link.equipment_status] }}
+                          />
+                          <span className="font-mono text-gray-500">{link.equipment_code}</span>
+                          <span className="max-w-[10rem] truncate">{link.equipment_name}</span>
+                          {!link.in_step_area && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                          {canEditEquipment && (
+                            <button
+                              onClick={() => handleUnlink(link)}
+                              className="text-gray-400 hover:text-red-600"
+                              title="Quitar del paso"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                      {canEditEquipment && (
+                        <button
+                          onClick={() => setEquipmentStep(step)}
+                          className="inline-flex items-center gap-1 rounded-full border border-dashed border-blue-300 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Equipo
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Expanded Details */}
                   {isExpanded && hasDetails && (
                     <div className="mt-2 ml-11 space-y-1.5">
@@ -256,6 +351,16 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
             );
           })}
         </div>
+      )}
+
+      {/* Step Equipment Modal */}
+      {equipmentStep && (
+        <StepEquipmentModal
+          isOpen
+          onClose={() => setEquipmentStep(null)}
+          productId={productId}
+          step={equipmentStep}
+        />
       )}
 
       {/* Process Step Modal */}
