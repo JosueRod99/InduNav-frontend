@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Search, AlertCircle } from 'lucide-react';
+import { X, Search, AlertCircle, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Button from '../../../components/ui/Button';
 import {
   getEmployeesByArea,
   createAssignment,

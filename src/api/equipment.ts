@@ -1,4 +1,5 @@
 import apiClient from './client';
+import type { GeoJSONPolygon } from './areaRepresentations';
 
 // ============================================================
 // TYPE DEFINITIONS
@@ -119,6 +120,7 @@ export interface CreateEquipmentRequest {
 }
 
 export interface UpdateEquipmentRequest {
+  plant_id?: string;
   code?: string;
   name?: string;
   equipment_type?: EquipmentType;
@@ -201,6 +203,14 @@ export const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
   maintenance: 'En Mantenimiento',
   out_of_service: 'Fuera de Servicio',
   retired: 'Dado de Baja',
+};
+
+// Status colors used on area layouts (map fill, legend and lists)
+export const EQUIPMENT_STATUS_COLORS: Record<EquipmentStatus, string> = {
+  active: '#16A34A',
+  maintenance: '#F59E0B',
+  out_of_service: '#DC2626',
+  retired: '#6B7280',
 };
 
 export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
@@ -485,4 +495,62 @@ export const endAreaAssignment = async (
  */
 export const deleteAreaAssignment = async (assignmentId: string): Promise<void> => {
   await apiClient.delete(`/equipment/area-assignments/${assignmentId}`);
+};
+
+// ============================================================
+// API FUNCTIONS - EQUIPMENT FOOTPRINTS (area internal layouts)
+// ============================================================
+
+export interface EquipmentFootprint {
+  id: string;
+  equipment_id: string;
+  layout_id: string;
+  geometry: GeoJSONPolygon;
+  display_color: string | null;
+  metadata: Record<string, any>;
+  created_at: Date;
+  updated_at: Date;
+
+  // Populated from joins
+  equipment_code?: string;
+  equipment_name?: string;
+  equipment_type?: EquipmentType;
+  equipment_status?: EquipmentStatus;
+}
+
+/**
+ * Get equipment footprints drawn on a layout
+ */
+export const getLayoutFootprints = async (layoutId: string): Promise<EquipmentFootprint[]> => {
+  const { data } = await apiClient.get(`/equipment/layouts/${layoutId}/footprints`);
+  return data.footprints || [];
+};
+
+/**
+ * Create (or replace) the footprint of equipment on a layout
+ */
+export const createFootprint = async (
+  equipmentId: string,
+  payload: { layout_id: string; geometry: GeoJSONPolygon; display_color?: string | null }
+): Promise<EquipmentFootprint> => {
+  const { data } = await apiClient.post(`/equipment/${equipmentId}/footprints`, payload);
+  return data.footprint;
+};
+
+/**
+ * Update footprint geometry or color
+ */
+export const updateFootprint = async (
+  footprintId: string,
+  payload: { geometry?: GeoJSONPolygon; display_color?: string | null }
+): Promise<EquipmentFootprint> => {
+  const { data } = await apiClient.patch(`/equipment/footprints/${footprintId}`, payload);
+  return data.footprint;
+};
+
+/**
+ * Delete footprint
+ */
+export const deleteFootprint = async (footprintId: string): Promise<void> => {
+  await apiClient.delete(`/equipment/footprints/${footprintId}`);
 };

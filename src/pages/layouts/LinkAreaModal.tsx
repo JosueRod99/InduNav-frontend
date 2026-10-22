@@ -9,6 +9,7 @@ import AreaSelector from '../../components/areas/AreaSelector';
 import {
   getAreaTree,
   createArea,
+  type AreaTreeNode,
   type CreateAreaRequest,
 } from '../../api/areas';
 import {
@@ -26,7 +27,19 @@ interface LinkAreaModalProps {
   layoutId: string | null;
   floorLevel: number;
   coordinates: number[][]; // Leaflet format [lat, lng]
+  // When drawing inside an area internal layout: only its sub-areas can be linked,
+  // and new areas are created as its children
+  parentArea?: { id: string; name: string };
 }
+
+const findNode = (nodes: AreaTreeNode[], id: string): AreaTreeNode | null => {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const found = node.children ? findNode(node.children, id) : null;
+    if (found) return found;
+  }
+  return null;
+};
 
 type TabType = 'link' | 'create';
 
@@ -58,6 +71,7 @@ const LinkAreaModal = ({
   layoutId,
   floorLevel,
   coordinates,
+  parentArea,
 }: LinkAreaModalProps) => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('link');
@@ -67,7 +81,7 @@ const LinkAreaModal = ({
   const [newAreaData, setNewAreaData] = useState<CreateAreaRequest>({
     organization_id: organizationId,
     plant_id: plantId,
-    parent_area_id: null,
+    parent_area_id: parentArea?.id || null,
     name: '',
     code: '',
     description: '',
@@ -110,7 +124,7 @@ const LinkAreaModal = ({
       setNewAreaData({
         organization_id: organizationId,
         plant_id: plantId,
-        parent_area_id: null,
+        parent_area_id: parentArea?.id || null,
         name: '',
         code: '',
         description: '',
@@ -122,7 +136,12 @@ const LinkAreaModal = ({
         supervisor_id: '',
       });
     }
-  }, [isOpen, organizationId, plantId]);
+  }, [isOpen, organizationId, plantId, parentArea?.id]);
+
+  // Inside an area layout only that area's descendants are linkable
+  const linkableAreas = parentArea
+    ? (areasTree && findNode(areasTree, parentArea.id)?.children) || []
+    : areasTree;
 
   // Mutation for linking existing area
   const linkAreaMutation = useMutation({
@@ -284,17 +303,19 @@ const LinkAreaModal = ({
       {activeTab === 'link' ? (
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Selecciona un área organizacional existente para vincular esta geometría.
+            {parentArea
+              ? `Selecciona una subárea de "${parentArea.name}" para vincular esta geometría.`
+              : 'Selecciona un área organizacional existente para vincular esta geometría.'}
           </p>
 
           {isLoadingAreas ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : areasTree && areasTree.length > 0 ? (
+          ) : linkableAreas && linkableAreas.length > 0 ? (
             <AreaSelector
-              label="Área Organizacional"
-              areas={areasTree}
+              label={parentArea ? 'Subárea' : 'Área Organizacional'}
+              areas={linkableAreas}
               selectedAreaId={selectedAreaId}
               onSelect={(area) => setSelectedAreaId(area?.id || null)}
               placeholder="Seleccionar área..."
@@ -303,7 +324,11 @@ const LinkAreaModal = ({
           ) : (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
-                <strong>No hay áreas organizacionales disponibles.</strong>
+                <strong>
+                  {parentArea
+                    ? `"${parentArea.name}" todavía no tiene subáreas.`
+                    : 'No hay áreas organizacionales disponibles.'}
+                </strong>
               </p>
               <p className="text-xs text-yellow-700 mt-2">
                 Ve a la página de Áreas y crea al menos un área organizacional para esta planta, o usa la pestaña "Crear Nueva Área".
@@ -341,7 +366,11 @@ const LinkAreaModal = ({
           />
 
           {/* Parent Area */}
-          {areasTree && areasTree.length > 0 && (
+          {parentArea ? (
+            <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              Se creará como subárea de <strong>{parentArea.name}</strong>
+            </div>
+          ) : areasTree && areasTree.length > 0 && (
             <AreaSelector
               label="Área Padre (opcional)"
               areas={areasTree}

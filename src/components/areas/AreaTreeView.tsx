@@ -32,7 +32,7 @@ const AreaTreeView = ({
 
   const treeData = areas.map(transformToTreeNode);
 
-  const renderAreaNode = (node: TreeNode & AreaTreeNode, isExpanded: boolean, hasChildren: boolean) => {
+  const renderAreaNode = (node: TreeNode & AreaTreeNode, _isExpanded: boolean, _hasChildren: boolean) => {
     const areaTypeColors: Record<string, string> = {
       production: 'bg-blue-100 text-blue-800',
       warehouse: 'bg-yellow-100 text-yellow-800',

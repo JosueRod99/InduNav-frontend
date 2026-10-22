@@ -28,6 +28,8 @@ export interface AreaPhysicalRepresentation {
     id: string;
     layout_name: string;
     plant_id: string;
+    layout_image_url?: string | null;
+    organizational_area_id?: string | null; // set when it's an area internal layout
   };
 }
 

@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { X, Download, History, FileText, Upload, ExternalLink } from 'lucide-react';
+import { X, History, Upload, ExternalLink } from 'lucide-react';
 import {
   updateDocument,
   getDocumentVersions,
   getFileIcon,
   formatFileSize,
   getCategoryLabel,
-  getStatusLabel,
   type AreaDocument,
 } from '../../../api/areaDocuments';
 import Button from '../../../components/ui/Button';

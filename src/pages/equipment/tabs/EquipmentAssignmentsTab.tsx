@@ -64,6 +64,8 @@ const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignment
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['equipment-assignments', equipmentId] });
     queryClient.invalidateQueries({ queryKey: ['area-equipment'] });
+    // Moving/removing equipment deletes its footprint from the previous area layout
+    queryClient.invalidateQueries({ queryKey: ['layout-footprints'] });
   };
 
   const resetForm = () => {

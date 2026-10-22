@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Plus, ExternalLink, Trash2, Edit, Calendar, HardDrive } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
 import EquipmentDocumentModal from '../modals/EquipmentDocumentModal';
 import {

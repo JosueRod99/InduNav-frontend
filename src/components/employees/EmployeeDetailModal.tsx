@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { X, User, Mail, Phone, Briefcase, Building2, Calendar, MapPin, Award, Users } from 'lucide-react';
-import { getEmployee, type Employee } from '../../api/employees';
+import { getEmployee } from '../../api/employees';
 import { getAssignmentsByEmployee } from '../../api/areaAssignments';
 import Badge from '../ui/Badge';
 

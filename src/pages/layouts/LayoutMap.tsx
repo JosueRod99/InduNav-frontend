@@ -1,34 +1,71 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { MapContainer, ImageOverlay, Polygon, useMap } from 'react-leaflet';
+import { MapContainer, ImageOverlay, Polygon, Polyline, Rectangle, Tooltip, useMap } from 'react-leaflet';
 import { Check, RotateCcw, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
-import type { AreaPhysicalRepresentation } from '../../api/areaRepresentations';
+import type { AreaPhysicalRepresentation, GeoJSONPolygon } from '../../api/areaRepresentations';
 import Button from '../../components/ui/Button';
+import {
+  EQUIPMENT_STATUS_COLORS,
+  EQUIPMENT_STATUS_LABELS,
+  type EquipmentStatus,
+} from '../../api/equipment';
+
+// Any polygon that can be edited point by point (area representation or equipment footprint)
+export interface EditableShape {
+  id: string;
+  geometry: GeoJSONPolygon;
+  color?: string;
+  name?: string;
+}
+
+// Equipment footprint drawn on an area internal layout
+export interface MapFootprint {
+  id: string;
+  geometry: GeoJSONPolygon;
+  label: string;
+  color?: string | null;
+  status?: EquipmentStatus;
+}
+
+// Border dash per status so the state is readable without relying only on color
+const STATUS_DASH: Partial<Record<EquipmentStatus, string>> = {
+  maintenance: '6 4',
+  out_of_service: '2 4',
+};
 
 interface LayoutMapProps {
   imageUrl: string | null;
+  imageBounds?: L.LatLngBoundsExpression; // defaults to the full 0–1000 canvas
+  outline?: number[][] | null; // boundary of the parent area, GeoJSON [x, y]
   areas: AreaPhysicalRepresentation[];
   onAreaClick?: (area: AreaPhysicalRepresentation) => void;
   selectedAreaId?: string | null;
+  footprints?: MapFootprint[];
+  onFootprintClick?: (footprint: MapFootprint) => void;
+  selectedFootprintId?: string | null;
+  colorByStatus?: boolean; // fill footprints by equipment status instead of their own color
   drawMode?: boolean;
+  drawTitle?: string;
   editMode?: boolean;
-  editingArea?: AreaPhysicalRepresentation | null;
+  editingArea?: EditableShape | null;
   onAreaDrawn?: (coordinates: number[][]) => void;
   onAreaEdited?: (coordinates: number[][]) => void;
 }
 
-// Component to handle map bounds based on image
-function MapBoundsHandler({ imageUrl }: { imageUrl: string | null }) {
+const CANVAS_BOUNDS: L.LatLngBoundsExpression = [[0, 0], [1000, 1000]];
+const GRID_LINES = Array.from({ length: 11 }, (_, i) => i * 100);
+const DEFAULT_FOOTPRINT_COLOR = '#334155';
+
+const toLeaflet = (coords: number[][]) => coords.map((c) => [c[1], c[0]] as L.LatLngExpression);
+
+// Component to fit the map to the layout canvas
+function MapBoundsHandler() {
   const map = useMap();
 
   useEffect(() => {
-    if (imageUrl) {
-      // Set default bounds for the map
-      const bounds = L.latLngBounds([[0, 0], [1000, 1000]]);
-      map.fitBounds(bounds);
-    }
-  }, [imageUrl, map]);
+    map.fitBounds(L.latLngBounds(CANVAS_BOUNDS as L.LatLngBoundsLiteral));
+  }, [map]);
 
   return null;
 }
@@ -36,10 +73,12 @@ function MapBoundsHandler({ imageUrl }: { imageUrl: string | null }) {
 // Component to handle drawing mode with editable points
 function DrawingHandler({
   drawMode,
+  title = 'Dibujando Área',
   onAreaDrawn,
   onCancel
 }: {
   drawMode: boolean;
+  title?: string;
   onAreaDrawn?: (coordinates: number[][]) => void;
   onCancel?: () => void;
 }) {
@@ -184,14 +223,6 @@ function DrawingHandler({
 
       const coordinates = points.map(p => [p.lat, p.lng]);
 
-      // Debug: Log coordinates being sent
-      console.log('🎨 Drawing finished with points:', {
-        pointsCount: points.length,
-        coordinates: coordinates,
-        firstPoint: coordinates[0],
-        lastPoint: coordinates[coordinates.length - 1],
-      });
-
       // Use setTimeout to ensure the flag is set before any click events
       setTimeout(() => {
         onAreaDrawn?.(coordinates);
@@ -225,7 +256,7 @@ function DrawingHandler({
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-900">Dibujando Área</h3>
+        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -292,7 +323,7 @@ function EditingHandler({
   onCancel
 }: {
   editMode: boolean;
-  editingArea: AreaPhysicalRepresentation | null;
+  editingArea: EditableShape | null;
   onAreaEdited?: (coordinates: number[][]) => void;
   onCancel?: () => void;
 }) {
@@ -337,8 +368,8 @@ function EditingHandler({
 
     if (pts.length >= 2) {
       polygonRef.current = L.polygon(pts, {
-        color: (editingArea as any)?.color || '#3B82F6',
-        fillColor: (editingArea as any)?.color || '#3B82F6',
+        color: editingArea?.color || '#3B82F6',
+        fillColor: editingArea?.color || '#3B82F6',
         fillOpacity: 0.3,
         weight: 2,
       }).addTo(map);
@@ -363,7 +394,7 @@ function EditingHandler({
         icon: L.divIcon({
           className: 'edit-point-marker',
           html: `<div style="
-            background: ${(editingArea as any)?.color || '#3B82F6'};
+            background: ${editingArea?.color || '#3B82F6'};
             width: 14px;
             height: 14px;
             border-radius: 50%;
@@ -483,10 +514,6 @@ function EditingHandler({
   const handleFinish = () => {
     if (points.length >= 3) {
       const coordinates = points.map(p => [p.lat, p.lng]);
-      console.log('✏️ Editing finished with points:', {
-        pointsCount: points.length,
-        coordinates: coordinates,
-      });
 
       setTimeout(() => {
         onAreaEdited?.(coordinates);
@@ -518,7 +545,7 @@ function EditingHandler({
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-900">Editando Área: {(editingArea as any)?.name || 'Sin nombre'}</h3>
+        <h3 className="text-sm font-semibold text-gray-900">Editando: {editingArea?.name || 'Sin nombre'}</h3>
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -596,10 +623,17 @@ interface ExtendedLayoutMapProps extends LayoutMapProps {
 
 const LayoutMap = ({
   imageUrl,
+  imageBounds = CANVAS_BOUNDS,
+  outline,
   areas,
   onAreaClick,
   selectedAreaId,
+  footprints = [],
+  onFootprintClick,
+  selectedFootprintId,
+  colorByStatus = false,
   drawMode,
+  drawTitle,
   editMode,
   editingArea,
   onAreaDrawn,
@@ -607,20 +641,12 @@ const LayoutMap = ({
   onCancelDraw,
   onCancelEdit
 }: ExtendedLayoutMapProps) => {
-  const bounds: L.LatLngBoundsExpression = [[0, 0], [1000, 1000]];
+  const isEditing = (id: string) => editMode && editingArea?.id === id;
 
-  // Debug: Log areas when they change
-  useEffect(() => {
-    if (areas.length > 0) {
-      console.log('📍 Areas loaded from DB:', areas.map(area => ({
-        name: area.organizational_area?.name || area.display_name,
-        geometryType: area.geometry?.type,
-        coordinatesCount: area.geometry?.coordinates?.[0]?.length,
-        firstCoord: area.geometry?.coordinates?.[0]?.[0],
-        lastCoord: area.geometry?.coordinates?.[0]?.[area.geometry?.coordinates?.[0]?.length - 1],
-      })));
-    }
-  }, [areas]);
+  const statusCounts = footprints.reduce<Partial<Record<EquipmentStatus, number>>>((acc, fp) => {
+    if (fp.status) acc[fp.status] = (acc[fp.status] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="relative w-full h-full">
@@ -628,15 +654,16 @@ const LayoutMap = ({
         center={[500, 500]}
         zoom={0}
         minZoom={-2}
-        maxZoom={2}
+        maxZoom={3}
         crs={L.CRS.Simple}
         className="w-full h-full"
         zoomControl={true}
         attributionControl={false}
       >
-        <MapBoundsHandler imageUrl={imageUrl} />
+        <MapBoundsHandler />
         <DrawingHandler
           drawMode={drawMode || false}
+          title={drawTitle}
           onAreaDrawn={onAreaDrawn}
           onCancel={onCancelDraw}
         />
@@ -647,39 +674,49 @@ const LayoutMap = ({
           onCancel={onCancelEdit}
         />
 
-        {imageUrl && (
-          <ImageOverlay
-            url={imageUrl}
-            bounds={bounds}
+        {imageUrl ? (
+          <ImageOverlay url={imageUrl} bounds={imageBounds} />
+        ) : (
+          <>
+            {/* Blank canvas with a reference grid */}
+            <Rectangle
+              bounds={CANVAS_BOUNDS}
+              pathOptions={{ color: '#E5E7EB', weight: 1, fillColor: '#FFFFFF', fillOpacity: 1 }}
+              interactive={false}
+            />
+            {GRID_LINES.map((v) => (
+              <Polyline
+                key={`h${v}`}
+                positions={[[v, 0], [v, 1000]]}
+                pathOptions={{ color: '#F1F5F9', weight: 1 }}
+                interactive={false}
+              />
+            ))}
+            {GRID_LINES.map((v) => (
+              <Polyline
+                key={`v${v}`}
+                positions={[[0, v], [1000, v]]}
+                pathOptions={{ color: '#F1F5F9', weight: 1 }}
+                interactive={false}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Boundary of the parent area (area internal layouts) */}
+        {outline && outline.length >= 3 && (
+          <Polygon
+            positions={toLeaflet(outline)}
+            pathOptions={{ color: '#1E3A8A', weight: 3, dashArray: '8 6', fill: false }}
+            interactive={false}
           />
         )}
 
         {areas.map((area) => {
           if (!area.geometry?.coordinates?.[0]) return null;
 
-          // Don't render the area being edited (EditingHandler handles it)
-          if (editMode && editingArea && area.id === editingArea.id) {
-            return null;
-          }
-
-          // Log original coordinates from DB
-          const dbCoords = area.geometry.coordinates[0];
-
-          // Convert from GeoJSON [lng, lat] to Leaflet [lat, lng]
-          const coordinates = dbCoords.map((coord: number[]) =>
-            [coord[1], coord[0]] as L.LatLngExpression
-          );
-
-          // Debug log for comparison
-          const areaName = area.organizational_area?.name || area.display_name;
-          if (areaName === 'test2') {
-            console.log('🔍 Converting test2 area:', {
-              dbFormat: 'GeoJSON [lng, lat]',
-              leafletFormat: 'Leaflet [lat, lng]',
-              allPointsDB: dbCoords,
-              allPointsLeaflet: coordinates,
-            });
-          }
+          // Don't render the shape being edited (EditingHandler handles it)
+          if (isEditing(area.id)) return null;
 
           // Get color from display_color, or fall back to organizational area color
           const areaColor = area.display_color || area.organizational_area?.color || '#3B82F6';
@@ -687,7 +724,7 @@ const LayoutMap = ({
           return (
             <Polygon
               key={area.id}
-              positions={coordinates}
+              positions={toLeaflet(area.geometry.coordinates[0])}
               pathOptions={{
                 color: areaColor,
                 fillColor: areaColor,
@@ -700,7 +737,60 @@ const LayoutMap = ({
             />
           );
         })}
+
+        {/* Equipment footprints: dark solid border + label, drawn above areas */}
+        {footprints.map((fp) => {
+          if (!fp.geometry?.coordinates?.[0] || isEditing(fp.id)) return null;
+          const statusColor = fp.status ? EQUIPMENT_STATUS_COLORS[fp.status] : undefined;
+          const color = (colorByStatus && statusColor) || fp.color || DEFAULT_FOOTPRINT_COLOR;
+          const isSelected = selectedFootprintId === fp.id;
+
+          return (
+            <Polygon
+              key={fp.id}
+              positions={toLeaflet(fp.geometry.coordinates[0])}
+              pathOptions={{
+                color: isSelected ? '#F59E0B' : '#0F172A',
+                fillColor: color,
+                fillOpacity: isSelected ? 0.85 : 0.65,
+                weight: isSelected ? 3 : 2,
+                dashArray: colorByStatus && fp.status ? STATUS_DASH[fp.status] : undefined,
+              }}
+              eventHandlers={{
+                click: () => onFootprintClick?.(fp),
+              }}
+            >
+              <Tooltip
+                permanent
+                direction="center"
+                className={`equipment-footprint-label ${
+                  colorByStatus && fp.status ? `status-${fp.status}` : ''
+                }`}
+              >
+                {fp.label}
+              </Tooltip>
+            </Polygon>
+          );
+        })}
       </MapContainer>
+
+      {/* Status legend */}
+      {colorByStatus && footprints.length > 0 && !drawMode && !editMode && (
+        <div className="absolute bottom-3 left-3 z-[1000] bg-white/95 rounded-lg shadow-md border border-gray-200 px-3 py-2 space-y-1">
+          {(Object.keys(EQUIPMENT_STATUS_COLORS) as EquipmentStatus[])
+            .filter((status) => statusCounts[status])
+            .map((status) => (
+              <div key={status} className="flex items-center gap-2 text-xs text-gray-700">
+                <span
+                  className="w-3 h-3 rounded-sm border border-slate-900/40"
+                  style={{ backgroundColor: EQUIPMENT_STATUS_COLORS[status] }}
+                />
+                <span>{EQUIPMENT_STATUS_LABELS[status]}</span>
+                <span className="ml-auto pl-2 font-semibold text-gray-900">{statusCounts[status]}</span>
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 };

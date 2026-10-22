@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -15,6 +15,7 @@ import {
   EQUIPMENT_TYPE_LABELS,
   EQUIPMENT_STATUS_LABELS,
 } from '../../api/equipment';
+import { getPlants } from '../../api/plants';
 
 interface EquipmentModalProps {
   isOpen: boolean;
@@ -34,6 +35,13 @@ const EquipmentModal = ({
   const queryClient = useQueryClient();
   const isEditing = !!equipment;
 
+  const { data: plantsData } = useQuery({
+    queryKey: ['plants', organizationId],
+    queryFn: () => getPlants({ organization_id: organizationId, limit: 100 }),
+    enabled: isOpen && !!organizationId,
+  });
+  const plants = plantsData?.plants || [];
+
   const [formData, setFormData] = useState<CreateEquipmentRequest>({
     organization_id: organizationId,
     plant_id: plantId || '',
@@ -51,6 +59,10 @@ const EquipmentModal = ({
   });
 
   useEffect(() => {
+    if (!equipment) {
+      // Preselect the plant filtered on the list page; the user can change it
+      setFormData((prev) => ({ ...prev, organization_id: organizationId, plant_id: plantId || '' }));
+    }
     if (equipment) {
       setFormData({
         organization_id: equipment.organization_id,
@@ -68,7 +80,16 @@ const EquipmentModal = ({
         warranty_expiry_date: equipment.warranty_expiry_date || undefined,
       });
     }
-  }, [equipment]);
+  }, [equipment, organizationId, plantId]);
+
+  // Auto-select when the organization has a single plant
+  useEffect(() => {
+    if (!isEditing && !formData.plant_id && plants.length === 1) {
+      setFormData((prev) => ({ ...prev, plant_id: plants[0].id }));
+    }
+  }, [isEditing, formData.plant_id, plants]);
+
+  const plantChanged = isEditing && !!equipment && formData.plant_id !== equipment.plant_id;
 
   // Create mutation
   const createMutation = useMutation({
@@ -91,6 +112,11 @@ const EquipmentModal = ({
       toast.success('Equipo actualizado exitosamente');
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       queryClient.invalidateQueries({ queryKey: ['equipment', equipment?.id] });
+      if (plantChanged) {
+        queryClient.invalidateQueries({ queryKey: ['equipment-assignments', equipment?.id] });
+        queryClient.invalidateQueries({ queryKey: ['area-equipment'] });
+        queryClient.invalidateQueries({ queryKey: ['layout-footprints'] });
+      }
       onClose();
     },
     onError: (error: any) => {
@@ -112,7 +138,16 @@ const EquipmentModal = ({
     }
 
     if (!formData.plant_id) {
-      toast.error('La planta es requerida');
+      toast.error('Selecciona la planta a la que pertenece el equipo');
+      return;
+    }
+
+    if (
+      plantChanged &&
+      !window.confirm(
+        'Al cambiar de planta, el equipo se retirará de su área actual y se borrará su dibujo en el layout. ¿Continuar?'
+      )
+    ) {
       return;
     }
 
@@ -148,6 +183,31 @@ const EquipmentModal = ({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Plant */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Planta <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={formData.plant_id}
+            onChange={(e) => handleChange('plant_id', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+            required
+          >
+            <option value="">Seleccionar planta...</option>
+            {plants.map((plant) => (
+              <option key={plant.id} value={plant.id}>
+                {plant.name}
+              </option>
+            ))}
+          </select>
+          {plantChanged && (
+            <p className="mt-1 text-xs text-amber-700">
+              Cambiar de planta retira el equipo de su área actual y borra su dibujo en el layout.
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           {/* Code */}
           <Input

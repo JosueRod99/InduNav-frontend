@@ -281,9 +281,7 @@ const EmployeeAreaAssignments = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {assignment.organizational_area?.full_path_name ||
-                          assignment.organizational_area?.name ||
-                          'Área sin nombre'}
+                        {assignment.area_name || 'Área sin nombre'}
                       </p>
                       <Badge
                         variant="default"

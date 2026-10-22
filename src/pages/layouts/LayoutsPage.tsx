@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Trash2, Square, Upload, PenTool } from 'lucide-react';
+import { MapPin, Trash2, Square, Upload, PenTool, LayoutGrid } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -23,6 +24,7 @@ const LayoutsPage = () => {
   const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
 
   // Fetch plants
@@ -241,7 +243,16 @@ const LayoutsPage = () => {
               selectedAreaId={selectedArea?.id}
               drawMode={drawMode}
               editMode={editMode}
-              editingArea={editMode ? selectedArea : null}
+              editingArea={
+                editMode && selectedArea
+                  ? {
+                      id: selectedArea.id,
+                      geometry: selectedArea.geometry,
+                      name: selectedArea.display_name || selectedArea.organizational_area?.name,
+                      color: selectedArea.display_color || selectedArea.organizational_area?.color || undefined,
+                    }
+                  : null
+              }
               onAreaDrawn={handleAreaDrawn}
               onAreaEdited={handleAreaEdited}
               onCancelDraw={() => setDrawMode(false)}
@@ -333,6 +344,13 @@ const LayoutsPage = () => {
                 )}
 
                 <div className="space-y-2">
+                  <Button
+                    onClick={() => navigate(`/areas/${selectedArea.organizational_area_id}?tab=layout`)}
+                    className="w-full gap-2 justify-center"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                    Abrir layout interno
+                  </Button>
                   <Button
                     onClick={handleStartEditing}
                     className="w-full gap-2 justify-center"

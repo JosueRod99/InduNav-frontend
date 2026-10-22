@@ -14,7 +14,19 @@ export interface EmployeeAreaAssignment {
   created_at: Date;
   updated_at: Date;
 
-  // Relations populated by backend
+  // Flat fields joined by the backend (employeeAreaAssignmentService)
+  area_name?: string;
+  area_code?: string | null;
+  area_type?: string;
+  area_color?: string | null;
+  first_name?: string;
+  last_name?: string;
+  email?: string | null;
+  phone?: string | null; // only in getByArea
+  employee_number?: string; // only in getByArea
+  position?: string | null; // only in getByArea
+
+  // Nested relations (not returned by the current backend queries)
   employee?: {
     id: string;
     first_name: string;

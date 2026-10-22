@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Upload, Trash2, Download, Eye, ExternalLink, GitBranch } from 'lucide-react';
+import { FileText, Upload, Trash2, Eye, ExternalLink, GitBranch } from 'lucide-react';
 import {
   getDocumentsByArea,
   deleteDocument,
@@ -105,10 +105,6 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
   const handleDocumentClick = (document: AreaDocument) => {
     setSelectedDocument(document);
     setIsEditModalOpen(true);
-  };
-
-  const handleDownload = (document: AreaDocument) => {
-    window.open(document.file_url, '_blank');
   };
 
   const handlePreview = (document: AreaDocument) => {

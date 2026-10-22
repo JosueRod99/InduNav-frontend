@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Users, MapPin, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -8,7 +8,6 @@ import EmployeeModal from './EmployeeModal';
 import { getEmployees, deleteEmployee, type Employee } from '../../api/employees';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
-import { getEmployeePrimaryArea } from '../../api/areaAssignments';
 
 const EmployeesPage = () => {
   const [selectedOrg, setSelectedOrg] = useState<string>('');

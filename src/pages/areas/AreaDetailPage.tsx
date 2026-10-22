@@ -1,7 +1,6 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { getArea } from '../../api/areas';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -15,13 +14,17 @@ import DocumentsTab from './tabs/DocumentsTab';
 import GalleryTab from './tabs/GalleryTab';
 import ProductsTab from './tabs/ProductsTab';
 import EquipmentTab from './tabs/EquipmentTab';
+import AreaLayoutTab from './tabs/AreaLayoutTab';
 
-type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery' | 'products' | 'equipment';
+type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery' | 'products' | 'equipment' | 'layout';
 
 const AreaDetailPage = () => {
   const { areaId } = useParams<{ areaId: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('general');
+  // Active tab lives in the URL (?tab=layout) so it can be linked and survives navigating between areas
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get('tab') as TabType) || 'general';
+  const setActiveTab = (tab: TabType) => setSearchParams({ tab }, { replace: true });
 
   // Fetch area details
   const { data: area, isLoading, error } = useQuery({
@@ -55,6 +58,7 @@ const AreaDetailPage = () => {
     { id: 'personal', label: 'Personal' },
     { id: 'products', label: 'Productos' },
     { id: 'equipment', label: 'Equipos' },
+    { id: 'layout', label: 'Layout' },
     { id: 'safety', label: 'Seguridad' },
     { id: 'certifications', label: 'Certificaciones' },
     { id: 'documents', label: 'Documentos' },
@@ -71,6 +75,8 @@ const AreaDetailPage = () => {
         return <ProductsTab areaId={areaId!} area={area} />;
       case 'equipment':
         return <EquipmentTab areaId={areaId!} area={area} />;
+      case 'layout':
+        return <AreaLayoutTab areaId={areaId!} area={area} />;
       case 'safety':
         return <SafetyTab areaId={areaId!} />;
       case 'certifications':

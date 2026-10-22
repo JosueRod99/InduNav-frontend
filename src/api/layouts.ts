@@ -3,6 +3,7 @@ import apiClient from './client';
 export interface PlantLayout {
   id: string;
   plant_id: string;
+  organizational_area_id: string | null; // set for area internal layouts
   layout_name: string;
   layout_image_url: string | null;
   layout_data: Record<string, any>;
@@ -32,6 +33,7 @@ export interface PlantArea {
 
 export interface CreateLayoutRequest {
   plant_id: string;
+  organizational_area_id?: string;
   layout_name: string;
   layout_image_url?: string;
   layout_data?: Record<string, any>;
@@ -40,7 +42,7 @@ export interface CreateLayoutRequest {
 
 export interface UpdateLayoutRequest {
   layout_name?: string;
-  layout_image_url?: string;
+  layout_image_url?: string | null;
   layout_data?: Record<string, any>;
   floor_level?: number;
   is_active?: boolean;
@@ -81,6 +83,17 @@ export const getLayouts = async (params?: { plant_id?: string; floor_level?: num
 export const getLayout = async (id: string): Promise<PlantLayout> => {
   const { data } = await apiClient.get(`/layouts/${id}`);
   return data.layout || data;
+};
+
+// Internal layout of an organizational area (null when the area has none yet)
+export const getAreaLayout = async (areaId: string): Promise<PlantLayout | null> => {
+  try {
+    const { data } = await apiClient.get(`/layouts/area/${areaId}`);
+    return data.layout || null;
+  } catch (error: any) {
+    if (error.response?.status === 404) return null;
+    throw error;
+  }
 };
 
 export const getLayoutByPlantAndFloor = async (plantId: string, floorLevel: number): Promise<PlantLayout> => {

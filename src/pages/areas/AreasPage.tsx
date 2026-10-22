@@ -16,7 +16,6 @@ import {
   deleteArea,
   type AreaTreeNode,
   type OrganizationalArea,
-  type AreaStatistics,
 } from '../../api/areas';
 import { getRepresentationsByArea } from '../../api/areaRepresentations';
 import { getOrganizations } from '../../api/organizations';
@@ -427,8 +426,7 @@ const AreasPage = () => {
                   </Button>
                   <Button
                     onClick={handleDelete}
-                    variant="danger"
-                    className="w-full gap-2"
+                    className="w-full gap-2 bg-red-600 hover:bg-red-700"
                   >
                     <Trash2 className="h-4 w-4" />
                     Eliminar

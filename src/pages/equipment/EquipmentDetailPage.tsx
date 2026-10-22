@@ -11,7 +11,6 @@ import EquipmentAssignmentsTab from './tabs/EquipmentAssignmentsTab';
 import EquipmentSpecificationsEditor from './components/EquipmentSpecificationsEditor';
 import {
   getEquipmentById,
-  type Equipment,
   EQUIPMENT_TYPE_LABELS,
   EQUIPMENT_STATUS_LABELS,
 } from '../../api/equipment';

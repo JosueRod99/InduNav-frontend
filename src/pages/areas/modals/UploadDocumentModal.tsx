@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Upload, FileText, Check, Link } from 'lucide-react';
+import { X, Upload, Check, Link } from 'lucide-react';
 import { createDocument, getFileIcon } from '../../../api/areaDocuments';
 import apiClient from '../../../api/client';
 import Button from '../../../components/ui/Button';

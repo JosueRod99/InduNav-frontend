@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Shield, AlertTriangle, FileText, MapPin, Calendar, Ban } from 'lucide-react';
+import { Shield, AlertTriangle, FileText, MapPin, Ban } from 'lucide-react';
 import { getSafetyInfoByArea } from '../../../api/areaSafetyInfo';
 import type { PPEItem, Hazard, EmergencyContact } from '../../../api/areaSafetyInfo';
 import Badge from '../../../components/ui/Badge';

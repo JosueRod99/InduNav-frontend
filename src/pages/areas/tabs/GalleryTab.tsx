@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Image as ImageIcon, Star, Upload, Grid3x3, List, Trash2 } from 'lucide-react';
+import { Image as ImageIcon, Upload, Grid3x3, List, Trash2 } from 'lucide-react';
 import { getPhotosByArea, deletePhoto, type AreaPhoto } from '../../../api/areaPhotos';
 import Badge from '../../../components/ui/Badge';
 import UploadPhotoModal from '../modals/UploadPhotoModal';

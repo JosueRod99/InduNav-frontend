@@ -21,3 +21,32 @@
     scrollbar-width: none;
   }
 }
+/* Equipment footprint labels on area internal layouts */
+.leaflet-tooltip.equipment-footprint-label {
+  background: rgba(15, 23, 42, 0.85);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  box-shadow: none;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.leaflet-tooltip.equipment-footprint-label::before {
+  display: none;
+}
+
+/* Footprint label tinted by equipment status (map "Por estado" mode) */
+.leaflet-tooltip.equipment-footprint-label.status-maintenance {
+  background: rgba(146, 64, 14, 0.92);
+}
+
+.leaflet-tooltip.equipment-footprint-label.status-out_of_service {
+  background: rgba(153, 27, 27, 0.92);
+}
+
+.leaflet-tooltip.equipment-footprint-label.status-retired {
+  background: rgba(75, 85, 99, 0.92);
+}
