@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -50,6 +50,13 @@ const TourViewerPage = () => {
   const [narrationText, setNarrationText] = useState('');
   const [textCopied, setTextCopied] = useState(false);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [areaMenuPosition, setAreaMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const areaMenuButtonRef = useRef<HTMLButtonElement>(null);
+  // Al cambiar de área con el header compacto, el scroll automático hacia arriba no debe
+  // expandirlo (cambiaría de altura a media animación). Se congela hasta el siguiente gesto
+  // de scroll del usuario.
+  const freezeHeaderRef = useRef(false);
 
   useEffect(() => {
     // Histéresis: se compacta al pasar 150px y solo se expande al volver casi arriba (< 20px).
@@ -65,7 +72,7 @@ const TourViewerPage = () => {
 
     const update = () => {
       rafId = null;
-      if (performance.now() < lockedUntil) return;
+      if (freezeHeaderRef.current || performance.now() < lockedUntil) return;
 
       const y = window.scrollY;
       const next = isCompact ? y > EXPAND_AT : y > COMPACT_AT;
@@ -84,14 +91,44 @@ const TourViewerPage = () => {
       if (rafId === null) rafId = requestAnimationFrame(update);
     };
 
+    // Cualquier gesto de scroll del usuario descongela el header y lo re-evalúa
+    // (p. ej. rueda hacia arriba estando ya arriba lo expande)
+    const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+    const unfreeze = () => {
+      if (!freezeHeaderRef.current) return;
+      freezeHeaderRef.current = false;
+      handleScroll();
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (SCROLL_KEYS.includes(e.key)) unfreeze();
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('wheel', unfreeze, { passive: true });
+    window.addEventListener('touchmove', unfreeze, { passive: true });
+    window.addEventListener('keydown', handleKey);
 
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       lockedUntil = Infinity;
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('wheel', unfreeze);
+      window.removeEventListener('touchmove', unfreeze);
+      window.removeEventListener('keydown', handleKey);
     };
   }, []); // Sin dependencias para evitar re-creación del listener
+
+  useEffect(() => {
+    if (!areaMenuPosition) return;
+    const close = () => setAreaMenuPosition(null);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    window.addEventListener('scroll', close, { passive: true });
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('scroll', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [areaMenuPosition]);
 
   const tour = tourSlug ? getTourBySlug(tourSlug) : null;
 
@@ -284,34 +321,40 @@ const TourViewerPage = () => {
     }
   };
 
-  const goToNextArea = () => {
-    if (currentAreaIndex < tour.areas.length - 1) {
-      setCurrentAreaIndex(currentAreaIndex + 1);
-      setActiveTab('resumen');
-      setExpandedKeypoint(null);
-      setIsFaqExpanded(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  // Jump from the plant layout to another area, staying on the location tab
-  const goToArea = (areaId: string) => {
-    const index = tour.areas.findIndex((area) => area.id === areaId);
-    if (index === -1 || index === currentAreaIndex) return;
+  // Changing area is the only navigation that scrolls the page back to the top
+  const changeArea = (index: number, { keepTab = false } = {}) => {
+    if (index < 0 || index >= tour.areas.length || index === currentAreaIndex) return;
     setCurrentAreaIndex(index);
+    if (!keepTab) setActiveTab('resumen');
     setExpandedKeypoint(null);
     setIsFaqExpanded(false);
+    setAreaMenuPosition(null);
+    if (isHeaderCompact) freezeHeaderRef.current = true;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const goToPreviousArea = () => {
-    if (currentAreaIndex > 0) {
-      setCurrentAreaIndex(currentAreaIndex - 1);
-      setActiveTab('resumen');
-      setExpandedKeypoint(null);
-      setIsFaqExpanded(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+  const goToNextArea = () => changeArea(currentAreaIndex + 1);
+  const goToPreviousArea = () => changeArea(currentAreaIndex - 1);
+
+  // Jump from the plant layout to another area, staying on the location tab
+  const goToArea = (areaId: string) =>
+    changeArea(tour.areas.findIndex((area) => area.id === areaId), { keepTab: true });
+
+  // Area list opens below the sticky header. The header clips its overflow (needed for the
+  // compact animation), so the menu is rendered outside it with fixed positioning.
+  const toggleAreaMenu = () => {
+    if (areaMenuPosition) {
+      setAreaMenuPosition(null);
+      return;
     }
+    const header = headerRef.current?.getBoundingClientRect();
+    const button = areaMenuButtonRef.current?.getBoundingClientRect();
+    if (!header || !button) return;
+    const MENU_WIDTH = 288;
+    setAreaMenuPosition({
+      top: header.bottom + 4,
+      left: Math.max(8, Math.min(button.left, window.innerWidth - MENU_WIDTH - 8)),
+    });
   };
 
   const tabs: Array<{ id: TabType; label: { es: string; en: string }; Icon: any }> = [
@@ -328,7 +371,7 @@ const TourViewerPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header - Compact on scroll */}
-      <div className={`bg-white border-b border-slate-200 sticky top-0 z-50 transition-all duration-300 overflow-hidden ${
+      <div ref={headerRef} className={`bg-white border-b border-slate-200 sticky top-0 z-50 transition-all duration-300 overflow-hidden ${
         isHeaderCompact ? 'shadow-sm' : 'shadow-md'
       }`}>
         <div className={`max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 transition-all duration-300 ${
@@ -336,7 +379,7 @@ const TourViewerPage = () => {
         }`}>
           {/* Main Row */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <button
                 onClick={() => navigate('/tour')}
                 className="flex items-center gap-1 sm:gap-2 text-slate-600 hover:text-blue-600 transition-colors flex-shrink-0"
@@ -349,24 +392,53 @@ const TourViewerPage = () => {
               </span>
               </button>
 
-              <div className={`flex items-center gap-1.5 sm:gap-2 transition-all duration-300 ${
-                isHeaderCompact ? 'opacity-100 max-w-[150px] sm:max-w-md' : 'opacity-0 max-w-0 overflow-hidden'
-              }`}>
-                <div className="h-4 sm:h-6 w-px bg-slate-300"></div>
-                <span className="text-xs sm:text-sm font-semibold text-blue-700 whitespace-nowrap truncate">
-                  {getText(currentArea.name, language)}
-                </span>
+              {/* Area navigation: previous · area list · next */}
+              <div className="flex items-center gap-0.5 sm:gap-1 min-w-0">
+                <div className="h-4 sm:h-6 w-px bg-slate-300 mr-1"></div>
+                <button
+                  onClick={goToPreviousArea}
+                  disabled={currentAreaIndex === 0}
+                  className="p-1 rounded-md text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-600 flex-shrink-0"
+                  aria-label={language === 'es' ? 'Área anterior' : 'Previous area'}
+                  title={language === 'es' ? 'Área anterior' : 'Previous area'}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  ref={areaMenuButtonRef}
+                  onClick={toggleAreaMenu}
+                  className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 min-w-0 transition-colors ${
+                    areaMenuPosition ? 'bg-slate-100' : 'hover:bg-slate-100'
+                  }`}
+                  aria-haspopup="listbox"
+                  aria-expanded={!!areaMenuPosition}
+                  title={language === 'es' ? 'Ir a otra área' : 'Go to another area'}
+                >
+                  <span className="hidden sm:inline text-sm font-semibold text-blue-700 truncate max-w-[12rem] lg:max-w-xs">
+                    {getText(currentArea.name, language)}
+                  </span>
+                  <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                    {currentAreaIndex + 1}/{tour.areas.length}
+                  </span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-slate-500 flex-shrink-0 transition-transform ${
+                      areaMenuPosition ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                <button
+                  onClick={goToNextArea}
+                  disabled={currentAreaIndex === tour.areas.length - 1}
+                  className="p-1 rounded-md text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-600 flex-shrink-0"
+                  aria-label={language === 'es' ? 'Siguiente área' : 'Next area'}
+                  title={language === 'es' ? 'Siguiente área' : 'Next area'}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-              {/* Progress indicator when compact - Hidden on mobile */}
-              <span className={`hidden sm:inline text-xs font-medium text-slate-600 transition-all duration-300 ${
-                isHeaderCompact ? 'opacity-100 max-w-20' : 'opacity-0 max-w-0 overflow-hidden'
-              }`}>
-                {currentAreaIndex + 1}/{tour.areas.length}
-              </span>
-
               {/* Audio Player */}
               <div className="flex items-center gap-1 sm:gap-2 bg-slate-50 rounded-lg px-1.5 sm:px-3 py-1.5 border border-slate-200">
                 {/* Play/Pause Button */}
@@ -470,6 +542,53 @@ const TourViewerPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Area list menu */}
+      {areaMenuPosition && (
+        <>
+          <div className="fixed inset-0 z-[55]" onClick={() => setAreaMenuPosition(null)} />
+          <div
+            role="listbox"
+            className="fixed z-[56] w-72 max-h-[60vh] overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
+            style={{ top: areaMenuPosition.top, left: areaMenuPosition.left }}
+          >
+            <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              {getText(tour.title, language)}
+            </p>
+            {tour.areas.map((area, index) => {
+              const isCurrent = index === currentAreaIndex;
+              return (
+                <button
+                  key={area.id}
+                  role="option"
+                  aria-selected={isCurrent}
+                  onClick={() => (isCurrent ? setAreaMenuPosition(null) : changeArea(index))}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
+                    isCurrent ? 'bg-blue-50' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                      isCurrent ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-sm ${isCurrent ? 'font-semibold text-blue-700' : 'text-slate-800'}`}>
+                      {getText(area.name, language)}
+                    </span>
+                    <span className="block truncate text-[11px] text-slate-500">
+                      {getText(area.shortDescription, language)}
+                    </span>
+                  </span>
+                  {isCurrent && <Check className="h-4 w-4 flex-shrink-0 text-blue-600" />}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -604,10 +723,7 @@ const TourViewerPage = () => {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
+                    onClick={() => setActiveTab(tab.id)}
                     className={`px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 ${
                       activeTab === tab.id
                         ? 'border-blue-600 text-blue-700 bg-blue-50'
