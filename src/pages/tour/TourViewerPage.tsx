@@ -257,7 +257,16 @@ const TourViewerPage = () => {
       case 'resumen':
         return <ResumenTab content={currentArea.tabs.resumen} language={language} />;
       case 'ubicacion':
-        return <UbicacionTab content={currentArea.tabs.ubicacion} layout={enhancedData.layout} language={language} />;
+        return (
+          <UbicacionTab
+            content={currentArea.tabs.ubicacion}
+            layout={enhancedData.layout}
+            language={language}
+            areaId={currentArea.id}
+            tourAreas={tour.areas}
+            onGoToArea={goToArea}
+          />
+        );
       case 'organigrama':
         return <OrganigramaTab content={currentArea.tabs.organigrama} employees={enhancedData.employees} language={language} />;
       case 'metricas':
@@ -283,6 +292,16 @@ const TourViewerPage = () => {
       setIsFaqExpanded(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+
+  // Jump from the plant layout to another area, staying on the location tab
+  const goToArea = (areaId: string) => {
+    const index = tour.areas.findIndex((area) => area.id === areaId);
+    if (index === -1 || index === currentAreaIndex) return;
+    setCurrentAreaIndex(index);
+    setExpandedKeypoint(null);
+    setIsFaqExpanded(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const goToPreviousArea = () => {

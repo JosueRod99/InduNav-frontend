@@ -45,6 +45,14 @@ interface LayoutMapProps {
   onFootprintClick?: (footprint: MapFootprint) => void;
   selectedFootprintId?: string | null;
   colorByStatus?: boolean; // fill footprints by equipment status instead of their own color
+  statusLabels?: Record<EquipmentStatus, string>; // legend texts (defaults to Spanish labels)
+  showAreaLabels?: boolean; // name label on each area
+  // 'permanent': labels always visible. 'hover': only on hover, or when the shape is
+  // highlighted/selected (touch screens have no hover)
+  labelMode?: 'permanent' | 'hover';
+  highlightedId?: string | null; // area or footprint highlighted from outside (e.g. a side list)
+  onShapeHover?: (id: string | null) => void;
+  scrollWheelZoom?: boolean; // disable inside scrollable pages (public tour)
   drawMode?: boolean;
   drawTitle?: string;
   editMode?: boolean;
@@ -56,6 +64,8 @@ interface LayoutMapProps {
 const CANVAS_BOUNDS: L.LatLngBoundsExpression = [[0, 0], [1000, 1000]];
 const GRID_LINES = Array.from({ length: 11 }, (_, i) => i * 100);
 const DEFAULT_FOOTPRINT_COLOR = '#334155';
+// Large ring around the canvas; with the area outline as a hole it masks the outside
+const OUTSIDE_MASK_RING: L.LatLngExpression[] = [[-5000, -5000], [-5000, 6000], [6000, 6000], [6000, -5000]];
 
 const toLeaflet = (coords: number[][]) => coords.map((c) => [c[1], c[0]] as L.LatLngExpression);
 
@@ -64,7 +74,7 @@ function MapBoundsHandler() {
   const map = useMap();
 
   useEffect(() => {
-    map.fitBounds(L.latLngBounds(CANVAS_BOUNDS as L.LatLngBoundsLiteral));
+    map.fitBounds(L.latLngBounds(CANVAS_BOUNDS as L.LatLngBoundsLiteral), { padding: [8, 8] });
   }, [map]);
 
   return null;
@@ -632,6 +642,12 @@ const LayoutMap = ({
   onFootprintClick,
   selectedFootprintId,
   colorByStatus = false,
+  statusLabels = EQUIPMENT_STATUS_LABELS,
+  showAreaLabels = false,
+  labelMode = 'permanent',
+  highlightedId = null,
+  onShapeHover,
+  scrollWheelZoom = true,
   drawMode,
   drawTitle,
   editMode,
@@ -642,6 +658,10 @@ const LayoutMap = ({
   onCancelEdit
 }: ExtendedLayoutMapProps) => {
   const isEditing = (id: string) => editMode && editingArea?.id === id;
+  const hoverHandlers = (id: string) =>
+    onShapeHover
+      ? { mouseover: () => onShapeHover(id), mouseout: () => onShapeHover(null) }
+      : {};
 
   const statusCounts = footprints.reduce<Partial<Record<EquipmentStatus, number>>>((acc, fp) => {
     if (fp.status) acc[fp.status] = (acc[fp.status] || 0) + 1;
@@ -655,10 +675,14 @@ const LayoutMap = ({
         zoom={0}
         minZoom={-2}
         maxZoom={3}
+        // Fractional zoom so the canvas fills the container instead of snapping to a smaller level
+        zoomSnap={0.1}
+        zoomDelta={0.5}
         crs={L.CRS.Simple}
         className="w-full h-full"
         zoomControl={true}
         attributionControl={false}
+        scrollWheelZoom={scrollWheelZoom}
       >
         <MapBoundsHandler />
         <DrawingHandler
@@ -703,6 +727,15 @@ const LayoutMap = ({
           </>
         )}
 
+        {/* Dim everything outside the parent area so the view focuses on it */}
+        {outline && outline.length >= 3 && (
+          <Polygon
+            positions={[OUTSIDE_MASK_RING, toLeaflet(outline)]}
+            pathOptions={{ stroke: false, fillColor: '#F8FAFC', fillOpacity: 0.7 }}
+            interactive={false}
+          />
+        )}
+
         {/* Boundary of the parent area (area internal layouts) */}
         {outline && outline.length >= 3 && (
           <Polygon
@@ -720,6 +753,9 @@ const LayoutMap = ({
 
           // Get color from display_color, or fall back to organizational area color
           const areaColor = area.display_color || area.organizational_area?.color || '#3B82F6';
+          const isHighlighted = highlightedId === area.id;
+          const isActive = selectedAreaId === area.id || isHighlighted;
+          const labelPermanent = labelMode === 'permanent' || isActive;
 
           return (
             <Polygon
@@ -728,13 +764,26 @@ const LayoutMap = ({
               pathOptions={{
                 color: areaColor,
                 fillColor: areaColor,
-                fillOpacity: selectedAreaId === area.id ? 0.6 : 0.3,
-                weight: selectedAreaId === area.id ? 3 : 2,
+                fillOpacity: isActive ? 0.6 : 0.3,
+                weight: isHighlighted ? 4 : isActive ? 3 : 2,
               }}
               eventHandlers={{
                 click: () => onAreaClick?.(area),
+                ...hoverHandlers(area.id),
               }}
-            />
+            >
+              {showAreaLabels && (
+                // key forces a remount: Leaflet does not toggle `permanent` on an existing tooltip
+                <Tooltip
+                  key={labelPermanent ? 'permanent' : 'hover'}
+                  permanent={labelPermanent}
+                  direction="center"
+                  className="area-name-label"
+                >
+                  {area.display_name || area.organizational_area?.name}
+                </Tooltip>
+              )}
+            </Polygon>
           );
         })}
 
@@ -744,24 +793,28 @@ const LayoutMap = ({
           const statusColor = fp.status ? EQUIPMENT_STATUS_COLORS[fp.status] : undefined;
           const color = (colorByStatus && statusColor) || fp.color || DEFAULT_FOOTPRINT_COLOR;
           const isSelected = selectedFootprintId === fp.id;
+          const isHighlighted = highlightedId === fp.id;
+          const labelPermanent = labelMode === 'permanent' || isSelected || isHighlighted;
 
           return (
             <Polygon
               key={fp.id}
               positions={toLeaflet(fp.geometry.coordinates[0])}
               pathOptions={{
-                color: isSelected ? '#F59E0B' : '#0F172A',
+                color: isSelected ? '#F59E0B' : isHighlighted ? '#2563EB' : '#0F172A',
                 fillColor: color,
-                fillOpacity: isSelected ? 0.85 : 0.65,
-                weight: isSelected ? 3 : 2,
+                fillOpacity: isSelected || isHighlighted ? 0.85 : 0.65,
+                weight: isSelected || isHighlighted ? 3 : 2,
                 dashArray: colorByStatus && fp.status ? STATUS_DASH[fp.status] : undefined,
               }}
               eventHandlers={{
                 click: () => onFootprintClick?.(fp),
+                ...hoverHandlers(fp.id),
               }}
             >
               <Tooltip
-                permanent
+                key={labelPermanent ? 'permanent' : 'hover'}
+                permanent={labelPermanent}
                 direction="center"
                 className={`equipment-footprint-label ${
                   colorByStatus && fp.status ? `status-${fp.status}` : ''
@@ -785,7 +838,7 @@ const LayoutMap = ({
                   className="w-3 h-3 rounded-sm border border-slate-900/40"
                   style={{ backgroundColor: EQUIPMENT_STATUS_COLORS[status] }}
                 />
-                <span>{EQUIPMENT_STATUS_LABELS[status]}</span>
+                <span>{statusLabels[status]}</span>
                 <span className="ml-auto pl-2 font-semibold text-gray-900">{statusCounts[status]}</span>
               </div>
             ))}
