@@ -94,7 +94,7 @@ const StopsPanel = ({ plantId, stops, selectedStopId, onSelect, onAdd, onAddArea
       {/* Stops */}
       <div className="rounded-lg border border-gray-200 bg-white">
         <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
-          <h3 className="text-sm font-semibold text-gray-900">Paradas ({stops.length})</h3>
+          <h3 className="text-sm font-semibold text-gray-900">Áreas ({stops.length})</h3>
           <button
             onClick={onAdd}
             className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
@@ -114,7 +114,7 @@ const StopsPanel = ({ plantId, stops, selectedStopId, onSelect, onAdd, onAddArea
             getKey={(s) => s.id}
             onMove={onMove}
             className="max-h-80 overflow-y-auto p-1.5"
-            handleLabel="Arrastra para cambiar el orden de la parada"
+            handleLabel="Arrastra para cambiar el orden de el área"
             renderItem={(stop, index) => {
               const isSelected = stop.id === selectedStopId;
               return (
@@ -144,8 +144,8 @@ const StopsPanel = ({ plantId, stops, selectedStopId, onSelect, onAdd, onAddArea
                   <button
                     onClick={() => onDelete(stop)}
                     className="rounded p-1 text-gray-300 opacity-0 hover:bg-red-50 hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
-                    aria-label={`Quitar parada ${index + 1}`}
-                    title="Quitar parada"
+                    aria-label={`Quitar área ${index + 1}`}
+                    title="Quitar área"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -183,7 +183,7 @@ const StopsPanel = ({ plantId, stops, selectedStopId, onSelect, onAdd, onAddArea
           </>
         ) : (
           <p className="px-3 py-6 text-center text-xs text-gray-500">
-            Esta planta no tiene un plano cargado. Puedes agregar paradas con el botón <strong>Agregar</strong>.
+            Esta planta no tiene un plano cargado. Puedes agregar áreas con el botón <strong>Agregar</strong>.
           </p>
         )}
       </div>

@@ -15,6 +15,8 @@ import PlantsPage from './pages/plants/PlantsPage';
 import ToursPage from './pages/tours/ToursPage';
 import TourEditorPage from './pages/tours/TourEditorPage';
 import TourViewerRealPage from './pages/tourViewer/TourViewerRealPage';
+import PublicTourPage, { StopQrRedirect } from './pages/tourViewer/PublicTourPage';
+import TourQrSheetPage from './pages/tours/TourQrSheetPage';
 import StopsPage from './pages/stops/StopsPage';
 import LayoutsPage from './pages/layouts/LayoutsPage';
 import EmployeesPage from './pages/employees/EmployeesPage';
@@ -71,6 +73,23 @@ function App() {
           {/* Public Tour Demo Routes */}
           <Route path="/tour" element={<TourCatalogPage />} />
           <Route path="/tour/:tourSlug" element={<TourViewerPage />} />
+
+          {/* Real tours, public (no login): short link, readable link and stop QR codes */}
+          <Route path="/t/:code" element={<PublicTourPage />} />
+          <Route path="/t/:orgSlug/:tourSlug" element={<PublicTourPage />} />
+          <Route path="/s/:qrCode" element={<StopQrRedirect />} />
+
+          {/* Printable QR sheet of a tour (full page, for printing) */}
+          <Route
+            path="/tours/:tourId/qr-sheet"
+            element={
+              <PrivateRoute>
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <TourQrSheetPage />
+                </RoleProtectedRoute>
+              </PrivateRoute>
+            }
+          />
 
           {/* Real tours: draft preview (full screen, outside the app layout; demo above is separate) */}
           <Route

@@ -109,6 +109,8 @@ export interface TourView {
     plant_name: string;
     organization: { name: string | null; logo_url: string | null };
     status: 'draft' | 'published' | 'archived';
+    public_code: string | null;
+    version: number | null;
   };
   plant_layout: {
     image_url: string | null;
@@ -121,6 +123,26 @@ export interface TourView {
 /** Draft preview for the editor (authenticated) */
 export const getTourPreview = async (tourId: string): Promise<TourView> => {
   const { data } = await apiClient.get(`/tours/${tourId}/preview`);
+  return data;
+};
+
+/** Published tour by short code (public, no login; private tours need a session) */
+export const getPublicTour = async (code: string): Promise<TourView> => {
+  const { data } = await apiClient.get(`/public/tours/${encodeURIComponent(code)}`);
+  return data;
+};
+
+/** Published tour by readable link /t/:orgSlug/:tourSlug */
+export const getPublicTourBySlug = async (orgSlug: string, tourSlug: string): Promise<TourView> => {
+  const { data } = await apiClient.get(
+    `/public/tours/by-slug/${encodeURIComponent(orgSlug)}/${encodeURIComponent(tourSlug)}`
+  );
+  return data;
+};
+
+/** QR code of a stop → tour code and position of the stop */
+export const resolveStopQr = async (qrCode: string): Promise<{ tour_code: string; stop_index: number | null }> => {
+  const { data } = await apiClient.get(`/public/stops/${encodeURIComponent(qrCode)}/resolve`);
   return data;
 };
 

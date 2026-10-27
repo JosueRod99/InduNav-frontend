@@ -84,7 +84,7 @@ export const SECTION_LABELS: Record<TourSectionKey, string> = {
 };
 
 export const SECTION_DESCRIPTIONS: Record<TourSectionKey, string> = {
-  summary: 'Narrativa, puntos clave y preguntas frecuentes de esta parada',
+  summary: 'Narrativa, puntos clave y preguntas frecuentes de esta área',
   location: 'Plano de la planta y el interior del área con sus equipos',
   personnel: 'Nombre, puesto y foto del personal (sin correo ni teléfono)',
   safety: 'EPP requerido, riesgos y días sin accidentes',
@@ -93,7 +93,7 @@ export const SECTION_DESCRIPTIONS: Record<TourSectionKey, string> = {
   gallery: 'Fotos del área',
   documents: 'Documentos del área (excepto privados)',
   certifications: 'Certificaciones del área',
-  highlights: 'Cifras clave que capturas en esta parada',
+  highlights: 'Cifras clave que capturas en esta área',
   custom: 'Contenido libre: bloques de texto y gráficas',
 };
 
@@ -211,4 +211,78 @@ export const deleteTourStop = async (stopId: string): Promise<void> => {
 export const getStopSectionCounts = async (stopId: string): Promise<SectionCounts | null> => {
   const { data } = await apiClient.get(`/tours/stops/${stopId}/section-counts`);
   return data.counts;
+};
+
+// ============================================================
+// PUBLISH & SHARE
+// ============================================================
+
+export interface TourShareInfo {
+  status: 'draft' | 'published' | 'archived';
+  visibility: 'link' | 'private';
+  public_code: string | null;
+  organization_slug: string | null;
+  slug: string;
+  version: number | null;
+  published_at: string | null;
+  stops: { id: string; number: number; title: Translations; qr_short_code: string | null }[];
+}
+
+export interface PublishResult {
+  version: number;
+  published_at: string;
+  public_code: string;
+  audio_generated: number;
+  counted_toward_limit: boolean;
+}
+
+/** skipNewAudio: publish keeping the previous narration (when the monthly limit is reached) */
+export const publishTour = async (tourId: string, options: { skipNewAudio?: boolean } = {}): Promise<PublishResult> => {
+  const { data } = await apiClient.post(`/tours/${tourId}/publish`, { skip_new_audio: !!options.skipNewAudio });
+  return data;
+};
+
+export interface NarrationItem {
+  stop_id: string;
+  stop_title: string;
+  language: TourLanguage;
+  script: string | null; // null = nothing to narrate in this language (visitors hear Spanish)
+  characters: number;
+  text_hash: string | null;
+  voice: string | null;
+  audio_url: string | null; // already generated for this exact script
+}
+
+export interface PublishEstimate {
+  items: NarrationItem[];
+  to_generate: number;
+  reused: number;
+  characters_to_generate: number;
+  usage: PublicationUsage;
+  limit_reached: boolean;
+  counts_toward_limit: boolean;
+}
+
+export const getPublishEstimate = async (tourId: string): Promise<PublishEstimate> => {
+  const { data } = await apiClient.get(`/tours/${tourId}/publish-estimate`);
+  return data.estimate;
+};
+
+export const unpublishTour = async (tourId: string): Promise<void> => {
+  await apiClient.post(`/tours/${tourId}/unpublish`);
+};
+
+export const getTourShareInfo = async (tourId: string): Promise<TourShareInfo> => {
+  const { data } = await apiClient.get(`/tours/${tourId}/share`);
+  return data.share;
+};
+
+/** Public links of a tour (absolute, for copying and QR codes) */
+export const tourLinks = (share: Pick<TourShareInfo, 'public_code' | 'organization_slug' | 'slug'>) => {
+  const origin = window.location.origin;
+  return {
+    short: share.public_code ? `${origin}/t/${share.public_code}` : null,
+    readable: share.public_code && share.organization_slug ? `${origin}/t/${share.organization_slug}/${share.slug}` : null,
+    stop: (qrShortCode: string) => `${origin}/s/${qrShortCode}`,
+  };
 };

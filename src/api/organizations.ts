@@ -7,6 +7,7 @@ export interface CreateOrganizationRequest {
   logo_url?: string;
   plan?: 'free' | 'pro' | 'enterprise';
   settings?: Record<string, any>;
+  tour_publications_per_month?: number; // tour publications with narration audio per month
 }
 
 export interface UpdateOrganizationRequest {
@@ -16,6 +17,7 @@ export interface UpdateOrganizationRequest {
   plan?: 'free' | 'pro' | 'enterprise';
   is_active?: boolean;
   settings?: Record<string, any>;
+  tour_publications_per_month?: number;
 }
 
 export interface GetOrganizationsParams {

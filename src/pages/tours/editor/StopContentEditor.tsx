@@ -58,7 +58,7 @@ const StopContentEditor = ({ stop, language, organizationId, plantId, onChange }
       {/* Title + narrative */}
       <div className="space-y-4">
         <TranslatedField
-          label="Título de la parada"
+          label="Título del área en el tour"
           value={stop.title_translations}
           language={language}
           onChange={(value) => onChange({ title_translations: value })}
@@ -157,7 +157,7 @@ const StopContentEditor = ({ stop, language, organizationId, plantId, onChange }
 
       {/* Cover image */}
       <div>
-        {sectionTitle('Imagen de la parada', 'Se muestra en la cabecera del área en el tour')}
+        {sectionTitle('Imagen del área', 'Se muestra en la cabecera del área durante el tour')}
         <div className="max-w-md">
           <ImageUpload
             onImageUploaded={(url) => onChange({ image_url: url })}

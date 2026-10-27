@@ -7,6 +7,9 @@ import Input from '../../components/ui/Input';
 import { createOrganization, updateOrganization, type CreateOrganizationRequest } from '../../api/organizations';
 import type { Organization } from '../../types';
 
+// Default for new organizations; adjustable per organization according to its plan
+const DEFAULT_TOUR_PUBLICATIONS = 20;
+
 interface OrganizationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,6 +22,7 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
     name: '',
     slug: '',
     plan: 'free',
+    tour_publications_per_month: DEFAULT_TOUR_PUBLICATIONS,
   });
 
   const isEditing = !!organization;
@@ -30,12 +34,14 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
         slug: organization.slug,
         plan: organization.plan,
         logo_url: organization.logo_url || undefined,
+        tour_publications_per_month: organization.tour_publications_per_month ?? DEFAULT_TOUR_PUBLICATIONS,
       });
     } else {
       setFormData({
         name: '',
         slug: '',
         plan: 'free',
+        tour_publications_per_month: DEFAULT_TOUR_PUBLICATIONS,
       });
     }
   }, [organization]);
@@ -144,6 +150,30 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
             <option value="pro">Pro</option>
             <option value="enterprise">Enterprise</option>
           </select>
+        </div>
+
+        <div>
+          <label htmlFor="tour_publications_per_month" className="block text-sm font-medium text-gray-700 mb-1">
+            Publicaciones de tours con narración por mes
+          </label>
+          <Input
+            id="tour_publications_per_month"
+            name="tour_publications_per_month"
+            type="number"
+            min={0}
+            step={1}
+            value={formData.tour_publications_per_month ?? DEFAULT_TOUR_PUBLICATIONS}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                tour_publications_per_month: e.target.value === '' ? 0 : Math.max(0, Math.floor(Number(e.target.value))),
+              }))
+            }
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Se comparten entre todos los tours de la organización. Solo cuentan las publicaciones que generan audio
+            nuevo, y el conteo vuelve a 0 automáticamente el día 1 de cada mes (hora de México).
+          </p>
         </div>
 
         <div>

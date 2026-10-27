@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Map, Globe, Lock, LayoutList, Eye, MapPin, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Map, Globe, Lock, LayoutList, Eye, MapPin, Clock, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import TourModal from './TourModal';
+import ShareTourModal from './modals/ShareTourModal';
 import { getTours, deleteTour } from '../../api/tours';
 import { getPlants } from '../../api/plants';
 import type { Tour } from '../../types';
@@ -15,6 +16,7 @@ import type { Tour } from '../../types';
 type TourCard = Tour & {
   stops_count?: number | string;
   status?: 'draft' | 'published' | 'archived';
+  public_code?: string | null;
   visibility?: 'link' | 'private';
   has_unpublished_changes?: boolean;
   cover_image_url?: string | null;
@@ -30,7 +32,7 @@ const statusBadge = (tour: TourCard) => {
       ? { text: 'Cambios sin publicar', className: 'bg-amber-100 text-amber-800' }
       : { text: 'Publicado', className: 'bg-green-100 text-green-800' };
   }
-  if (tour.status === 'archived') return { text: 'Archivado', className: 'bg-gray-200 text-gray-700' };
+  if (tour.status === 'archived') return { text: 'Despublicado', className: 'bg-gray-200 text-gray-700' };
   return { text: 'Borrador', className: 'bg-gray-100 text-gray-700' };
 };
 
@@ -39,6 +41,7 @@ const ToursPage = () => {
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
   const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [shareTour, setShareTour] = useState<TourCard | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -200,7 +203,7 @@ const ToursPage = () => {
                   <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="h-3.5 w-3.5" />
-                      {stopsCount} {stopsCount === 1 ? 'parada' : 'paradas'}
+                      {stopsCount} {stopsCount === 1 ? 'área' : 'áreas'}
                     </span>
                     <span>{getPlantName(tour.plant_id)}</span>
                     <span className="inline-flex items-center gap-1">
@@ -218,6 +221,16 @@ const ToursPage = () => {
                     <LayoutList className="h-4 w-4" />
                     Editor
                   </button>
+                  {tour.status === 'published' && tour.public_code && (
+                    <button
+                      onClick={() => setShareTour(tour)}
+                      className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100"
+                      title="Link, QR y hoja de QRs por área"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Compartir
+                    </button>
+                  )}
                   <a
                     href={`/preview/tours/${tour.id}`}
                     target="_blank"
@@ -251,6 +264,15 @@ const ToursPage = () => {
             );
           })}
         </div>
+      )}
+
+      {shareTour && (
+        <ShareTourModal
+          isOpen
+          onClose={() => setShareTour(null)}
+          tourId={shareTour.id}
+          tourTitle={shareTour.title_translations?.es || shareTour.title}
+        />
       )}
 
       <TourModal

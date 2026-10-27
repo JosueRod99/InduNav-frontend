@@ -4,7 +4,6 @@ import {
   Building2,
   Factory,
   Map,
-  QrCode,
   Users,
   LayoutGrid,
   Network,
@@ -33,7 +32,7 @@ const navItems: NavItem[] = [
   { to: '/users', icon: Users, label: 'Usuarios', allowedRoles: ['platform_admin'] },
   { to: '/plants', icon: Factory, label: 'Plantas', allowedRoles: ['platform_admin', 'org_owner'] },
   { to: '/tours', icon: Map, label: 'Tours' },
-  { to: '/stops', icon: QrCode, label: 'Stops & QR' },
+  // 'Stops & QR' was merged into the tour editor (stops) and Share (QR codes); /stops still exists
   { to: '/layouts', icon: LayoutGrid, label: 'Layout 2D' },
   { to: '/employees', icon: Users, label: 'Empleados', allowedRoles: ['platform_admin', 'org_owner'] },
   { to: '/areas', icon: Boxes, label: 'Áreas', allowedRoles: ['platform_admin', 'org_owner', 'plant_manager'] },

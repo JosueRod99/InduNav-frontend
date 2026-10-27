@@ -118,9 +118,9 @@ const TourSettingsEditor = ({ tour, language, onChange }: TourSettingsEditorProp
       </div>
 
       <div>
-        <h4 className="text-sm font-semibold text-gray-900">Estructura por defecto de las paradas</h4>
+        <h4 className="text-sm font-semibold text-gray-900">Estructura por defecto de las áreas</h4>
         <p className="mb-3 text-xs text-gray-500">
-          Las paradas nuevas empiezan con estas secciones en este orden. Cada parada se puede ajustar después.
+          Las áreas que agregues empiezan con estas secciones en este orden. Cada área se puede ajustar después.
         </p>
         <SectionsEditor
           sections={tour.default_sections}

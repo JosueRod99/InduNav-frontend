@@ -54,6 +54,7 @@ export interface Organization {
   plan: 'free' | 'pro' | 'enterprise';
   is_active: boolean;
   settings: Record<string, any>;
+  tour_publications_per_month?: number;
   created_at: Date;
   updated_at: Date;
 }

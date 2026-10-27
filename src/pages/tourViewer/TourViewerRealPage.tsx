@@ -6,6 +6,7 @@ import {
   Award,
   Flag,
   Globe,
+  Home,
   Play,
   RotateCcw,
   BarChart3,
@@ -99,12 +100,20 @@ const TourViewerRealPage = () => {
   return <TourExperience view={view} onExit={() => navigate(`/tours/${tourId}/edit`)} />;
 };
 
-const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }) => {
-  const [stopIndex, setStopIndex] = useState(0);
+interface TourExperienceProps {
+  view: TourView;
+  onExit?: () => void; // preview only: back to the editor
+  initialStopIndex?: number | null; // open directly at a stop (stop QR codes, ?stop=N)
+}
+
+export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = null }: TourExperienceProps) => {
+  const validInitialStop =
+    initialStopIndex !== null && initialStopIndex >= 0 && initialStopIndex < view.stops.length ? initialStopIndex : null;
+  const [stopIndex, setStopIndex] = useState(validInitialStop ?? 0);
   const [language, setLanguage] = useState<TourLanguage>(view.tour.languages[0] || 'es');
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [started, setStarted] = useState(false); // false = cover screen (step 0)
+  const [started, setStarted] = useState(validInitialStop !== null); // false = cover screen (step 0)
   const [finished, setFinished] = useState(false); // end-of-tour screen
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -129,6 +138,16 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
     };
   }, [menuOpen]);
 
+  /** Back to the tour cover (step 0) */
+  const goToCover = () => {
+    setStarted(false);
+    setFinished(false);
+    setStopIndex(0);
+    setActiveSection(null);
+    setMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const goTo = (index: number, keepSection = false) => {
     if (index < 0 || index >= stops.length || (index === stopIndex && started && !finished)) return;
     setStarted(true);
@@ -142,7 +161,9 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
   const goToArea = (areaId: string) => goTo(stops.findIndex((s) => s.area_id === areaId), true);
 
   const tourTitle = tr(view.tour.title, language);
-  const audioUrl = stop?.audio?.[language] || null;
+  // Without narration in the selected language, visitors hear the Spanish one (same as texts)
+  const audioUrl = stop?.audio?.[language] || stop?.audio?.es || null;
+  const audioIsFallback = !!audioUrl && !stop?.audio?.[language];
 
   const renderSection = useMemo(
     () => (section: TourSection) => {
@@ -216,10 +237,10 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
             {stops.length > 0 && (
               <div ref={menuRef} className="relative flex items-center gap-0.5">
                 <button
-                  onClick={() => goTo(stopIndex - 1)}
-                  disabled={!started || stopIndex === 0}
+                  onClick={() => (stopIndex === 0 || finished ? goToCover() : goTo(stopIndex - 1))}
+                  disabled={!started}
                   className="rounded-md p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
-                  aria-label={lang('Parada anterior', 'Previous stop')}
+                  aria-label={lang('Área anterior', 'Previous area')}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -229,20 +250,34 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
                   aria-haspopup="listbox"
                   aria-expanded={menuOpen}
                 >
-                  {started ? `${stopIndex + 1}/${stops.length}` : `${stops.length} ${lang('paradas', 'stops')}`}
+                  {started ? `${stopIndex + 1}/${stops.length}` : `${stops.length} ${lang('áreas', 'areas')}`}
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <button
                   onClick={() => (started ? goTo(stopIndex + 1) : goTo(0))}
                   disabled={started && stopIndex === stops.length - 1}
                   className="rounded-md p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
-                  aria-label={lang('Siguiente parada', 'Next stop')}
+                  aria-label={lang('Siguiente área', 'Next area')}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
 
                 {menuOpen && (
                   <div role="listbox" className="absolute right-0 top-full z-50 mt-1 max-h-[60vh] w-72 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+                    <button
+                      role="option"
+                      aria-selected={!started}
+                      onClick={() => (started ? goToCover() : setMenuOpen(false))}
+                      className={`flex w-full items-center gap-3 border-b border-slate-100 px-3 py-2 text-left ${!started ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                    >
+                      <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${!started ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        <Home className="h-3.5 w-3.5" />
+                      </span>
+                      <span className={`flex-1 text-sm ${!started ? 'font-semibold text-blue-700' : 'text-slate-800'}`}>
+                        {lang('Inicio del recorrido', 'Tour start')}
+                      </span>
+                      {!started && <Check className="h-4 w-4 text-blue-600" />}
+                    </button>
                     {stops.map((s, i) => (
                       <button
                         key={s.id}
@@ -293,7 +328,7 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
       <main className="mx-auto max-w-6xl space-y-5 px-3 py-5 sm:px-6">
         {!stop ? (
           <div className="rounded-lg border border-slate-200 bg-white p-12 text-center text-slate-600">
-            {lang('Este tour todavía no tiene paradas.', 'This tour has no stops yet.')}
+            {lang('Este tour todavía no tiene áreas.', 'This tour has no areas yet.')}
           </div>
         ) : !started ? (
           <TourCover view={view} language={language} onStart={() => goTo(0)} onOpenStop={goTo} />
@@ -326,13 +361,7 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <button
-                onClick={() => {
-                  setStarted(false);
-                  setFinished(false);
-                  setStopIndex(0);
-                  setActiveSection(null);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
+                onClick={goToCover}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -381,11 +410,14 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
                   <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">
                     <Volume2 className="h-4 w-4 text-slate-400" />
                     {audioUrl ? (
-                      <audio controls src={audioUrl} className="h-8 w-full" />
+                      <div className="w-full">
+                        <audio key={audioUrl} controls src={audioUrl} className="h-8 w-full" />
+                        {audioIsFallback && <p className="mt-1 text-[11px] text-slate-500">Narration available in Spanish only.</p>}
+                      </div>
                     ) : view.is_preview ? (
-                      lang('La narración de esta parada se generará al publicar.', 'Narration will be generated when the tour is published.')
+                      lang('La narración de esta área se generará al publicar.', 'Narration will be generated when the tour is published.')
                     ) : (
-                      lang('Esta parada no tiene narración.', 'This stop has no narration.')
+                      lang('Esta área no tiene narración.', 'This area has no narration.')
                     )}
                   </div>
                 </div>
@@ -396,7 +428,7 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               {sections.length === 0 ? (
                 <p className="p-8 text-center text-sm text-slate-500">
-                  {lang('Esta parada todavía no tiene contenido visible.', 'This stop has no visible content yet.')}
+                  {lang('Esta área todavía no tiene contenido visible.', 'This area has no visible content yet.')}
                 </p>
               ) : (
                 <>
@@ -432,12 +464,11 @@ const TourExperience = ({ view, onExit }: { view: TourView; onExit: () => void }
             {/* Bottom navigation */}
             <nav className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
               <button
-                onClick={() => goTo(stopIndex - 1)}
-                disabled={stopIndex === 0}
+                onClick={() => (stopIndex === 0 ? goToCover() : goTo(stopIndex - 1))}
                 className="flex min-w-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-30"
               >
                 <ChevronLeft className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate">{stopIndex > 0 ? tr(stops[stopIndex - 1].title, language) : lang('Anterior', 'Previous')}</span>
+                <span className="truncate">{stopIndex > 0 ? tr(stops[stopIndex - 1].title, language) : lang('Inicio', 'Start')}</span>
               </button>
               {stopIndex < stops.length - 1 ? (
                 <button
@@ -504,7 +535,7 @@ const TourCover = ({
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 backdrop-blur">
               <MapPin className="h-3.5 w-3.5" />
-              {view.stops.length} {lang(view.stops.length === 1 ? 'parada' : 'paradas', view.stops.length === 1 ? 'stop' : 'stops')}
+              {view.stops.length} {lang(view.stops.length === 1 ? 'área' : 'áreas', view.stops.length === 1 ? 'area' : 'areas')}
             </span>
             {view.tour.languages.length > 1 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 backdrop-blur">

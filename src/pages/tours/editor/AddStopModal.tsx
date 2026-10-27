@@ -52,7 +52,7 @@ const AddStopModal = ({ isOpen, onClose, organizationId, plantId, usedAreaIds, o
       <Modal
         isOpen={isOpen && !isCreateOpen}
         onClose={onClose}
-        title="Agregar parada"
+        title="Agregar área"
         size="md"
         footer={
           <>
@@ -67,7 +67,7 @@ const AddStopModal = ({ isOpen, onClose, organizationId, plantId, usedAreaIds, o
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Cada parada es un área de la planta. Su personal, equipos, productos y plano se muestran en vivo.
+            Elige un área de la planta. Su personal, equipos, productos y plano se muestran en vivo.
           </p>
 
           {isLoading ? (
@@ -88,7 +88,7 @@ const AddStopModal = ({ isOpen, onClose, organizationId, plantId, usedAreaIds, o
           {alreadyInTour && (
             <p className="flex items-center gap-1.5 text-sm text-amber-700">
               <AlertCircle className="h-4 w-4" />
-              Esta área ya es una parada del tour.
+              Esta área ya está en el tour.
             </p>
           )}
 
