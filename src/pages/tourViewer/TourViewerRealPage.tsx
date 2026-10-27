@@ -46,6 +46,7 @@ import {
 } from './sections/StopSections';
 import { CUSTOM_SECTION_ICONS, DEFAULT_CUSTOM_SECTION_ICON } from '../../components/tours/customSectionIcons';
 import LocationSection from './sections/LocationSection';
+import NarrationPlayer from './components/NarrationPlayer';
 
 // Viewer of REAL tours (separate from the demo at /tour/:slug, which is not touched).
 // Step 3: draft preview for the editor. Step 4 adds the public route reading the published version.
@@ -116,6 +117,21 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
   const [started, setStarted] = useState(validInitialStop !== null); // false = cover screen (step 0)
   const [finished, setFinished] = useState(false); // end-of-tour screen
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+
+  // The area list is fixed-positioned under the header and kept inside the screen on phones
+  const toggleMenu = () => {
+    if (!menuOpen) {
+      const button = menuButtonRef.current?.getBoundingClientRect();
+      const header = menuButtonRef.current?.closest('header')?.getBoundingClientRect();
+      if (button && header) {
+        const width = Math.min(288, window.innerWidth - 16);
+        setMenuPosition({ top: header.bottom + 4, left: Math.max(8, Math.min(button.right - width, window.innerWidth - width - 8)) });
+      }
+    }
+    setMenuOpen(!menuOpen);
+  };
 
   const stops = view.stops;
   const stop = stops[stopIndex];
@@ -215,7 +231,7 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
 
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-2.5 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-6 sm:py-2.5">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {view.is_preview && (
               <button onClick={onExit} className="rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Volver al editor">
@@ -225,17 +241,17 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
             {view.tour.organization.logo_url && (
               <img src={view.tour.organization.logo_url} alt="" className="hidden h-8 w-8 rounded object-contain sm:block" />
             )}
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-blue-700 sm:text-base">{tourTitle}</p>
+            <div className="hidden min-w-0 sm:block">
+              <p className="truncate text-base font-bold text-blue-700">{tourTitle}</p>
               <p className="hidden truncate text-[11px] text-slate-500 sm:block">
                 {view.tour.organization.name} · {view.tour.plant_name}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-shrink-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:flex-none sm:gap-2">
             {stops.length > 0 && (
-              <div ref={menuRef} className="relative flex items-center gap-0.5">
+              <div ref={menuRef} className="flex flex-shrink-0 items-center gap-0.5">
                 <button
                   onClick={() => (stopIndex === 0 || finished ? goToCover() : goTo(stopIndex - 1))}
                   disabled={!started}
@@ -245,7 +261,8 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => setMenuOpen(!menuOpen)}
+                  ref={menuButtonRef}
+                  onClick={toggleMenu}
                   className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-slate-700 ${menuOpen ? 'bg-slate-100' : 'hover:bg-slate-100'}`}
                   aria-haspopup="listbox"
                   aria-expanded={menuOpen}
@@ -263,7 +280,11 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
                 </button>
 
                 {menuOpen && (
-                  <div role="listbox" className="absolute right-0 top-full z-50 mt-1 max-h-[60vh] w-72 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+                  <div
+                    role="listbox"
+                    className="fixed z-50 max-h-[60vh] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
+                    style={{ top: menuPosition.top, left: menuPosition.left }}
+                  >
                     <button
                       role="option"
                       aria-selected={!started}
@@ -300,13 +321,17 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
               </div>
             )}
 
+            {started && !finished && audioUrl && (
+              <NarrationPlayer key={audioUrl} src={audioUrl} language={language} isFallback={audioIsFallback} />
+            )}
+
             {view.tour.languages.length > 1 && (
-              <div className="flex rounded-md bg-slate-100 p-0.5">
+              <div className="flex flex-shrink-0 rounded-md bg-slate-100 p-0.5">
                 {view.tour.languages.map((l) => (
                   <button
                     key={l}
                     onClick={() => setLanguage(l)}
-                    className={`rounded px-2 py-0.5 text-[11px] font-semibold ${language === l ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600'}`}
+                    className={`rounded px-1.5 py-0.5 text-[11px] font-semibold sm:px-2 ${language === l ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600'}`}
                   >
                     {l.toUpperCase()}
                   </button>
@@ -315,6 +340,7 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
             )}
           </div>
         </div>
+        <p className="truncate px-3 pb-1.5 text-xs font-bold text-blue-700 sm:hidden">{tourTitle}</p>
         {stops.length > 0 && (
           <div className="h-1 bg-slate-100">
             <div
@@ -385,7 +411,8 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
                     {stopIndex + 1}/{stops.length}
                   </span>
                 </div>
-                <div className="space-y-4 p-5">
+                {/* Like the demo: the info column has a max height and scrolls (e.g. when the FAQ is open) */}
+                <div className="max-h-96 space-y-4 overflow-y-auto p-5">
                   <div>
                     <h1 className="text-2xl font-bold text-blue-700">{tr(stop.title, language) || stop.area?.name}</h1>
                     {stop.area?.description && <p className="mt-1 text-sm text-slate-600">{stop.area.description}</p>}
@@ -407,19 +434,21 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
                     </div>
                   )}
                   <StopFaq stop={stop} language={language} />
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">
-                    <Volume2 className="h-4 w-4 text-slate-400" />
-                    {audioUrl ? (
-                      <div className="w-full">
-                        <audio key={audioUrl} controls src={audioUrl} className="h-8 w-full" />
-                        {audioIsFallback && <p className="mt-1 text-[11px] text-slate-500">Narration available in Spanish only.</p>}
-                      </div>
-                    ) : view.is_preview ? (
-                      lang('La narración de esta área se generará al publicar.', 'Narration will be generated when the tour is published.')
-                    ) : (
-                      lang('Esta área no tiene narración.', 'This area has no narration.')
-                    )}
-                  </div>
+                  {audioUrl ? (
+                    audioIsFallback && (
+                      <p className="flex items-center gap-2 text-xs text-slate-500">
+                        <Volume2 className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                        Narration available in Spanish only.
+                      </p>
+                    )
+                  ) : (
+                    <p className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600">
+                      <Volume2 className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                      {view.is_preview
+                        ? lang('La narración de esta área se generará al publicar.', 'Narration will be generated when the tour is published.')
+                        : lang('Esta área no tiene narración.', 'This area has no narration.')}
+                    </p>
+                  )}
                 </div>
               </div>
             </section>
@@ -560,7 +589,7 @@ const TourCover = ({
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
           {lang('Qué vas a conocer', 'What you will see')}
         </h2>
-        <ol className="grid gap-2 sm:grid-cols-2">
+        <ol className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {view.stops.map((s, i) => (
             <li key={s.id}>
               <button

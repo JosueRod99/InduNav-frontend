@@ -65,6 +65,12 @@ const StopNarrationEditor = ({ stop, language, item, isLoading, onChange }: Stop
         )}
       </div>
 
+      {item?.synth_text && item.script && item.synth_text !== item.script && (
+        <p className="rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-xs text-purple-900">
+          <strong>Modo prueba:</strong> solo se generará “{item.synth_text}”. Al apagarlo se genera el guion completo.
+        </p>
+      )}
+
       {item?.audio_url && (
         <audio controls src={item.audio_url} className="w-full max-w-lg" aria-label="Narración generada" />
       )}

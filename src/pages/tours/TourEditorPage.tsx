@@ -13,6 +13,7 @@ import {
   Rocket,
   Share2,
   Volume2,
+  FlaskConical,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -374,6 +375,16 @@ const TourEditorPage = () => {
           </Button>
         </div>
       </div>
+
+      {data!.narration_test_mode && (
+        <div className="flex items-start gap-2 rounded-lg border border-purple-300 bg-purple-50 px-4 py-2.5 text-sm text-purple-900" role="status">
+          <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <p>
+            <strong>Modo prueba de narración activo:</strong> al publicar solo se genera la primera frase de cada guion (~2–5 s).
+            Apágalo en el servidor (<code className="rounded bg-purple-100 px-1">TTS_TEST_MODE=false</code>) para generar los audios completos.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* Editing area (left, wide) */}

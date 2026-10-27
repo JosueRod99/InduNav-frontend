@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   Award,
@@ -73,42 +73,52 @@ export const SummarySection = ({ stop, language }: { stop: TourViewStop; languag
   );
 };
 
-/** FAQ of the stop, shown in the stop header (under the person in charge), like the demo */
+/**
+ * FAQ of the stop, shown in the stop header (under the person in charge). Works like the demo: it
+ * expands in place and the stop header's info column (max-h-96) scrolls when it gets long.
+ */
 export const StopFaq = ({ stop, language }: { stop: TourViewStop; language: Lang }) => {
   const [open, setOpen] = useState(false);
   const [openItem, setOpenItem] = useState<number | null>(null);
   const faq = (stop.content.faq || []).filter((f) => tr(f.q, language));
+
+  // New area: start closed
+  useEffect(() => {
+    setOpen(false);
+    setOpenItem(null);
+  }, [stop.id]);
+
   if (faq.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-slate-200">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-medium text-slate-800 hover:bg-slate-100"
         aria-expanded={open}
       >
         <span className="flex items-center gap-2">
-          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`h-4 w-4 flex-shrink-0 text-blue-600 transition-transform ${open ? 'rotate-180' : ''}`} />
           {t(language, 'Preguntas frecuentes', 'FAQ')}
         </span>
-        <span className="text-xs font-normal text-slate-500">
+        <span className="flex-shrink-0 whitespace-nowrap text-xs font-normal text-slate-500">
           {faq.length} {t(language, faq.length === 1 ? 'pregunta' : 'preguntas', faq.length === 1 ? 'question' : 'questions')}
         </span>
       </button>
       {open && (
-        <div className="divide-y divide-slate-100 border-t border-slate-200">
+        <div className="space-y-2 px-3 pb-3">
           {faq.map((item, i) => (
-            <div key={i}>
+            <div key={i} className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
               <button
                 onClick={() => setOpenItem(openItem === i ? null : i)}
-                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
+                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium text-slate-900 hover:bg-slate-50"
                 aria-expanded={openItem === i}
               >
                 {tr(item.q, language)}
                 <ChevronDown className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${openItem === i ? 'rotate-180' : ''}`} />
               </button>
               {openItem === i && (
-                <div className="px-3 pb-3">
+                <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
                   <Paragraphs text={tr(item.a, language)} />
                 </div>
               )}

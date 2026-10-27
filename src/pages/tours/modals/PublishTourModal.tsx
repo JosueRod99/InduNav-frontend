@@ -125,6 +125,13 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
           )
         )}
 
+        {estimate?.test_mode && estimate.to_generate > 0 && (
+          <p className="rounded-lg border border-purple-300 bg-purple-50 p-3 text-sm text-purple-900">
+            <strong>Modo prueba de narración activo:</strong> se generará solo la primera frase de cada guion (~2–5 s). Los
+            visitantes escucharán esa versión corta hasta que publiques con el modo prueba apagado.
+          </p>
+        )}
+
         {isPublishing && estimate && estimate.to_generate > 0 && !keepPreviousAudio && (
           <p className="flex items-center gap-2 text-sm text-gray-600">
             <Loader2 className="h-4 w-4 animate-spin" /> Generando la narración… puede tardar unos segundos por audio.

@@ -157,6 +157,7 @@ export interface TourBuilderData {
   tour: BuilderTour;
   stops: BuilderStop[];
   publications: PublicationUsage;
+  narration_test_mode?: boolean; // TTS_TEST_MODE: only the first sentence of each script is synthesized
 }
 
 export type SectionCounts = Partial<Record<TourSectionKey, number | boolean>>;
@@ -234,6 +235,7 @@ export interface PublishResult {
   public_code: string;
   audio_generated: number;
   counted_toward_limit: boolean;
+  test_mode: boolean;
 }
 
 /** skipNewAudio: publish keeping the previous narration (when the monthly limit is reached) */
@@ -247,6 +249,7 @@ export interface NarrationItem {
   stop_title: string;
   language: TourLanguage;
   script: string | null; // null = nothing to narrate in this language (visitors hear Spanish)
+  synth_text: string | null; // text actually synthesized (first sentence in test mode)
   characters: number;
   text_hash: string | null;
   voice: string | null;
@@ -255,6 +258,7 @@ export interface NarrationItem {
 
 export interface PublishEstimate {
   items: NarrationItem[];
+  test_mode: boolean;
   to_generate: number;
   reused: number;
   characters_to_generate: number;
