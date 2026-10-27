@@ -10,6 +10,7 @@ interface NarrationPlayerProps {
   src: string;
   language: 'es' | 'en';
   isFallback?: boolean; // no narration in the selected language: the Spanish one plays
+  onListen?: (seconds: number) => void; // seconds of real playback (visit stats)
 }
 
 const SPEEDS = [1, 1.25, 1.5];
@@ -21,9 +22,10 @@ const format = (seconds: number, round: (n: number) => number = Math.floor) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
-const NarrationPlayer = ({ src, language, isFallback = false }: NarrationPlayerProps) => {
+const NarrationPlayer = ({ src, language, isFallback = false, onListen }: NarrationPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const lastTime = useRef(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -80,7 +82,15 @@ const NarrationPlayer = ({ src, language, isFallback = false }: NarrationPlayerP
         preload="metadata"
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
-        onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
+        onTimeUpdate={(e) => {
+          const time = e.currentTarget.currentTime;
+          // Only continuous playback counts as listened (seeking jumps are ignored)
+          const delta = time - lastTime.current;
+          if (!e.currentTarget.paused && delta > 0 && delta < 2) onListen?.(delta / e.currentTarget.playbackRate);
+          lastTime.current = time;
+          setCurrent(time);
+        }}
+        onSeeked={(e) => (lastTime.current = e.currentTarget.currentTime)}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={() => setIsPlaying(false)}

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2, Lock, MapPinOff } from 'lucide-react';
 import { getPublicTour, getPublicTourBySlug, resolveStopQr } from '../../api/tourView';
 import { TourExperience } from './TourViewerRealPage';
+import type { VisitSource } from './useVisitTracking';
 
 // Public pages of real tours (no login): /t/:code, /t/:orgSlug/:tourSlug and stop QR codes /s/:qrCode.
 // Separate from the demo at /tour/:slug.
@@ -17,6 +18,7 @@ const PublicTourPage = () => {
   const [searchParams] = useSearchParams();
   const stopParam = Number(searchParams.get('stop'));
   const initialStopIndex = Number.isInteger(stopParam) && stopParam > 0 ? stopParam - 1 : null;
+  const source: VisitSource = searchParams.get('src') === 'qr' ? 'qr' : code ? 'link' : 'slug';
 
   const { data: view, isLoading, error } = useQuery({
     queryKey: ['public-tour', code, orgSlug, tourSlug],
@@ -67,7 +69,7 @@ const PublicTourPage = () => {
     );
   }
 
-  return <TourExperience view={view} initialStopIndex={initialStopIndex} />;
+  return <TourExperience view={view} initialStopIndex={initialStopIndex} source={source} />;
 };
 
 /** /s/:qrCode → opens the tour at that stop */
@@ -83,7 +85,7 @@ export const StopQrRedirect = () => {
 
   useEffect(() => {
     if (data) {
-      const stop = data.stop_index !== null ? `?stop=${data.stop_index + 1}` : '';
+      const stop = data.stop_index !== null ? `?stop=${data.stop_index + 1}&src=qr` : '?src=qr';
       navigate(`/t/${data.tour_code}${stop}`, { replace: true });
     }
   }, [data, navigate]);

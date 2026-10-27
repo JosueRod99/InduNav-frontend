@@ -9,6 +9,7 @@ import {
   Copy,
   ExternalLink,
   Eye,
+  BarChart3,
   Loader2,
   Rocket,
   Share2,
@@ -328,7 +329,7 @@ const TourEditorPage = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -343,6 +344,10 @@ const TourEditorPage = () => {
           >
             <Eye className="h-4 w-4" />
             Vista previa
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate(`/tours/${tourId}/stats`)}>
+            <BarChart3 className="h-4 w-4" />
+            Estadísticas
           </Button>
           {isPublished && (
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsShareOpen(true)}>

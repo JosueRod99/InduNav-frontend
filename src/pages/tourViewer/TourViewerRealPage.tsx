@@ -47,6 +47,7 @@ import {
 import { CUSTOM_SECTION_ICONS, DEFAULT_CUSTOM_SECTION_ICON } from '../../components/tours/customSectionIcons';
 import LocationSection from './sections/LocationSection';
 import NarrationPlayer from './components/NarrationPlayer';
+import { useVisitTracking, type VisitSource } from './useVisitTracking';
 
 // Viewer of REAL tours (separate from the demo at /tour/:slug, which is not touched).
 // Step 3: draft preview for the editor. Step 4 adds the public route reading the published version.
@@ -105,9 +106,10 @@ interface TourExperienceProps {
   view: TourView;
   onExit?: () => void; // preview only: back to the editor
   initialStopIndex?: number | null; // open directly at a stop (stop QR codes, ?stop=N)
+  source?: VisitSource; // how the visitor arrived (visit stats)
 }
 
-export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = null }: TourExperienceProps) => {
+export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = null, source = 'link' }: TourExperienceProps) => {
   const validInitialStop =
     initialStopIndex !== null && initialStopIndex >= 0 && initialStopIndex < view.stops.length ? initialStopIndex : null;
   const [stopIndex, setStopIndex] = useState(validInitialStop ?? 0);
@@ -180,6 +182,18 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
   // Without narration in the selected language, visitors hear the Spanish one (same as texts)
   const audioUrl = stop?.audio?.[language] || stop?.audio?.es || null;
   const audioIsFallback = !!audioUrl && !stop?.audio?.[language];
+
+  // Anonymous visit stats (published tours only, never the editor preview)
+  const { onNarration } = useVisitTracking({
+    enabled: !view.is_preview,
+    tourId: view.tour.id,
+    publicCode: view.tour.public_code,
+    source,
+    entryStopId: source === 'qr' && validInitialStop !== null ? stops[validInitialStop]?.id ?? null : null,
+    language,
+    stopId: started && !finished ? stop?.id ?? null : null,
+    finished,
+  });
 
   const renderSection = useMemo(
     () => (section: TourSection) => {
@@ -322,7 +336,7 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
             )}
 
             {started && !finished && audioUrl && (
-              <NarrationPlayer key={audioUrl} src={audioUrl} language={language} isFallback={audioIsFallback} />
+              <NarrationPlayer key={audioUrl} src={audioUrl} language={language} isFallback={audioIsFallback} onListen={onNarration} />
             )}
 
             {view.tour.languages.length > 1 && (

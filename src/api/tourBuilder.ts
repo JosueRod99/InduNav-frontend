@@ -290,3 +290,30 @@ export const tourLinks = (share: Pick<TourShareInfo, 'public_code' | 'organizati
     stop: (qrShortCode: string) => `${origin}/s/${qrShortCode}`,
   };
 };
+
+// ---------------------------------------------------------------------------
+// Visit statistics (anonymous visits of the published tour)
+// ---------------------------------------------------------------------------
+
+export interface TourStats {
+  days: number;
+  totals: { visits: number; started: number; completed: number; avg_seconds: number };
+  by_day: { date: string; visits: number }[];
+  languages: Record<string, number>;
+  sources: Record<string, number>;
+  devices: Record<string, number>;
+  stops: {
+    stop_id: string;
+    order_index: number;
+    title: string;
+    views: number;
+    avg_seconds: number;
+    audio_listeners: number;
+    avg_audio_seconds: number;
+  }[];
+}
+
+export const getTourStats = async (tourId: string, days: number): Promise<TourStats> => {
+  const { data } = await apiClient.get(`/tours/${tourId}/stats`, { params: { days } });
+  return data.stats;
+};

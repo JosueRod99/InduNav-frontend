@@ -11,10 +11,11 @@ const AppLayout = () => {
       {/* Sidebar */}
       <Sidebar />
 
-      {/* Main Content */}
+      {/* Main Content (min-w-0: wide tables scroll inside their own container instead of
+          stretching the page past the screen, where the root overflow-hidden would cut it) */}
       <div
         className={`
-          flex flex-1 flex-col transition-all duration-300 ease-in-out
+          flex min-w-0 flex-1 flex-col transition-all duration-300 ease-in-out
 
           /* Mobile: Sin padding (sidebar es overlay) */
           pl-0

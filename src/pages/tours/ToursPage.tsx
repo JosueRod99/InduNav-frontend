@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Map, Globe, Lock, LayoutList, Eye, MapPin, Clock, Share2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Map, Globe, Lock, LayoutList, Eye, MapPin, Clock, Share2, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -12,9 +12,48 @@ import type { Tour } from '../../types';
 
 // Catalog of the organization's tours (cards). Each card opens the editor or the preview.
 
+/** Icon action of a tour card, with a visible label on hover/focus (and as its accessible name) */
+const CardAction = ({
+  label,
+  onClick,
+  href,
+  className = 'text-gray-600 hover:bg-gray-100 hover:text-blue-700',
+  alignEnd = false,
+  children,
+}: {
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  className?: string;
+  alignEnd?: boolean; // last button: the label opens to the left so it stays on screen
+  children: React.ReactNode;
+}) => {
+  const classes = `peer flex h-8 w-8 items-center justify-center rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${className}`;
+  return (
+    <span className="relative z-1000">
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className={classes}>
+          {children}
+        </a>
+      ) : (
+        <button type="button" onClick={onClick} aria-label={label} className={classes}>
+          {children}
+        </button>
+      )}
+      <span
+        role="presentation"
+        className={`pointer-events-none absolute bottom-full z-20 mb-1.5 hidden whitespace-nowrap ${alignEnd ? 'right-0' : 'left-1/2 -translate-x-1/2'} rounded bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow peer-hover:block peer-focus-visible:block`}
+      >
+        {label}
+      </span>
+    </span>
+  );
+};
+
 /** List rows include the v2 fields (PLAN_TOURS_REALES.md) on top of the legacy Tour type */
 type TourCard = Tour & {
   stops_count?: number | string;
+  visits_30d?: number | string;
   status?: 'draft' | 'published' | 'archived';
   public_code?: string | null;
   visibility?: 'link' | 'private';
@@ -168,17 +207,17 @@ const ToursPage = () => {
           </div>
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
           {tours.map((tour) => {
             const badge = statusBadge(tour);
             const stopsCount = Number(tour.stops_count || 0);
             const title = tour.title_translations?.es || tour.title;
             const description = tour.description_translations?.es || tour.description;
             return (
-              <article key={tour.id} className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+              <article key={tour.id} className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
                 <button
                   onClick={() => navigate(`/tours/${tour.id}/edit`)}
-                  className="relative aspect-[16/9] w-full overflow-hidden bg-gradient-to-br from-blue-600 to-slate-800 text-left"
+                  className="relative aspect-[16/9] w-full overflow-hidden rounded-t-xl bg-gradient-to-br from-blue-600 to-slate-800 text-left"
                   aria-label={`Abrir el editor de ${title}`}
                 >
                   {tour.cover_image_url ? (
@@ -206,6 +245,16 @@ const ToursPage = () => {
                       {stopsCount} {stopsCount === 1 ? 'área' : 'áreas'}
                     </span>
                     <span>{getPlantName(tour.plant_id)}</span>
+                    {tour.status === 'published' && (
+                      <button
+                        onClick={() => navigate(`/tours/${tour.id}/stats`)}
+                        className="inline-flex items-center gap-1 rounded hover:text-blue-700 hover:underline"
+                        title="Ver estadísticas de visitas"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        {Number(tour.visits_30d || 0).toLocaleString('es-MX')} {Number(tour.visits_30d) === 1 ? 'visita' : 'visitas'} (30 días)
+                      </button>
+                    )}
                     <span className="inline-flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5" />
                       {new Date(tour.updated_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
@@ -213,51 +262,36 @@ const ToursPage = () => {
                   </div>
                 </div>
 
+                {/* One line at any card width: the main action with text, the rest as labeled icons */}
                 <div className="flex items-center gap-2 border-t border-gray-100 px-4 py-3">
                   <button
                     onClick={() => navigate(`/tours/${tour.id}/edit`)}
-                    className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                    className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
                   >
-                    <LayoutList className="h-4 w-4" />
+                    <LayoutList className="h-4 w-4 flex-shrink-0" />
                     Editor
                   </button>
-                  {tour.status === 'published' && tour.public_code && (
-                    <button
-                      onClick={() => setShareTour(tour)}
-                      className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100"
-                      title="Link, QR y hoja de QRs por área"
-                    >
-                      <Share2 className="h-4 w-4" />
-                      Compartir
-                    </button>
-                  )}
-                  <a
-                    href={`/preview/tours/${tour.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200"
-                    title="Ver el tour como lo verán los visitantes"
-                  >
-                    <Eye className="h-4 w-4" />
-                    Vista previa
-                  </a>
-                  <div className="ml-auto flex items-center gap-1">
-                    <button
-                      onClick={() => handleEdit(tour)}
-                      className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-blue-700"
-                      title="Editar nombre y datos básicos"
-                      aria-label="Editar datos básicos"
-                    >
+                  <div className="flex flex-shrink-0 items-center gap-0.5">
+                    {tour.status === 'published' && tour.public_code && (
+                      <CardAction label="Compartir: link y QR" onClick={() => setShareTour(tour)} className="text-green-700 hover:bg-green-50">
+                        <Share2 className="h-4 w-4" />
+                      </CardAction>
+                    )}
+                    <CardAction label="Vista previa" href={`/preview/tours/${tour.id}`}>
+                      <Eye className="h-4 w-4" />
+                    </CardAction>
+                    {tour.status === 'published' && (
+                      <CardAction label="Estadísticas" onClick={() => navigate(`/tours/${tour.id}/stats`)}>
+                        <BarChart3 className="h-4 w-4" />
+                      </CardAction>
+                    )}
+                    <span className="mx-0.5 h-5 w-px bg-gray-200" aria-hidden />
+                    <CardAction label="Editar datos básicos" onClick={() => handleEdit(tour)}>
                       <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(tour)}
-                      className="rounded p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                      title="Eliminar tour"
-                      aria-label="Eliminar tour"
-                    >
+                    </CardAction>
+                    <CardAction label="Eliminar tour" alignEnd onClick={() => handleDelete(tour)} className="text-gray-500 hover:bg-red-50 hover:text-red-600">
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </CardAction>
                   </div>
                 </div>
               </article>
