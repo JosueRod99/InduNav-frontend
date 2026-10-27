@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -14,6 +14,7 @@ import {
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
+import LabelModeToggle, { useLabelMode } from '../../layouts/LabelModeToggle';
 import LayoutMap, { type EditableShape, type MapFootprint } from '../../layouts/LayoutMap';
 import LinkAreaModal from '../../layouts/LinkAreaModal';
 import AreaLayoutBackgroundModal from '../modals/AreaLayoutBackgroundModal';
@@ -65,6 +66,22 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
   const [drawnKind, setDrawnKind] = useState<'choose' | 'area' | 'equipment' | null>(null);
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
   const [colorByStatus, setColorByStatus] = useState(true);
+  // Names on the map: always, or only on hover (like the tour map)
+  const [labelMode, changeLabelMode] = useLabelMode();
+  // Shape under the mouse, shared by the map and the side list
+  const [hovered, setHovered] = useState<{ id: string; from: 'map' | 'list' } | null>(null);
+  const listRows = useRef(new Map<string, HTMLButtonElement>());
+  useEffect(() => {
+    if (hovered?.from === 'map') listRows.current.get(hovered.id)?.scrollIntoView({ block: 'nearest' });
+  }, [hovered]);
+  const rowHover = (id: string) => ({
+    onMouseEnter: () => setHovered({ id, from: 'list' }),
+    onMouseLeave: () => setHovered(null),
+    ref: (el: HTMLButtonElement | null) => {
+      if (el) listRows.current.set(id, el);
+      else listRows.current.delete(id);
+    },
+  });
 
   // ---------- Data ----------
   const { data: layout, isLoading: isLoadingLayout } = useQuery({
@@ -266,6 +283,9 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {(subAreas.length > 0 || footprints.length > 0) && (
+            <LabelModeToggle value={labelMode} onChange={changeLabelMode} />
+          )}
           {footprints.length > 0 && (
             <div className="flex items-center rounded-lg border border-gray-300 p-0.5 text-xs font-medium">
               {[
@@ -316,7 +336,8 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
 
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Map */}
-        <div className="flex-1 h-[600px] bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {/* Fixed height when stacked (flex-1 alone would collapse it to 0 in the column layout) */}
+        <div className="h-[420px] w-full min-w-0 bg-white rounded-lg border border-gray-200 overflow-hidden sm:h-[520px] lg:h-[600px] lg:flex-1">
           <LayoutMap
             imageUrl={background.imageUrl}
             imageBounds={background.imageBounds}
@@ -331,6 +352,10 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
             }}
             selectedFootprintId={selection?.kind === 'equipment' ? selection.item.id : null}
             colorByStatus={colorByStatus}
+            showAreaLabels
+            labelMode={labelMode}
+            highlightedId={isBusy ? null : hovered?.id ?? null}
+            onShapeHover={(id) => !isBusy && setHovered(id ? { id, from: 'map' } : null)}
             drawMode={drawMode}
             drawTitle="Dibujando subárea o equipo"
             editMode={editMode}
@@ -408,10 +433,13 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
                 {subAreas.map((rep) => (
                   <button
                     key={rep.id}
+                    {...rowHover(rep.id)}
                     onClick={() => !isBusy && setSelection({ kind: 'area', item: rep })}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm transition-colors ${
                       selection?.kind === 'area' && selection.item.id === rep.id
                         ? 'bg-blue-50 text-blue-900'
+                        : hovered?.id === rep.id
+                        ? 'bg-gray-100 text-gray-900'
                         : 'hover:bg-gray-50 text-gray-800'
                     }`}
                   >
@@ -438,10 +466,13 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
                 {footprints.map((fp) => (
                   <button
                     key={fp.id}
+                    {...rowHover(fp.id)}
                     onClick={() => !isBusy && setSelection({ kind: 'equipment', item: fp })}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm transition-colors ${
                       selection?.kind === 'equipment' && selection.item.id === fp.id
                         ? 'bg-blue-50 text-blue-900'
+                        : hovered?.id === fp.id
+                        ? 'bg-gray-100 text-gray-900'
                         : 'hover:bg-gray-50 text-gray-800'
                     }`}
                   >

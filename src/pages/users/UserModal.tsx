@@ -89,6 +89,15 @@ const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
     },
   });
 
+  // Same rules as the backend (validators/userValidators.ts)
+  const isPlatformAdminRole = rolesData?.find((r) => r.id === formData.role_id)?.name === 'platform_admin';
+  const passwordRules = [
+    { ok: formData.password.length >= 8, text: '8 caracteres' },
+    { ok: /[A-Z]/.test(formData.password), text: 'una mayúscula' },
+    { ok: /[a-z]/.test(formData.password), text: 'una minúscula' },
+    { ok: /[0-9]/.test(formData.password), text: 'un número' },
+  ];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -102,14 +111,20 @@ const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
       return;
     }
 
-    if (formData.password && formData.password.length < 8) {
-      toast.error('La contraseña debe tener al menos 8 caracteres');
+    if (formData.password && passwordRules.some((r) => !r.ok)) {
+      toast.error(`La contraseña debe tener al menos ${passwordRules.map((r) => r.text).join(', ')}`);
+      return;
+    }
+
+    if (!isPlatformAdminRole && !formData.organization_id) {
+      toast.error('Selecciona la empresa del usuario (obligatoria para este rol)');
       return;
     }
 
     const payload = {
       ...formData,
-      organization_id: formData.organization_id || null,
+      email: formData.email.trim().toLowerCase(),
+      organization_id: isPlatformAdminRole ? null : formData.organization_id || null,
     };
 
     // Don't send password if it's empty (for updates)
@@ -200,7 +215,17 @@ const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
                 required={!isEditing}
                 minLength={8}
                 placeholder={isEditing ? 'Dejar vacío para mantener actual' : 'Mínimo 8 caracteres'}
+                aria-describedby="password-rules"
               />
+              {(!isEditing || formData.password) && (
+                <p id="password-rules" className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                  {passwordRules.map((rule) => (
+                    <span key={rule.text} className={rule.ok ? 'text-green-700' : 'text-gray-500'}>
+                      {rule.ok ? '✓' : '○'} {rule.text}
+                    </span>
+                  ))}
+                </p>
+              )}
             </div>
 
             <div>
@@ -224,14 +249,16 @@ const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Organización
+                Organización {!isPlatformAdminRole && '*'}
               </label>
               <select
-                value={formData.organization_id}
+                value={isPlatformAdminRole ? '' : formData.organization_id}
                 onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isPlatformAdminRole}
+                required={!isPlatformAdminRole}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               >
-                <option value="">Sin organización</option>
+                <option value="">{isPlatformAdminRole ? 'No aplica (administra todas las empresas)' : 'Selecciona una organización'}</option>
                 {orgsData?.organizations?.map((org) => (
                   <option key={org.id} value={org.id}>
                     {org.name}

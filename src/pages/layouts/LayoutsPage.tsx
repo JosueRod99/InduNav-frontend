@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Trash2, Square, Upload, PenTool, LayoutGrid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import LayoutMap from './LayoutMap';
+import LabelModeToggle, { useLabelMode } from './LabelModeToggle';
 import LinkAreaModal from './LinkAreaModal';
 import LayoutModal from './LayoutModal';
 import { getPlants } from '../../api/plants';
@@ -23,6 +24,13 @@ const LayoutsPage = () => {
   const [drawMode, setDrawMode] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
+  // Names on the map (always / on hover) and the area under the mouse, shared by map and list
+  const [labelMode, setLabelMode] = useLabelMode();
+  const [hovered, setHovered] = useState<{ id: string; from: 'map' | 'list' } | null>(null);
+  const listRows = useRef(new Map<string, HTMLDivElement>());
+  useEffect(() => {
+    if (hovered?.from === 'map') listRows.current.get(hovered.id)?.scrollIntoView({ block: 'nearest' });
+  }, [hovered]);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -135,10 +143,10 @@ const LayoutsPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
+    <div className="flex flex-col lg:h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Layout 2D</h2>
             <p className="mt-1 text-sm text-gray-600">
@@ -147,9 +155,10 @@ const LayoutsPage = () => {
           </div>
 
           {selectedPlantId && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {!drawMode && !editMode ? (
                 <>
+                  {areaRepresentations.length > 0 && <LabelModeToggle value={labelMode} onChange={setLabelMode} />}
                   <Button
                     onClick={() => setIsLayoutModalOpen(true)}
                     className="gap-2"
@@ -179,8 +188,8 @@ const LayoutsPage = () => {
         </div>
 
         {/* Filters */}
-        <div className="mt-4 flex gap-4">
-          <div className="w-64">
+        <div className="mt-4 flex flex-wrap gap-4">
+          <div className="w-full sm:w-64">
             <label htmlFor="plant-select" className="block text-sm font-medium text-gray-700 mb-1">
               Seleccionar Planta
             </label>
@@ -200,7 +209,7 @@ const LayoutsPage = () => {
           </div>
 
           {selectedPlantId && (
-            <div className="w-48">
+            <div className="w-full sm:w-48">
               <label htmlFor="floor-select" className="block text-sm font-medium text-gray-700 mb-1">
                 Piso
               </label>
@@ -233,14 +242,18 @@ const LayoutsPage = () => {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex gap-4">
-          {/* Map */}
-          <div className="flex-1 bg-white rounded-lg shadow overflow-hidden">
+        <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row">
+          {/* Map (fixed height when stacked on small screens; fills the page from lg up) */}
+          <div className="h-[420px] min-w-0 bg-white rounded-lg shadow overflow-hidden sm:h-[520px] lg:h-auto lg:flex-1">
             <LayoutMap
               imageUrl={currentLayout?.layout_image_url || null}
               areas={areaRepresentations}
               onAreaClick={handleAreaClick}
               selectedAreaId={selectedArea?.id}
+              showAreaLabels
+              labelMode={labelMode}
+              highlightedId={drawMode || editMode ? null : hovered?.id ?? null}
+              onShapeHover={(id) => !drawMode && !editMode && setHovered(id ? { id, from: 'map' } : null)}
               drawMode={drawMode}
               editMode={editMode}
               editingArea={
@@ -261,7 +274,7 @@ const LayoutsPage = () => {
           </div>
 
           {/* Sidebar */}
-          <div className="w-80 bg-white rounded-lg shadow p-4 overflow-y-auto">
+          <div className="w-full bg-white rounded-lg shadow p-4 lg:w-80 lg:overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Áreas ({areaRepresentations.length})
             </h3>
@@ -284,10 +297,18 @@ const LayoutsPage = () => {
                   return (
                     <div
                       key={areaRep.id}
+                      ref={(el) => {
+                        if (el) listRows.current.set(areaRep.id, el);
+                        else listRows.current.delete(areaRep.id);
+                      }}
                       onClick={() => setSelectedArea(areaRep)}
+                      onMouseEnter={() => setHovered({ id: areaRep.id, from: 'list' })}
+                      onMouseLeave={() => setHovered(null)}
                       className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
                         selectedArea?.id === areaRep.id
                           ? 'border-blue-500 bg-blue-50'
+                          : hovered?.id === areaRep.id
+                          ? 'border-blue-300 bg-gray-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >

@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useEffect, useMemo } from 'react';
 import {
   AudioLines,
+  ScrollText,
   Building2,
   Factory,
   Map,
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { to: '/plants', icon: Factory, label: 'Plantas', allowedRoles: ['platform_admin', 'org_owner'] },
   { to: '/tours', icon: Map, label: 'Tours' },
   { to: '/admin/narration-usage', icon: AudioLines, label: 'Consumo de narración', allowedRoles: ['platform_admin'] },
+  { to: '/admin/audit', icon: ScrollText, label: 'Auditoría', allowedRoles: ['platform_admin'] },
   // 'Stops & QR' was merged into the tour editor (stops) and Share (QR codes); /stops still exists
   { to: '/layouts', icon: LayoutGrid, label: 'Layout 2D' },
   { to: '/employees', icon: Users, label: 'Empleados', allowedRoles: ['platform_admin', 'org_owner'] },

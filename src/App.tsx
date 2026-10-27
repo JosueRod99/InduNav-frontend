@@ -15,6 +15,7 @@ import PlantsPage from './pages/plants/PlantsPage';
 import ToursPage from './pages/tours/ToursPage';
 import TourEditorPage from './pages/tours/TourEditorPage';
 import NarrationUsagePage from './pages/admin/NarrationUsagePage';
+import AuditLogPage from './pages/admin/AuditLogPage';
 import TourStatsPage from './pages/tours/TourStatsPage';
 import TourViewerRealPage from './pages/tourViewer/TourViewerRealPage';
 import PublicTourPage, { StopQrRedirect } from './pages/tourViewer/PublicTourPage';
@@ -139,6 +140,14 @@ function App() {
               }
             />
             <Route path="tours" element={<ToursPage />} />
+            <Route
+              path="admin/audit"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin']}>
+                  <AuditLogPage />
+                </RoleProtectedRoute>
+              }
+            />
             <Route
               path="admin/narration-usage"
               element={

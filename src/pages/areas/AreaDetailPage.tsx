@@ -135,8 +135,9 @@ const AreaDetailPage = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+      {/* Scrolls sideways on small screens instead of widening the page */}
+      <div className="overflow-x-auto border-b border-gray-200">
+        <nav className="-mb-px flex space-x-6 sm:space-x-8" aria-label="Tabs">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
