@@ -17,6 +17,53 @@ export interface UpdatePlantRequest {
   timezone?: string;
   is_active?: boolean;
   settings?: Record<string, any>;
+  description?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+}
+
+// Plant "Resumen" tab. Fields the user's role cannot see come back null/empty.
+export interface PlantSummary {
+  counts: {
+    areas: number;
+    products: number | null;
+    employees: number;
+    tours: number;
+    tours_published: number;
+    equipment_by_status: Partial<Record<'active' | 'maintenance' | 'out_of_service' | 'retired', number>> | null;
+  };
+  alerts: {
+    equipment: { id: string; code: string; name: string; status: 'maintenance' | 'out_of_service'; updated_at: string }[];
+    certifications: {
+      id: string;
+      certification_name: string;
+      expiry_date: string | null;
+      next_audit_date: string | null;
+      area_id: string;
+      area_name: string;
+      kind: 'expired' | 'expiring' | 'audit';
+    }[];
+  };
+  tours: {
+    visits_30d: number;
+    visits_prev_30d: number;
+    top: { id: string; title: string; status: string; visits_30d: number }[];
+  };
+  activity:
+    | {
+        id: string;
+        method: string;
+        action: string;
+        kind: 'plant' | 'area' | 'equipment' | 'product' | 'tour' | 'stop' | 'employee' | 'layout';
+        entity_id: string;
+        entity_name: string | null;
+        tour_id: string | null;
+        user_name: string | null;
+        created_at: string;
+      }[]
+    | null; // managers only
+  alert_days: number;
 }
 
 export interface GetPlantsParams {
@@ -52,6 +99,11 @@ export const getPlants = async (params?: GetPlantsParams): Promise<PlantsRespons
 export const getPlant = async (id: string): Promise<Plant> => {
   const { data } = await apiClient.get(`/plants/${id}`);
   return data.plant;
+};
+
+export const getPlantSummary = async (id: string): Promise<PlantSummary> => {
+  const { data } = await apiClient.get(`/plants/${id}/summary`);
+  return data;
 };
 
 // Get plants by organization

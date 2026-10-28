@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { MapPin, Plus, Calendar, ArrowRight, History, Trash2, StopCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
@@ -18,6 +17,7 @@ import {
   type Equipment,
   type EquipmentAreaAssignment,
 } from '../../../api/equipment';
+import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 
 interface EquipmentAssignmentsTabProps {
   equipmentId: string;
@@ -36,7 +36,7 @@ const today = () => new Date().toISOString().split('T')[0];
 
 const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignmentsTabProps) => {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const [showForm, setShowForm] = useState(false);
   const [areaId, setAreaId] = useState<string | null>(null);
   const [assignmentType, setAssignmentType] = useState<AssignmentType>('permanent');

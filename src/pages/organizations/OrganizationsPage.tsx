@@ -8,8 +8,10 @@ import OrganizationModal from './OrganizationModal';
 import { getOrganizations, deleteOrganization } from '../../api/organizations';
 import { useIsPlatformAdmin } from '../../hooks/usePermissions';
 import type { Organization } from '../../types';
+import { Link, useNavigate } from 'react-router-dom';
 
 const OrganizationsPage = () => {
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
   const queryClient = useQueryClient();
@@ -121,7 +123,7 @@ const OrganizationsPage = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {data.organizations.map((org) => (
-                <tr key={org.id} className="hover:bg-gray-50">
+                <tr key={org.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/organizations/${org.id}`)}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       {org.logo_url ? (
@@ -136,7 +138,13 @@ const OrganizationsPage = () => {
                         </div>
                       )}
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{org.name}</div>
+                        <Link
+                          to={`/organizations/${org.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline"
+                        >
+                          {org.name}
+                        </Link>
                       </div>
                     </div>
                   </td>
@@ -151,7 +159,7 @@ const OrganizationsPage = () => {
                       {org.is_active ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                     {isPlatformAdmin && (
                       <>
                         <button

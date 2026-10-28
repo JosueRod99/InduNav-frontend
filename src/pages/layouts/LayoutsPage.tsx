@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Trash2, Square, Upload, PenTool, LayoutGrid } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -14,9 +13,13 @@ import { getLayouts } from '../../api/layouts';
 import { getAreasByLayout } from '../../api/areaRepresentations';
 import { deleteRepresentation, updateRepresentation, type AreaPhysicalRepresentation } from '../../api/areaRepresentations';
 import { useAuthStore } from '../../store/authStore';
+import type { PlantScopedProps } from '../plants/plantScope';
+import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 
-const LayoutsPage = () => {
-  const [selectedPlantId, setSelectedPlantId] = useState<string>('');
+const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
+  const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
+
+  const [selectedPlantId, setSelectedPlantId] = useState<string>(plantId ?? '');
   const [selectedFloor, setSelectedFloor] = useState<number>(0);
   const [selectedArea, setSelectedArea] = useState<AreaPhysicalRepresentation | null>(null);
   const [isLinkAreaModalOpen, setIsLinkAreaModalOpen] = useState(false);
@@ -32,7 +35,7 @@ const LayoutsPage = () => {
     if (hovered?.from === 'map') listRows.current.get(hovered.id)?.scrollIntoView({ block: 'nearest' });
   }, [hovered]);
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const { user } = useAuthStore();
 
   // Fetch plants
@@ -143,16 +146,18 @@ const LayoutsPage = () => {
   };
 
   return (
-    <div className="flex flex-col lg:h-[calc(100vh-8rem)]">
+    <div className={`flex flex-col ${embedded ? 'lg:h-[calc(100vh-17rem)] lg:min-h-[32rem]' : 'lg:h-[calc(100vh-8rem)]'}`}>
       {/* Header */}
       <div className="mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Layout 2D</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Diseña y gestiona distribuciones de planta en 2D
-            </p>
-          </div>
+        <div className={`flex flex-wrap items-center gap-3 ${embedded ? 'justify-end' : 'justify-between'}`}>
+          {!embedded && (
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Layout 2D</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Diseña y gestiona distribuciones de planta en 2D
+              </p>
+            </div>
+          )}
 
           {selectedPlantId && (
             <div className="flex flex-wrap items-center gap-2">
@@ -189,24 +194,26 @@ const LayoutsPage = () => {
 
         {/* Filters */}
         <div className="mt-4 flex flex-wrap gap-4">
-          <div className="w-full sm:w-64">
-            <label htmlFor="plant-select" className="block text-sm font-medium text-gray-700 mb-1">
-              Seleccionar Planta
-            </label>
-            <select
-              id="plant-select"
-              value={selectedPlantId}
-              onChange={(e) => setSelectedPlantId(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            >
-              <option value="">Seleccionar planta</option>
-              {plantsData?.plants.map((plant) => (
-                <option key={plant.id} value={plant.id}>
-                  {plant.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!embedded && (
+            <div className="w-full sm:w-64">
+              <label htmlFor="plant-select" className="block text-sm font-medium text-gray-700 mb-1">
+                Seleccionar Planta
+              </label>
+              <select
+                id="plant-select"
+                value={selectedPlantId}
+                onChange={(e) => setSelectedPlantId(e.target.value)}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              >
+                <option value="">Seleccionar planta</option>
+                {plantsData?.plants.map((plant) => (
+                  <option key={plant.id} value={plant.id}>
+                    {plant.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {selectedPlantId && (
             <div className="w-full sm:w-48">

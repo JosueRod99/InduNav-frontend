@@ -7,14 +7,16 @@ import Input from '../../components/ui/Input';
 import { createPlant, updatePlant, type CreatePlantRequest } from '../../api/plants';
 import { getOrganizations } from '../../api/organizations';
 import type { Plant } from '../../types';
+import { PLANT_TIMEZONES } from './timezones';
 
 interface PlantModalProps {
   isOpen: boolean;
   onClose: () => void;
   plant?: Plant | null;
+  defaultOrganizationId?: string; // creating from an organization's page
 }
 
-const PlantModal = ({ isOpen, onClose, plant }: PlantModalProps) => {
+const PlantModal = ({ isOpen, onClose, plant, defaultOrganizationId }: PlantModalProps) => {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState<CreatePlantRequest>({
     organization_id: '',
@@ -43,7 +45,7 @@ const PlantModal = ({ isOpen, onClose, plant }: PlantModalProps) => {
       });
     } else {
       setFormData({
-        organization_id: '',
+        organization_id: defaultOrganizationId || '',
         name: '',
         slug: '',
         location: '',
@@ -198,15 +200,11 @@ const PlantModal = ({ isOpen, onClose, plant }: PlantModalProps) => {
             required
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           >
-            <option value="America/Mexico_City">Ciudad de México (GMT-6)</option>
-            <option value="America/Cancun">Cancún (GMT-5)</option>
-            <option value="America/Monterrey">Monterrey (GMT-6)</option>
-            <option value="America/Tijuana">Tijuana (GMT-8)</option>
-            <option value="America/New_York">New York (GMT-5)</option>
-            <option value="America/Los_Angeles">Los Angeles (GMT-8)</option>
-            <option value="America/Chicago">Chicago (GMT-6)</option>
-            <option value="Europe/Madrid">Madrid (GMT+1)</option>
-            <option value="Europe/London">London (GMT+0)</option>
+            {PLANT_TIMEZONES.map((tz) => (
+              <option key={tz.value} value={tz.value}>
+                {tz.label}
+              </option>
+            ))}
           </select>
         </div>
       </form>

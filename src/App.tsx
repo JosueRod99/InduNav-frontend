@@ -17,19 +17,16 @@ import TourEditorPage from './pages/tours/TourEditorPage';
 import NarrationUsagePage from './pages/admin/NarrationUsagePage';
 import AuditLogPage from './pages/admin/AuditLogPage';
 import TourStatsPage from './pages/tours/TourStatsPage';
+import PlantWorkspacePage from './pages/plants/PlantWorkspacePage';
+import LegacyPlantRedirect from './pages/plants/LegacyPlantRedirect';
+import OrganizationWorkspacePage from './pages/organizations/OrganizationWorkspacePage';
 import TourViewerRealPage from './pages/tourViewer/TourViewerRealPage';
 import PublicTourPage, { StopQrRedirect } from './pages/tourViewer/PublicTourPage';
 import TourQrSheetPage from './pages/tours/TourQrSheetPage';
 import StopsPage from './pages/stops/StopsPage';
-import LayoutsPage from './pages/layouts/LayoutsPage';
-import EmployeesPage from './pages/employees/EmployeesPage';
-import OrgChartPage from './pages/org-chart/OrgChartPage';
 import ReportsPage from './pages/reports/ReportsPage';
-import AreasPage from './pages/areas/AreasPage';
 import AreaDetailPage from './pages/areas/AreaDetailPage';
-import ProductsPage from './pages/products/ProductsPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
-import EquipmentPage from './pages/equipment/EquipmentPage';
 import EquipmentDetailPage from './pages/equipment/EquipmentDetailPage';
 
 // Public Pages
@@ -123,6 +120,18 @@ function App() {
                 </RoleProtectedRoute>
               }
             />
+            {/* Organization page (platform admins: any; organization owners: their own, "Mi empresa") */}
+            {['organizations/:orgId', 'organizations/:orgId/:tab'].map((path) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                    <OrganizationWorkspacePage />
+                  </RoleProtectedRoute>
+                }
+              />
+            ))}
             <Route
               path="users"
               element={
@@ -134,9 +143,7 @@ function App() {
             <Route
               path="plants"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
-                  <PlantsPage />
-                </RoleProtectedRoute>
+                <PlantsPage />
               }
             />
             <Route path="tours" element={<ToursPage />} />
@@ -172,24 +179,14 @@ function App() {
                 </RoleProtectedRoute>
               }
             />
+            {/* Plant workspace: all sections of one plant behind tabs */}
+            <Route path="plants/:plantId" element={<PlantWorkspacePage />} />
+            <Route path="plants/:plantId/:tab" element={<PlantWorkspacePage />} />
             <Route path="stops" element={<StopsPage />} />
-            <Route path="layouts" element={<LayoutsPage />} />
-            <Route
-              path="employees"
-              element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
-                  <EmployeesPage />
-                </RoleProtectedRoute>
-              }
-            />
-            <Route
-              path="areas"
-              element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner', 'plant_manager']}>
-                  <AreasPage />
-                </RoleProtectedRoute>
-              }
-            />
+            {/* Old section pages: now tabs of each plant (redirect keeps old links working) */}
+            <Route path="layouts" element={<LegacyPlantRedirect tab="layout" />} />
+            <Route path="employees" element={<LegacyPlantRedirect tab="personal" />} />
+            <Route path="areas" element={<LegacyPlantRedirect tab="areas" />} />
             <Route
               path="areas/:areaId"
               element={
@@ -198,14 +195,7 @@ function App() {
                 </RoleProtectedRoute>
               }
             />
-            <Route
-              path="products"
-              element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
-                  <ProductsPage />
-                </RoleProtectedRoute>
-              }
-            />
+            <Route path="products" element={<LegacyPlantRedirect tab="productos" />} />
             <Route
               path="products/:productId"
               element={
@@ -214,14 +204,7 @@ function App() {
                 </RoleProtectedRoute>
               }
             />
-            <Route
-              path="equipment"
-              element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
-                  <EquipmentPage />
-                </RoleProtectedRoute>
-              }
-            />
+            <Route path="equipment" element={<LegacyPlantRedirect tab="equipos" />} />
             <Route
               path="equipment/:id"
               element={
@@ -230,7 +213,7 @@ function App() {
                 </RoleProtectedRoute>
               }
             />
-            <Route path="org-chart" element={<OrgChartPage />} />
+            <Route path="org-chart" element={<LegacyPlantRedirect tab="personal" query="?vista=organigrama" />} />
             <Route path="reports" element={<ReportsPage />} />
           </Route>
 

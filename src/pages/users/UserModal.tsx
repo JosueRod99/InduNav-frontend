@@ -11,9 +11,10 @@ interface UserModalProps {
   isOpen: boolean;
   onClose: () => void;
   user?: User | null;
+  defaultOrganizationId?: string; // creating from an organization's page
 }
 
-const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
+const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalProps) => {
   const queryClient = useQueryClient();
   const isEditing = !!user;
 
@@ -59,11 +60,11 @@ const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
         first_name: '',
         last_name: '',
         role_id: '',
-        organization_id: '',
+        organization_id: defaultOrganizationId || '',
         is_active: true,
       });
     }
-  }, [user]);
+  }, [user, defaultOrganizationId]);
 
   const createMutation = useMutation({
     mutationFn: createUser,

@@ -8,11 +8,32 @@ import PlantModal from './PlantModal';
 import { getPlants, deletePlant } from '../../api/plants';
 import { getOrganizations } from '../../api/organizations';
 import type { Plant } from '../../types';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useBackState, useNavigateWithBack } from '../../hooks/useBackNavigation';
+import { useAuthStore } from '../../store/authStore';
 
-const PlantsPage = () => {
+const SECTION_LABELS: Record<string, string> = {
+  layout: 'Layout',
+  areas: 'Áreas',
+  equipos: 'Equipos',
+  productos: 'Productos',
+  personal: 'Personal',
+  tours: 'Tours',
+};
+
+const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
+  const embedded = !!organizationId; // organization page tab: fixed organization
+  const navigate = useNavigateWithBack(); // the plant's breadcrumb returns here (e.g. to the organization)
+  const backState = useBackState();
+  const { user } = useAuthStore();
+  const isPlatformAdmin = user?.role?.name === 'platform_admin';
+  // Coming from an old section link (/equipment…): pick the plant to open that section
+  const [searchParams] = useSearchParams();
+  const section = SECTION_LABELS[searchParams.get('seccion') || ''] ? searchParams.get('seccion')! : null;
+  const plantPath = (id: string) => `/plants/${id}${section ? `/${section}` : ''}`;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
-  const [selectedOrgFilter, setSelectedOrgFilter] = useState<string>('');
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState<string>(organizationId ?? '');
   const queryClient = useQueryClient();
 
   // Fetch organizations for filter
@@ -68,21 +89,23 @@ const PlantsPage = () => {
   return (
     <div>
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Plantas</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Gestiona las plantas industriales
-          </p>
-        </div>
+      <div className={`flex items-center ${embedded ? 'justify-end mb-4' : 'justify-between mb-8'}`}>
+        {!embedded && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Plantas</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {section ? `Elige la planta para ver ${SECTION_LABELS[section]}` : 'Gestiona las plantas industriales'}
+            </p>
+          </div>
+        )}
         <Button onClick={handleCreate} className="gap-2">
           <Plus className="h-4 w-4" />
           Nueva Planta
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6">
+      {/* Filters (organization: only for platform admins, outside an organization page) */}
+      <div className={`mb-6 ${embedded || !isPlatformAdmin ? 'hidden' : ''}`}>
         <div className="flex gap-4">
           <div className="w-64">
             <label htmlFor="org-filter" className="block text-sm font-medium text-gray-700 mb-1">
@@ -155,14 +178,21 @@ const PlantsPage = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {data.plants.map((plant) => (
-                <tr key={plant.id} className="hover:bg-gray-50">
+                <tr key={plant.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(plantPath(plant.id))}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
                         <Factory className="h-5 w-5 text-green-600" />
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{plant.name}</div>
+                        <Link
+                          to={plantPath(plant.id)}
+                          state={backState}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline"
+                        >
+                          {plant.name}
+                        </Link>
                         <div className="text-sm text-gray-500">{plant.slug}</div>
                       </div>
                     </div>
@@ -190,7 +220,7 @@ const PlantsPage = () => {
                       {plant.is_active ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => handleEdit(plant)}
                       className="text-blue-600 hover:text-blue-900 mr-4"
@@ -216,6 +246,7 @@ const PlantsPage = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         plant={selectedPlant}
+        defaultOrganizationId={organizationId}
       />
     </div>
   );

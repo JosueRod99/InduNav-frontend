@@ -1,4 +1,6 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { getPlants } from '../../api/plants';
 import { useEffect, useMemo } from 'react';
 import {
   AudioLines,
@@ -7,16 +9,11 @@ import {
   Factory,
   Map,
   Users,
-  LayoutGrid,
-  Network,
   FileText,
   BarChart3,
   X,
   ChevronsLeft,
   ChevronsRight,
-  Boxes,
-  Package,
-  Wrench,
 } from 'lucide-react';
 import { useSidebarStore } from '../../store/sidebarStore';
 import { useAuthStore } from '../../store/authStore';
@@ -26,42 +23,55 @@ interface NavItem {
   icon: React.ComponentType<any>;
   label: string;
   allowedRoles?: string[]; // If undefined, accessible to all authenticated users
+  activePrefix?: string; // highlighted on any page under this path (e.g. a plant's tabs)
 }
 
-const navItems: NavItem[] = [
-  { to: '/dashboard', icon: BarChart3, label: 'Dashboard' },
-  { to: '/organizations', icon: Building2, label: 'Organizaciones', allowedRoles: ['platform_admin'] },
-  { to: '/users', icon: Users, label: 'Usuarios', allowedRoles: ['platform_admin'] },
-  { to: '/plants', icon: Factory, label: 'Plantas', allowedRoles: ['platform_admin', 'org_owner'] },
+// Navigation by place: each plant (and its sections: layout, areas, equipment, products,
+// personal, tours) and each organization has its own page with tabs.
+const generalItems: NavItem[] = [
+  { to: '/dashboard', icon: BarChart3, label: 'Inicio' },
+  { to: '/plants', icon: Factory, label: 'Plantas', activePrefix: '/plants' },
   { to: '/tours', icon: Map, label: 'Tours' },
-  { to: '/admin/narration-usage', icon: AudioLines, label: 'Consumo de narración', allowedRoles: ['platform_admin'] },
-  { to: '/admin/audit', icon: ScrollText, label: 'Auditoría', allowedRoles: ['platform_admin'] },
-  // 'Stops & QR' was merged into the tour editor (stops) and Share (QR codes); /stops still exists
-  { to: '/layouts', icon: LayoutGrid, label: 'Layout 2D' },
-  { to: '/employees', icon: Users, label: 'Empleados', allowedRoles: ['platform_admin', 'org_owner'] },
-  { to: '/areas', icon: Boxes, label: 'Áreas', allowedRoles: ['platform_admin', 'org_owner', 'plant_manager'] },
-  { to: '/products', icon: Package, label: 'Productos', allowedRoles: ['platform_admin', 'org_owner'] },
-  { to: '/equipment', icon: Wrench, label: 'Equipos', allowedRoles: ['platform_admin', 'org_owner'] },
-  { to: '/org-chart', icon: Network, label: 'Organigrama' },
   { to: '/reports', icon: FileText, label: 'Reportes' },
+];
+
+const adminItems: NavItem[] = [
+  { to: '/organizations', icon: Building2, label: 'Organizaciones', activePrefix: '/organizations' },
+  { to: '/users', icon: Users, label: 'Usuarios' },
+  { to: '/admin/audit', icon: ScrollText, label: 'Auditoría' },
+  { to: '/admin/narration-usage', icon: AudioLines, label: 'Consumo de narración' },
 ];
 
 const Sidebar = () => {
   const { isOpen, isMobileMenuOpen, toggleSidebar, closeMobileMenu } = useSidebarStore();
   const { user } = useAuthStore();
+  const { pathname } = useLocation();
+  const role = user?.role?.name;
+  const isPlatformAdmin = role === 'platform_admin';
 
-  // Filter nav items based on user role
-  const filteredNavItems = useMemo(() => {
-    if (!user || !user.role) return navItems;
+  // A company with a single plant goes straight to it
+  const { data: plantsData } = useQuery({
+    queryKey: ['plants', 'mine'],
+    queryFn: () => getPlants({ limit: 100 }),
+    enabled: !!user && !isPlatformAdmin,
+    staleTime: 5 * 60 * 1000,
+  });
+  const onlyPlant = !isPlatformAdmin && plantsData?.plants.length === 1 ? plantsData.plants[0] : null;
 
-    return navItems.filter(item => {
-      // If no role restriction, show to everyone
-      if (!item.allowedRoles) return true;
-
-      // Check if user's role is in allowed roles
-      return item.allowedRoles.includes(user.role.name);
-    });
-  }, [user]);
+  const sections = useMemo(() => {
+    const general = generalItems
+      .filter((item) => !item.allowedRoles || (role && item.allowedRoles.includes(role)))
+      .map((item) =>
+        item.to === '/plants' && onlyPlant ? { ...item, to: `/plants/${onlyPlant.id}/resumen`, label: 'Mi planta' } : item
+      );
+    if (role === 'org_owner' && user?.organization_id) {
+      general.push({ to: `/organizations/${user.organization_id}/plantas`, icon: Building2, label: 'Mi empresa', activePrefix: '/organizations' });
+    }
+    return [
+      { title: null, items: general },
+      ...(isPlatformAdmin ? [{ title: 'Administración', items: adminItems }] : []),
+    ];
+  }, [role, user?.organization_id, isPlatformAdmin, onlyPlant]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -136,41 +146,54 @@ const Sidebar = () => {
 
         {/* Navigation */}
         <nav className="mt-6 px-3 overflow-y-auto max-h-[calc(100vh-8rem)]">
-          <div className="space-y-1">
-            {filteredNavItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/dashboard'}
-                  onClick={() => {
-                    // Close mobile menu when clicking a link
-                    if (window.innerWidth < 768) {
-                      closeMobileMenu();
-                    }
-                  }}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${isActive
-                      ? 'bg-gray-800 text-white'
-                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                    }`
-                  }
-                  title={item.label}
+          {sections.map((section) => (
+            <div key={section.title ?? 'general'} className={section.title ? 'mt-6 border-t border-gray-800 pt-4' : ''}>
+              {section.title && (
+                <p
+                  className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 transition-opacity ${
+                    isOpen ? 'opacity-100' : 'h-0 overflow-hidden opacity-0 md:h-0'
+                  }`}
                 >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                  <span
-                    className={`
-                      transition-all duration-300 whitespace-nowrap overflow-hidden
-                      ${isOpen ? 'opacity-100 w-auto' : 'opacity-0 w-0'}
-                    `}
-                  >
-                    {item.label}
-                  </span>
-                </NavLink>
-              );
-            })}
-          </div>
+                  {section.title}
+                </p>
+              )}
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.to === '/dashboard'}
+                      onClick={() => {
+                        // Close mobile menu when clicking a link
+                        if (window.innerWidth < 768) {
+                          closeMobileMenu();
+                        }
+                      }}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${isActive || (item.activePrefix && pathname.startsWith(item.activePrefix))
+                          ? 'bg-gray-800 text-white'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                        }`
+                      }
+                      title={item.label}
+                    >
+                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <span
+                        className={`
+                          transition-all duration-300 whitespace-nowrap overflow-hidden
+                          ${isOpen ? 'opacity-100 w-auto' : 'opacity-0 w-0'}
+                        `}
+                      >
+                        {item.label}
+                      </span>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
 
           {/* Toggle Sidebar Button - solo tablet/desktop */}
           <div className="hidden md:block mt-6 pt-6 border-t border-gray-800">

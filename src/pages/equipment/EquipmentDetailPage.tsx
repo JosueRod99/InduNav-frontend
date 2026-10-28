@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Wrench, Edit } from 'lucide-react';
+import { Wrench, Edit } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import EquipmentModal from './EquipmentModal';
@@ -15,10 +15,10 @@ import {
   EQUIPMENT_TYPE_LABELS,
   EQUIPMENT_STATUS_LABELS,
 } from '../../api/equipment';
+import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
 
 const EquipmentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'general' | 'gallery' | 'documents' | 'assignments' | 'products'>('general');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -49,16 +49,8 @@ const EquipmentDetailPage = () => {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <Button
-              onClick={() => navigate('/equipment')}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver
-            </Button>
+          <PlantBreadcrumb plantId={equipment.plant_id} tab="equipos" current={equipment.name} />
+          <div className="flex flex-wrap items-center gap-3 mb-2">
             <Badge variant="info" className="font-mono">
               {equipment.code}
             </Badge>
@@ -105,9 +97,9 @@ const EquipmentDetailPage = () => {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <div className="flex gap-4">
+      {/* Tabs (scroll sideways on small screens) */}
+      <div className="overflow-x-auto border-b border-gray-200">
+        <div className="flex gap-4 [&>*]:whitespace-nowrap">
           <button
             onClick={() => setActiveTab('general')}
             className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${

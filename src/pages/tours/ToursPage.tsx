@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Map, Globe, Lock, LayoutList, Eye, MapPin, Clock, Share2, BarChart3 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import TourModal from './TourModal';
@@ -9,6 +9,8 @@ import ShareTourModal from './modals/ShareTourModal';
 import { getTours, deleteTour } from '../../api/tours';
 import { getPlants } from '../../api/plants';
 import type { Tour } from '../../types';
+import type { PlantScopedProps } from '../plants/plantScope';
+import { rememberToursList } from './toursReturn';
 
 // Catalog of the organization's tours (cards). Each card opens the editor or the preview.
 
@@ -75,10 +77,14 @@ const statusBadge = (tour: TourCard) => {
   return { text: 'Borrador', className: 'bg-gray-100 text-gray-700' };
 };
 
-const ToursPage = () => {
+const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
+  const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
+  const { pathname } = useLocation();
+  useEffect(() => rememberToursList(pathname), [pathname]); // the editor's back arrow returns here
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
-  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>('');
+  const [selectedPlantFilter, setSelectedPlantFilter] = useState<string>(plantId ?? '');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [shareTour, setShareTour] = useState<TourCard | null>(null);
   const queryClient = useQueryClient();
@@ -133,11 +139,13 @@ const ToursPage = () => {
   return (
     <div>
       {/* Page Header */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Tours</h2>
-          <p className="mt-1 text-sm text-gray-600">Recorridos virtuales de tus plantas</p>
-        </div>
+      <div className={`mb-6 flex flex-wrap items-center gap-4 ${embedded ? 'justify-end' : 'justify-between'}`}>
+        {!embedded && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Tours</h2>
+            <p className="mt-1 text-sm text-gray-600">Recorridos virtuales de tus plantas</p>
+          </div>
+        )}
         <Button onClick={handleCreate} className="gap-2">
           <Plus className="h-4 w-4" />
           Nuevo Tour
@@ -146,24 +154,26 @@ const ToursPage = () => {
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap items-end gap-4">
-        <div className="w-64">
-          <label htmlFor="plant-filter" className="mb-1 block text-sm font-medium text-gray-700">
-            Planta
-          </label>
-          <select
-            id="plant-filter"
-            value={selectedPlantFilter}
-            onChange={(e) => setSelectedPlantFilter(e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-          >
-            <option value="">Todas las plantas</option>
-            {plantsData?.plants.map((plant) => (
-              <option key={plant.id} value={plant.id}>
-                {plant.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!embedded && (
+          <div className="w-64">
+            <label htmlFor="plant-filter" className="mb-1 block text-sm font-medium text-gray-700">
+              Planta
+            </label>
+            <select
+              id="plant-filter"
+              value={selectedPlantFilter}
+              onChange={(e) => setSelectedPlantFilter(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            >
+              <option value="">Todas las plantas</option>
+              {plantsData?.plants.map((plant) => (
+                <option key={plant.id} value={plant.id}>
+                  {plant.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex rounded-md border border-gray-300 bg-white p-0.5 text-sm" role="group" aria-label="Filtrar por estado">
           {(
             [

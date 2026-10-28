@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, MapPin, Wrench } from 'lucide-react';
 import Badge from '../../../components/ui/Badge';
 import { useAuthStore } from '../../../store/authStore';
@@ -14,6 +13,7 @@ import {
   USAGE_TYPE_LABELS,
   type ProductStepEquipment,
 } from '../../../api/productStepEquipment';
+import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 
 interface ProductEquipmentTabProps {
   productId: string;
@@ -23,7 +23,7 @@ interface ProductEquipmentTabProps {
 const EQUIPMENT_MODULE_ROLES = ['platform_admin', 'org_owner'];
 
 const ProductEquipmentTab = ({ productId }: ProductEquipmentTabProps) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const { user } = useAuthStore();
   const canOpenEquipment = !!user?.role && EQUIPMENT_MODULE_ROLES.includes(user.role.name);
 

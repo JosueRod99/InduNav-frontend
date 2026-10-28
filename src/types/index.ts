@@ -68,6 +68,11 @@ export interface Plant {
   timezone: string;
   is_active: boolean;
   settings: Record<string, any>;
+  description?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  organization_name?: string;
   created_at: Date;
   updated_at: Date;
 }

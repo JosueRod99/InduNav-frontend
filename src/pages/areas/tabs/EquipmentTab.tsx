@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { Wrench, Calendar, ChevronRight } from 'lucide-react';
 import Badge from '../../../components/ui/Badge';
 import { useAuthStore } from '../../../store/authStore';
@@ -11,6 +10,7 @@ import {
   ASSIGNMENT_TYPE_LABELS,
   type EquipmentType,
 } from '../../../api/equipment';
+import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 
 interface EquipmentTabProps {
   areaId: string;
@@ -21,7 +21,7 @@ interface EquipmentTabProps {
 const EQUIPMENT_MODULE_ROLES = ['platform_admin', 'org_owner'];
 
 const EquipmentTab = ({ areaId, area }: EquipmentTabProps) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const { user } = useAuthStore();
   const canOpenEquipment = !!user?.role && EQUIPMENT_MODULE_ROLES.includes(user.role.name);
   const [typeFilter, setTypeFilter] = useState<EquipmentType | 'all'>('all');

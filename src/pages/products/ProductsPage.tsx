@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Package, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import ProductModal from './ProductModal';
@@ -17,14 +16,18 @@ import {
 } from '../../api/products';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
+import type { PlantScopedProps } from '../plants/plantScope';
+import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 
-const ProductsPage = () => {
-  const navigate = useNavigate();
+const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
+  const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
+
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const queryClient = useQueryClient();
 
   // State
-  const [selectedOrg, setSelectedOrg] = useState<string>('');
-  const [selectedPlant, setSelectedPlant] = useState<string>('');
+  const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
+  const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | ''>('');
   const [selectedStatus, setSelectedStatus] = useState<ProductStatus | ''>('');
@@ -102,13 +105,15 @@ const ProductsPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Productos</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Catálogo de productos manufacturados en la planta
-          </p>
-        </div>
+      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
+        {!embedded && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Productos</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Catálogo de productos manufacturados en la planta
+            </p>
+          </div>
+        )}
 
         {selectedOrg && (
           <Button onClick={handleCreateNew} className="gap-2">
@@ -122,46 +127,50 @@ const ProductsPage = () => {
       <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Organization Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Organización
-            </label>
-            <select
-              value={selectedOrg}
-              onChange={(e) => {
-                setSelectedOrg(e.target.value);
-                setSelectedPlant('');
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Seleccionar organización</option>
-              {organizations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!embedded && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Organización
+              </label>
+              <select
+                value={selectedOrg}
+                onChange={(e) => {
+                  setSelectedOrg(e.target.value);
+                  setSelectedPlant('');
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Seleccionar organización</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Plant Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Planta
-            </label>
-            <select
-              value={selectedPlant}
-              onChange={(e) => setSelectedPlant(e.target.value)}
-              disabled={!selectedOrg}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            >
-              <option value="">Todas las plantas</option>
-              {plants.map((plant) => (
-                <option key={plant.id} value={plant.id}>
-                  {plant.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!embedded && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Planta
+              </label>
+              <select
+                value={selectedPlant}
+                onChange={(e) => setSelectedPlant(e.target.value)}
+                disabled={!selectedOrg}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+              >
+                <option value="">Todas las plantas</option>
+                {plants.map((plant) => (
+                  <option key={plant.id} value={plant.id}>
+                    {plant.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Category Filter */}
           <div>

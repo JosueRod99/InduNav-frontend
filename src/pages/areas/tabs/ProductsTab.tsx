@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Package, ExternalLink, MapPin, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import {
@@ -10,6 +9,7 @@ import {
   PRODUCT_STATUS_LABELS,
 } from '../../../api/products';
 import { getProcessSteps } from '../../../api/products';
+import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 
 interface ProductsTabProps {
   areaId: string;
@@ -17,7 +17,7 @@ interface ProductsTabProps {
 }
 
 const ProductsTab = ({ areaId, area }: ProductsTabProps) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
 
   // Fetch products that use this area

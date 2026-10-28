@@ -13,6 +13,7 @@ import GeneralTab from './tabs/GeneralTab';
 import ProcessTab from './tabs/ProcessTab';
 import GalleryTab from './tabs/GalleryTab';
 import ProductEquipmentTab from './tabs/ProductEquipmentTab';
+import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
 
 type TabType = 'general' | 'process' | 'equipment' | 'gallery';
 
@@ -41,9 +42,9 @@ const ProductDetailPage = () => {
     return (
       <div className="flex flex-col items-center justify-center h-96">
         <div className="text-red-600 mb-4">Error al cargar el producto</div>
-        <Button onClick={() => navigate('/products')} variant="outline">
+        <Button onClick={() => navigate('/plants')} variant="outline">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a Productos
+          Volver a Plantas
         </Button>
       </div>
     );
@@ -76,16 +77,8 @@ const ProductDetailPage = () => {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <Button
-              onClick={() => navigate('/products')}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver
-            </Button>
+          <PlantBreadcrumb plantId={product.plant_id} tab="productos" current={product.name} />
+          <div className="flex flex-wrap items-center gap-3 mb-2">
             <Badge variant="info" className="font-mono">
               {product.sku}
             </Badge>
@@ -129,9 +122,9 @@ const ProductDetailPage = () => {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+      {/* Tabs (scroll sideways on small screens) */}
+      <div className="overflow-x-auto border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8 [&>*]:whitespace-nowrap">
           {tabs.map((tab) => (
             <button
               key={tab.id}

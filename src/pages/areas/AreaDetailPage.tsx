@@ -15,6 +15,7 @@ import GalleryTab from './tabs/GalleryTab';
 import ProductsTab from './tabs/ProductsTab';
 import EquipmentTab from './tabs/EquipmentTab';
 import AreaLayoutTab from './tabs/AreaLayoutTab';
+import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
 
 type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery' | 'products' | 'equipment' | 'layout';
 
@@ -45,9 +46,9 @@ const AreaDetailPage = () => {
     return (
       <div className="flex flex-col items-center justify-center h-96">
         <div className="text-red-600 mb-4">Error al cargar el área</div>
-        <Button onClick={() => navigate('/areas')} variant="outline">
+        <Button onClick={() => navigate('/plants')} variant="outline">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a Áreas
+          Volver a Plantas
         </Button>
       </div>
     );
@@ -95,16 +96,8 @@ const AreaDetailPage = () => {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <Button
-              onClick={() => navigate('/areas')}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver
-            </Button>
+          <PlantBreadcrumb plantId={area.plant_id} tab="areas" current={area.name} />
+          <div className="flex flex-wrap items-center gap-3 mb-2">
             {area.code && (
               <Badge variant="secondary" className="font-mono">
                 {area.code}

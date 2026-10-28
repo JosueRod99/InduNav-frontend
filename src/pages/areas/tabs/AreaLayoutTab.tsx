@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import {
   PenTool,
   Trash2,
@@ -39,6 +38,7 @@ import {
   type EquipmentFootprint,
 } from '../../../api/equipment';
 import { plantImageBoundsForCrop, type AreaLayoutData } from '../../../utils/areaLayout';
+import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 
 interface AreaLayoutTabProps {
   areaId: string;
@@ -54,7 +54,7 @@ type Selection =
   | null;
 
 const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const canEdit = !!user?.role && EDITOR_ROLES.includes(user.role.name);

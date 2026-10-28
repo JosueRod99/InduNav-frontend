@@ -8,10 +8,13 @@ import EmployeeModal from './EmployeeModal';
 import { getEmployees, deleteEmployee, type Employee } from '../../api/employees';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
+import type { PlantScopedProps } from '../plants/plantScope';
 
-const EmployeesPage = () => {
-  const [selectedOrg, setSelectedOrg] = useState<string>('');
-  const [selectedPlant, setSelectedPlant] = useState<string>('');
+const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
+  const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
+
+  const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
+  const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
   const [selectedDept, setSelectedDept] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,13 +90,15 @@ const EmployeesPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Empleados</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Gestiona empleados y su estructura organizacional
-          </p>
-        </div>
+      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
+        {!embedded && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Empleados</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Gestiona empleados y su estructura organizacional
+            </p>
+          </div>
+        )}
 
         {selectedOrg && (
           <Button onClick={handleCreate} className="gap-2">
@@ -106,49 +111,53 @@ const EmployeesPage = () => {
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label htmlFor="org-filter" className="block text-sm font-medium text-gray-700 mb-1">
-              Organización
-            </label>
-            <select
-              id="org-filter"
-              value={selectedOrg}
-              onChange={(e) => {
-                setSelectedOrg(e.target.value);
-                setSelectedPlant('');
-                setSelectedDept('');
-              }}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            >
-              <option value="">Seleccionar organización</option>
-              {organizationsData?.organizations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!embedded && (
+            <div>
+              <label htmlFor="org-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Organización
+              </label>
+              <select
+                id="org-filter"
+                value={selectedOrg}
+                onChange={(e) => {
+                  setSelectedOrg(e.target.value);
+                  setSelectedPlant('');
+                  setSelectedDept('');
+                }}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              >
+                <option value="">Seleccionar organización</option>
+                {organizationsData?.organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {selectedOrg && (
             <>
-              <div>
-                <label htmlFor="plant-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Planta
-                </label>
-                <select
-                  id="plant-filter"
-                  value={selectedPlant}
-                  onChange={(e) => setSelectedPlant(e.target.value)}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                >
-                  <option value="">Todas las plantas</option>
-                  {plantsData?.plants.map((plant) => (
-                    <option key={plant.id} value={plant.id}>
-                      {plant.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!embedded && (
+                <div>
+                  <label htmlFor="plant-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                    Planta
+                  </label>
+                  <select
+                    id="plant-filter"
+                    value={selectedPlant}
+                    onChange={(e) => setSelectedPlant(e.target.value)}
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  >
+                    <option value="">Todas las plantas</option>
+                    {plantsData?.plants.map((plant) => (
+                      <option key={plant.id} value={plant.id}>
+                        {plant.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label htmlFor="dept-filter" className="block text-sm font-medium text-gray-700 mb-1">

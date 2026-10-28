@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Building2, Map, ExternalLink, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import AreaTreeView from '../../components/areas/AreaTreeView';
@@ -20,11 +20,15 @@ import {
 import { getRepresentationsByArea } from '../../api/areaRepresentations';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
+import type { PlantScopedProps } from '../plants/plantScope';
+import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 
-const AreasPage = () => {
-  const navigate = useNavigate();
-  const [selectedOrg, setSelectedOrg] = useState<string>('');
-  const [selectedPlant, setSelectedPlant] = useState<string>('');
+const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
+  const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
+
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
+  const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
+  const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingArea, setEditingArea] = useState<OrganizationalArea | null>(null);
@@ -138,13 +142,15 @@ const AreasPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Áreas Organizacionales</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Gestiona la estructura de áreas de tu organización
-          </p>
-        </div>
+      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
+        {!embedded && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Áreas Organizacionales</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Gestiona la estructura de áreas de tu organización
+            </p>
+          </div>
+        )}
 
         {selectedOrg && selectedPlant && (
           <Button onClick={handleCreateRoot} className="gap-2">
@@ -154,33 +160,35 @@ const AreasPage = () => {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
+      {/* Filters (only organization and plant: nothing to show inside the plant workspace) */}
+      <div className={`bg-white rounded-lg shadow p-4 ${embedded ? 'hidden' : ''}`}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="org-filter" className="block text-sm font-medium text-gray-700 mb-1">
-              Organización
-            </label>
-            <select
-              id="org-filter"
-              value={selectedOrg}
-              onChange={(e) => {
-                setSelectedOrg(e.target.value);
-                setSelectedPlant('');
-                setSelectedAreaId(null);
-              }}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            >
-              <option value="">Seleccionar organización</option>
-              {organizationsData?.organizations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!embedded && (
+            <div>
+              <label htmlFor="org-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Organización
+              </label>
+              <select
+                id="org-filter"
+                value={selectedOrg}
+                onChange={(e) => {
+                  setSelectedOrg(e.target.value);
+                  setSelectedPlant('');
+                  setSelectedAreaId(null);
+                }}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              >
+                <option value="">Seleccionar organización</option>
+                {organizationsData?.organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {selectedOrg && (
+          {selectedOrg && !embedded && (
             <div>
               <label htmlFor="plant-filter" className="block text-sm font-medium text-gray-700 mb-1">
                 Planta

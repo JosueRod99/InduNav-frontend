@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ChevronRight, Package } from 'lucide-react';
 import Badge from '../../../components/ui/Badge';
 import { EQUIPMENT_STATUS_LABELS, type Equipment } from '../../../api/equipment';
@@ -9,6 +8,7 @@ import {
   USAGE_TYPE_LABELS,
   type ProductStepEquipment,
 } from '../../../api/productStepEquipment';
+import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 
 interface EquipmentProductsTabProps {
   equipmentId: string;
@@ -16,7 +16,7 @@ interface EquipmentProductsTabProps {
 }
 
 const EquipmentProductsTab = ({ equipmentId, equipment }: EquipmentProductsTabProps) => {
-  const navigate = useNavigate();
+  const navigate = useNavigateWithBack(); // detail pages opened from here return here
 
   const { data: links = [], isLoading } = useQuery({
     queryKey: ['equipment-products', equipmentId],

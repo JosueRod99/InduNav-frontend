@@ -8,15 +8,16 @@ import UserModal from './UserModal';
 import { getUsers, deleteUser } from '../../api/users';
 import type { User } from '../../types';
 
-const UsersPage = () => {
+const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
+  const embedded = !!organizationId; // organization page tab: only its users
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch users
   const { data, isLoading, error } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => getUsers({ limit: 100 }),
+    queryKey: ['users', organizationId ?? 'all'],
+    queryFn: () => getUsers({ limit: 100, organization_id: organizationId }),
   });
 
   // Delete mutation
@@ -50,13 +51,15 @@ const UsersPage = () => {
   return (
     <div>
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Usuarios</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Gestiona los usuarios del sistema
-          </p>
-        </div>
+      <div className={`flex items-center ${embedded ? 'justify-end mb-4' : 'justify-between mb-8'}`}>
+        {!embedded && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Usuarios</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Gestiona los usuarios del sistema
+            </p>
+          </div>
+        )}
         <Button onClick={handleCreate} className="gap-2">
           <Plus className="h-4 w-4" />
           Nuevo Usuario
@@ -181,6 +184,7 @@ const UsersPage = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         user={selectedUser}
+        defaultOrganizationId={organizationId}
       />
     </div>
   );

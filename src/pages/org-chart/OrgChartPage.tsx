@@ -6,10 +6,13 @@ import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import { getOrgChart, type OrgChartNode } from '../../api/employees';
 import Button from '../../components/ui/Button';
+import type { PlantScopedProps } from '../plants/plantScope';
 
-const OrgChartPage = () => {
-  const [selectedOrg, setSelectedOrg] = useState<string>('');
-  const [selectedPlant, setSelectedPlant] = useState<string>('');
+const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
+  const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
+
+  const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
+  const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
   const chartRef = useRef<HTMLDivElement>(null);
   const orgChartInstance = useRef<any>(null);
 
@@ -248,13 +251,15 @@ const OrgChartPage = () => {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Organigrama</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Visualiza la estructura jerárquica de la organización
-            </p>
-          </div>
+        <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
+          {!embedded && (
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Organigrama</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Visualiza la estructura jerárquica de la organización
+              </p>
+            </div>
+          )}
 
           {selectedOrg && chartData && chartData.length > 0 && (
             <div className="flex gap-2">
@@ -277,27 +282,29 @@ const OrgChartPage = () => {
         {/* Filters */}
         <div className="mt-4 flex gap-4">
           {/* Organization selector */}
-          <div className="w-64">
-            <label htmlFor="org-select" className="block text-sm font-medium text-gray-700 mb-1">
-              Seleccionar Organización
-            </label>
-            <select
-              id="org-select"
-              value={selectedOrg}
-              onChange={(e) => setSelectedOrg(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            >
-              <option value="">Seleccionar organización</option>
-              {organizationsData?.organizations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!embedded && (
+            <div className="w-64">
+              <label htmlFor="org-select" className="block text-sm font-medium text-gray-700 mb-1">
+                Seleccionar Organización
+              </label>
+              <select
+                id="org-select"
+                value={selectedOrg}
+                onChange={(e) => setSelectedOrg(e.target.value)}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              >
+                <option value="">Seleccionar organización</option>
+                {organizationsData?.organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Plant selector */}
-          {selectedOrg && (
+          {selectedOrg && !embedded && (
             <div className="w-64">
               <label htmlFor="plant-select" className="block text-sm font-medium text-gray-700 mb-1">
                 Filtrar por Planta (opcional)

@@ -45,6 +45,7 @@ import TourSettingsEditor from './editor/TourSettingsEditor';
 import AddStopModal from './editor/AddStopModal';
 import PublishTourModal from './modals/PublishTourModal';
 import ShareTourModal from './modals/ShareTourModal';
+import { toursListPath } from './toursReturn';
 
 type EditorTab = 'content' | 'sections' | 'narration';
 
@@ -275,7 +276,7 @@ const TourEditorPage = () => {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-3">
         <p className="text-red-600">No se pudo cargar el tour.</p>
-        <Button variant="outline" onClick={() => navigate('/tours')}>
+        <Button variant="outline" onClick={() => navigate(toursListPath(undefined))}>
           Volver a Tours
         </Button>
       </div>
@@ -302,7 +303,7 @@ const TourEditorPage = () => {
           <button
             onClick={async () => {
               await Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
-              navigate('/tours');
+              navigate(toursListPath(tour.plant_id));
             }}
             className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
             aria-label="Volver a Tours"

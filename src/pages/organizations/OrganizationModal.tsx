@@ -51,6 +51,7 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
     onSuccess: () => {
       toast.success('Organización creada exitosamente');
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['organization'] });
       onClose();
     },
     onError: (error: any) => {
@@ -64,6 +65,7 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
     onSuccess: () => {
       toast.success('Organización actualizada exitosamente');
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['organization'] });
       onClose();
     },
     onError: (error: any) => {
