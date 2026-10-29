@@ -3,6 +3,7 @@ import TreeView from '../ui/TreeView';
 import type { TreeNode } from '../ui/TreeView';
 import type { AreaTreeNode } from '../../api/areas';
 import Badge from '../ui/Badge';
+import { areaTypeLabel } from '../../constants/areaTypes';
 
 interface AreaTreeViewProps {
   areas: AreaTreeNode[];
@@ -77,7 +78,7 @@ const AreaTreeView = ({
             variant="default"
             className={`text-xs flex-shrink-0 ${areaTypeColors[node.area_type] || 'bg-gray-100 text-gray-800'}`}
           >
-            {node.area_type}
+            {areaTypeLabel(node.area_type)}
           </Badge>
         )}
       </div>

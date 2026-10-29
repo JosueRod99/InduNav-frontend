@@ -206,6 +206,43 @@ export const PersonnelSection = ({ stop, language }: { stop: TourViewStop; langu
   </div>
 );
 
+// Steps of the plant processes done in this area ("what happens here")
+export const ProcessesSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
+  <ol className="space-y-3">
+    {(stop.live.processes || []).map((step) => (
+      <li key={`${step.process_name}-${step.step_number}`} className="rounded-lg border border-slate-200 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+          {step.process_name} · {t(language, `Paso ${step.step_number} de ${step.total_steps}`, `Step ${step.step_number} of ${step.total_steps}`)}
+        </p>
+        <p className="mt-1 font-semibold text-slate-900">{step.name}</p>
+        {step.description && <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{step.description}</p>}
+        {step.activities.length > 0 && (
+          <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-slate-700">
+            {step.activities.map((activity, i) => (
+              <li key={i}>{activity}</li>
+            ))}
+          </ul>
+        )}
+        {(step.documents.length > 0 || step.equipment.length > 0) && (
+          <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+            {step.documents.map((d) => (
+              <span key={`${d.code}-${d.title}`} className="rounded-md bg-blue-50 px-2 py-0.5 text-blue-800">
+                {d.code ? `${d.code} · ` : ''}
+                {d.title}
+              </span>
+            ))}
+            {step.equipment.map((name) => (
+              <span key={name} className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700">
+                {name}
+              </span>
+            ))}
+          </div>
+        )}
+      </li>
+    ))}
+  </ol>
+);
+
 export const SafetySection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => {
   const s = stop.live.safety!;
   return (
@@ -385,26 +422,44 @@ export const DocumentsSection = ({ stop, language }: { stop: TourViewStop; langu
 );
 
 export const CertificationsSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
-  <div className="grid gap-3 sm:grid-cols-2">
-    {stop.live.certifications.map((c) => (
-      <div key={c.id} className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
-        <Award className="h-6 w-6 flex-shrink-0 text-amber-500" />
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">{c.certification_name}</p>
-          {c.certification_body && <p className="text-xs text-slate-600">{c.certification_body}</p>}
-          {c.expiry_date && (
-            <p className="mt-1 text-[11px] text-slate-500">
-              {t(language, 'Vigente hasta', 'Valid until')}{' '}
-              {new Date(c.expiry_date).toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US', {
-                year: 'numeric',
-                month: 'short',
-                timeZone: 'UTC',
-              })}
-            </p>
-          )}
-        </div>
+  <div className="space-y-4">
+    {stop.live.certifications.length > 0 && (
+      <div className="grid gap-3 sm:grid-cols-2">
+        {stop.live.certifications.map((c) => (
+          <div key={c.id} className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+            <Award className="h-6 w-6 flex-shrink-0 text-amber-500" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">{c.certification_name}</p>
+              {c.certification_body && <p className="text-xs text-slate-600">{c.certification_body}</p>}
+              {c.status === 'in_progress' ? (
+                <p className="mt-1 text-[11px] font-medium text-blue-700">{t(language, 'En proceso de certificación', 'Certification in progress')}</p>
+              ) : (
+                c.expiry_date && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {t(language, 'Vigente hasta', 'Valid until')}{' '}
+                    {new Date(c.expiry_date).toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      timeZone: 'UTC',
+                    })}
+                  </p>
+                )
+              )}
+            </div>
+          </div>
+        ))}
       </div>
-    ))}
+    )}
+    {(stop.live.certified_people?.length ?? 0) > 0 && (
+      <ul className="flex flex-wrap gap-2">
+        {stop.live.certified_people!.map((p) => (
+          <li key={p.name} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
+            <strong className="text-slate-900">{p.count}</strong> {t(language, p.count === 1 ? 'persona certificada en' : 'personas certificadas en', p.count === 1 ? 'person certified in' : 'people certified in')}{' '}
+            {p.name}
+          </li>
+        ))}
+      </ul>
+    )}
   </div>
 );
 

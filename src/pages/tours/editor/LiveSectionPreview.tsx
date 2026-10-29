@@ -15,6 +15,7 @@ const AREA_TAB: Partial<Record<TourSectionKey, string>> = {
   safety: 'safety',
   equipment: 'equipment',
   products: 'products',
+  processes: 'processes',
   gallery: 'gallery',
   documents: 'documents',
   certifications: 'certifications',
@@ -48,6 +49,21 @@ const LiveSectionPreview = ({ sectionKey, stop, areaId }: LiveSectionPreviewProp
           </ul>
         );
       }
+      case 'processes':
+        return (
+          <ul className="space-y-1">
+            {(live.processes || []).slice(0, MAX_ROWS).map((p) => (
+              <li key={`${p.process_name}-${p.step_number}`} className="text-xs text-gray-700">
+                <span className="font-medium">{p.name}</span>
+                <span className="text-gray-500">
+                  {' '}
+                  · {p.process_name}, paso {p.step_number} de {p.total_steps}
+                </span>
+              </li>
+            ))}
+            {more(live.processes?.length || 0)}
+          </ul>
+        );
       case 'personnel':
         return (
           <ul className="space-y-1">
@@ -159,9 +175,10 @@ const LiveSectionPreview = ({ sectionKey, stop, areaId }: LiveSectionPreviewProp
         personnel: live.personnel.length + (live.headcount?.length || 0),
         equipment: live.equipment.length,
         products: live.products.length,
+        processes: live.processes?.length || 0,
         gallery: live.gallery.length,
         documents: live.documents.length,
-        certifications: live.certifications.length,
+        certifications: live.certifications.length + (live.certified_people?.length || 0),
       }
     : {};
   const isEmpty = !!live && (sectionKey === 'safety' ? !live.safety : listLengths[sectionKey] === 0);

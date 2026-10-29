@@ -22,6 +22,7 @@ import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
+import { areaTypeLabel } from '../../constants/areaTypes';
 
 const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
@@ -338,7 +339,7 @@ const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Tipo:</span>
-                      <span className="font-medium">{selectedArea.area_type}</span>
+                      <span className="font-medium">{areaTypeLabel(selectedArea.area_type)}</span>
                     </div>
                     {selectedArea.cost_center && (
                       <div className="flex justify-between">

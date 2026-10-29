@@ -18,6 +18,7 @@ import {
   type CreatePhysicalRepresentationRequest,
 } from '../../api/areaRepresentations';
 import { getEmployees } from '../../api/employees';
+import { AREA_TYPES } from '../../constants/areaTypes';
 
 interface LinkAreaModalProps {
   isOpen: boolean;
@@ -42,15 +43,6 @@ const findNode = (nodes: AreaTreeNode[], id: string): AreaTreeNode | null => {
 };
 
 type TabType = 'link' | 'create';
-
-const AREA_TYPES = [
-  { value: 'general', label: 'General' },
-  { value: 'production', label: 'Producción' },
-  { value: 'warehouse', label: 'Almacén' },
-  { value: 'office', label: 'Oficina' },
-  { value: 'quality', label: 'Control de Calidad' },
-  { value: 'maintenance', label: 'Mantenimiento' },
-];
 
 const PREDEFINED_COLORS = [
   '#3B82F6', // Blue

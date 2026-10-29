@@ -16,6 +16,7 @@ export type TourSectionKey =
   | 'safety'
   | 'equipment'
   | 'products'
+  | 'processes'
   | 'gallery'
   | 'documents'
   | 'certifications'
@@ -64,6 +65,7 @@ export const LIVE_SECTION_KEYS: TourSectionKey[] = [
   'safety',
   'equipment',
   'products',
+  'processes',
   'gallery',
   'documents',
   'certifications',
@@ -76,6 +78,7 @@ export const SECTION_LABELS: Record<TourSectionKey, string> = {
   safety: 'Seguridad',
   equipment: 'Equipos y Maquinaria',
   products: 'Productos',
+  processes: 'Procesos',
   gallery: 'Galería',
   documents: 'Documentos',
   certifications: 'Certificaciones',
@@ -90,6 +93,7 @@ export const SECTION_DESCRIPTIONS: Record<TourSectionKey, string> = {
   safety: 'EPP requerido, riesgos y días sin accidentes',
   equipment: 'Herramientas y maquinaria del área con su estado',
   products: 'Productos que pasan por el área (excepto privados)',
+  processes: 'Pasos de los procesos de la planta que se hacen en esta área (solo procesos vigentes)',
   gallery: 'Fotos del área',
   documents: 'Documentos del área (excepto privados)',
   certifications: 'Certificaciones del área',

@@ -16,6 +16,8 @@ import {
   Users,
   Wrench,
   BookOpen,
+  CopyCheck,
+  GitBranch,
   type LucideIcon,
 } from 'lucide-react';
 import SortableList, { moveItem } from '../../../components/ui/SortableList';
@@ -49,6 +51,7 @@ const SECTION_ICONS: Record<TourSectionKey, LucideIcon> = {
   safety: Shield,
   equipment: Wrench,
   products: Package,
+  processes: GitBranch,
   gallery: ImageIcon,
   documents: BookOpen,
   certifications: Award,
@@ -66,6 +69,8 @@ interface SectionsEditorProps {
   allowCustom?: boolean; // the tour template only orders built-in sections
   liveData?: TourViewStop; // what the live sections will show (stop editor only)
   areaId?: string | null;
+  /** Stop editor: show/hide one built-in section in every stop of the tour at once */
+  onApplyVisibilityToAll?: (key: TourSectionKey, visible: boolean) => void;
 }
 
 const SectionsEditor = ({
@@ -76,6 +81,7 @@ const SectionsEditor = ({
   allowCustom = true,
   liveData,
   areaId = null,
+  onApplyVisibilityToAll,
 }: SectionsEditorProps) => {
   // Expanded row: custom sections open their editor, live sections a quick look at their data
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -188,6 +194,18 @@ const SectionsEditor = ({
                     )}
                   </p>
                 </div>
+                {!isOwn && onApplyVisibilityToAll && (
+                  <button
+                    type="button"
+                    onClick={() => onApplyVisibilityToAll(section.key, section.visible)}
+                    className="inline-flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                    title={`${section.visible ? 'Mostrar' : 'Ocultar'} ${SECTION_LABELS[section.key]} en todas las paradas (después se puede cambiar en cada una)`}
+                    aria-label={`${section.visible ? 'Mostrar' : 'Ocultar'} ${SECTION_LABELS[section.key]} en todas las paradas`}
+                  >
+                    <CopyCheck className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">En todas</span>
+                  </button>
+                )}
                 {(isOwn || (isLive && canPreviewLive)) && (
                   <button
                     type="button"

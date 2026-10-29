@@ -13,6 +13,7 @@ import {
   type OrganizationalArea,
 } from '../../api/areas';
 import { getEmployees } from '../../api/employees';
+import { AREA_TYPES } from '../../constants/areaTypes';
 
 interface AreaModalProps {
   isOpen: boolean;
@@ -22,15 +23,6 @@ interface AreaModalProps {
   plantId: string;
   parentAreaId?: string | null;
 }
-
-const AREA_TYPES = [
-  { value: 'general', label: 'General' },
-  { value: 'production', label: 'Producción' },
-  { value: 'warehouse', label: 'Almacén' },
-  { value: 'office', label: 'Oficina' },
-  { value: 'quality', label: 'Control de Calidad' },
-  { value: 'maintenance', label: 'Mantenimiento' },
-];
 
 const PREDEFINED_COLORS = [
   '#3B82F6', // Blue

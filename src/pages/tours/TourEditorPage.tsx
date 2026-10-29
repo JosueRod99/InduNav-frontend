@@ -29,7 +29,10 @@ import {
   updateTourSettings,
   updateTourStop,
   TOUR_LANGUAGE_LABELS,
+  SECTION_LABELS,
   type BuilderStop,
+  type TourSection,
+  type TourSectionKey,
   type TourBuilderData,
   type TourLanguage,
   type UpdateStopPayload,
@@ -193,6 +196,30 @@ const TourEditorPage = () => {
       toast.success('Área quitada del tour');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'No se pudo quitar el área');
+    }
+  };
+
+  /** Show or hide one built-in section in every stop (and in the structure for new stops) */
+  const applySectionToAll = async (key: TourSectionKey, visible: boolean) => {
+    const label = SECTION_LABELS[key];
+    if (!window.confirm(`¿${visible ? 'Mostrar' : 'Ocultar'} "${label}" en las ${stops.length} áreas del tour?\n\nDespués puedes cambiarlo en cada área.`)) return;
+    const withVisibility = (sections: TourSection[]) =>
+      sections.some((s) => s.key === key) ? sections.map((s) => (s.key === key ? { ...s, visible } : s)) : [...sections, { key, visible }];
+    try {
+      await stopAutosave.flush();
+      for (const stop of stops) {
+        await updateTourStop(stop.id, { sections: withVisibility(stop.sections) });
+      }
+      const template = withVisibility(data!.tour.default_sections);
+      await updateTourSettings(tourId!, { default_sections: template });
+      setBuilder((prev) => ({
+        ...prev,
+        tour: { ...prev.tour, default_sections: template, has_unpublished_changes: true },
+        stops: prev.stops.map((s) => ({ ...s, sections: withVisibility(s.sections) })),
+      }));
+      toast.success(`"${label}" ${visible ? 'visible' : 'oculta'} en todas las áreas`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'No se pudo aplicar a todas las áreas');
     }
   };
 
@@ -518,6 +545,7 @@ const TourEditorPage = () => {
                   counts={sectionCounts ?? null}
                   liveData={liveView?.stops.find((s) => s.id === selectedStop.id)}
                   areaId={selectedStop.organizational_area_id}
+                  onApplyVisibilityToAll={stops.length > 1 ? applySectionToAll : undefined}
                 />
               </div>
             )}

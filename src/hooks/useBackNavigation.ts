@@ -16,6 +16,8 @@ const PLANT_TAB_LABELS: Record<string, string> = {
   areas: 'Volver a Áreas',
   equipos: 'Volver a Equipos',
   productos: 'Volver a Productos',
+  procesos: 'Volver a Procesos',
+  certificaciones: 'Volver a Certificaciones',
   personal: 'Volver a Personal',
   tours: 'Volver a Tours',
 };

@@ -5,6 +5,7 @@ import { getAssignmentsByEmployee } from '../../api/areaAssignments';
 import Badge from '../ui/Badge';
 import { personName } from '../../utils/personName';
 import EmployeeResponsibilities from '../responsibles/EmployeeResponsibilities';
+import EmployeeCertifications from '../responsibles/EmployeeCertifications';
 
 interface EmployeeDetailModalProps {
   isOpen: boolean;
@@ -251,6 +252,9 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
 
             {/* Areas this person is in charge of (independent of where they work) */}
             <EmployeeResponsibilities employee={employee} />
+
+            {/* Own certifications and the company/plant/area ones that cover the employee */}
+            <EmployeeCertifications employeeId={employee.id} />
 
             {/* Status */}
             <div className="pt-4 border-t border-gray-200">

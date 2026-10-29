@@ -25,6 +25,7 @@ import {
   Shield,
   User,
   Users,
+  GitBranch,
   Volume2,
   Wrench,
   type LucideIcon,
@@ -39,6 +40,7 @@ import {
   GallerySection,
   HighlightsSection,
   PersonnelSection,
+  ProcessesSection,
   ProductsSection,
   SafetySection,
   StopFaq,
@@ -57,6 +59,7 @@ const SECTION_META: Record<TourSectionKey, { es: string; en: string; Icon: Lucid
   summary: { es: 'Resumen', en: 'Summary', Icon: FileText },
   location: { es: 'Ubicación', en: 'Location', Icon: MapPin },
   personnel: { es: 'Personal', en: 'Team', Icon: Users },
+  processes: { es: 'Procesos', en: 'Processes', Icon: GitBranch },
   safety: { es: 'Seguridad', en: 'Safety', Icon: Shield },
   equipment: { es: 'Equipos', en: 'Equipment', Icon: Wrench },
   products: { es: 'Productos', en: 'Products', Icon: Package },
@@ -211,6 +214,8 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
           return <EquipmentSection stop={stop} language={language} />;
         case 'products':
           return <ProductsSection stop={stop} language={language} />;
+        case 'processes':
+          return <ProcessesSection stop={stop} language={language} />;
         case 'gallery':
           return <GallerySection stop={stop} />;
         case 'documents':

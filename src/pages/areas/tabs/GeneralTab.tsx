@@ -6,6 +6,7 @@ import Button from '../../../components/ui/Button';
 import EditGeneralInfoModal from '../modals/EditGeneralInfoModal';
 import EmployeeDetailModal from '../../../components/employees/EmployeeDetailModal';
 import AreaResponsiblesSection from '../../../components/responsibles/AreaResponsiblesSection';
+import { areaTypeLabel } from '../../../constants/areaTypes';
 
 interface GeneralTabProps {
   area: OrganizationalArea;
@@ -53,7 +54,7 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
             label="Tipo de Área"
             value={
               <Badge variant={area.area_type === 'production' ? 'success' : 'default'}>
-                {area.area_type}
+                {areaTypeLabel(area.area_type)}
               </Badge>
             }
           />

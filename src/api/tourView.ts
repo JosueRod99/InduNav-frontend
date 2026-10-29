@@ -57,6 +57,17 @@ export interface TourViewStop {
   live: {
     personnel: { id: string; name: string; position: string | null; avatar_url: string | null; is_primary: boolean }[];
     headcount?: { position: string; quantity: number; shift: string | null }[]; // unnamed staff by position
+    processes?: {
+      process_name: string;
+      process_code: string | null;
+      step_number: number;
+      total_steps: number;
+      name: string;
+      description: string | null;
+      activities: string[];
+      documents: { code: string | null; title: string }[];
+      equipment: string[];
+    }[];
     people_total?: number; // named + headcount
     safety: {
       required_ppe: string[];
@@ -90,12 +101,12 @@ export interface TourViewStop {
     certifications: {
       id: string;
       certification_name: string;
-      certification_type: string | null;
       certification_body: string | null;
-      status: string;
-      issue_date: string | null;
+      status: string; // active | in_progress
+      scope?: 'organization' | 'plant' | 'area';
       expiry_date: string | null;
     }[];
+    certified_people?: { name: string; count: number }[]; // people certifications of the area's staff, counts only
     location_available: boolean;
     interior: TourViewInterior | null;
   };

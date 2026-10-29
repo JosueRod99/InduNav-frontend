@@ -199,7 +199,8 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
   const inMaintenance = equipment?.maintenance || 0;
   const hiddenEquipment = outOfService + inMaintenance - alerts.equipment.length;
   const withoutSupervisor = alerts.without_supervisor || { total: 0, areas: [] };
-  const alertCount = outOfService + inMaintenance + alerts.certifications.length + withoutSupervisor.total;
+  const peopleCerts = alerts.certified_people || [];
+  const alertCount = outOfService + inMaintenance + alerts.certifications.length + withoutSupervisor.total + peopleCerts.length;
 
   const trend = tours.visits_prev_30d > 0 ? Math.round(((tours.visits_30d - tours.visits_prev_30d) / tours.visits_prev_30d) * 100) : null;
 
@@ -248,7 +249,7 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
                 )
               }
             >
-              {alerts.equipment.length === 0 && alerts.certifications.length === 0 && withoutSupervisor.total === 0 ? (
+              {alerts.equipment.length === 0 && alerts.certifications.length === 0 && withoutSupervisor.total === 0 && peopleCerts.length === 0 ? (
                 <p className="flex items-center gap-2 px-4 py-4 text-sm text-gray-600">
                   <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-600" />
                   Todo en orden: {showEquipmentAlerts ? 'ningún equipo detenido, ' : ''}todas las áreas con supervisor y ninguna certificación
@@ -306,6 +307,17 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
                       </Link>
                     </li>
                   )}
+                  {peopleCerts.map((p) => (
+                    <li key={p.type_id}>
+                      <Link to={`/plants/${plant.id}/certificaciones`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
+                        <BadgeCheck className={`h-4 w-4 flex-shrink-0 ${p.expired ? 'text-red-600' : 'text-amber-600'}`} />
+                        <span className="min-w-0 flex-1 truncate font-medium text-gray-900">{p.name}</span>
+                        <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${p.expired ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {[p.expired && `${p.expired} vencida${p.expired === 1 ? '' : 's'}`, p.expiring && `${p.expiring} por vencer`].filter(Boolean).join(' · ')}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
                   {alerts.certifications.map((cert) => {
                     const date = cert.kind === 'audit' ? cert.next_audit_date : cert.expiry_date;
                     const text =
@@ -317,7 +329,7 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
                     return (
                       <li key={cert.id}>
                         <Link
-                          to={`/areas/${cert.area_id}?tab=certifications`}
+                          to={cert.area_id ? `/areas/${cert.area_id}?tab=certifications` : `/plants/${plant.id}/certificaciones`}
                           state={backState}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50"
                         >

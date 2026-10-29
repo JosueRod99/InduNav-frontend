@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
 import { updateArea, type OrganizationalArea } from '../../../api/areas';
+import { AREA_TYPES, areaTypeLabel } from '../../../constants/areaTypes';
 
 interface EditGeneralInfoModalProps {
   isOpen: boolean;
@@ -179,15 +180,15 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
                 onChange={(e) => setFormData({ ...formData, area_type: e.target.value })}
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               >
-                <option value="production">Producción</option>
-                <option value="warehouse">Almacén</option>
-                <option value="office">Oficina</option>
-                <option value="laboratory">Laboratorio</option>
-                <option value="maintenance">Mantenimiento</option>
-                <option value="quality_control">Control de Calidad</option>
-                <option value="shipping">Embarque</option>
-                <option value="receiving">Recepción</option>
-                <option value="other">Otro</option>
+                {/* Types not in the list (older data) stay selectable so saving never changes them */}
+                {!AREA_TYPES.some((t) => t.value === formData.area_type) && (
+                  <option value={formData.area_type}>{areaTypeLabel(formData.area_type)}</option>
+                )}
+                {AREA_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
               </select>
             </div>
 

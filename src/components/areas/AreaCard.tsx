@@ -1,6 +1,7 @@
 import { Building2, Users, Maximize2, DollarSign, User } from 'lucide-react';
 import type { OrganizationalArea } from '../../api/areas';
 import Badge from '../ui/Badge';
+import { areaTypeLabel } from '../../constants/areaTypes';
 
 interface AreaCardProps {
   area: OrganizationalArea;
@@ -15,15 +16,6 @@ const AreaCard = ({
   className = '',
   showDetails = true,
 }: AreaCardProps) => {
-  const areaTypeLabels: Record<string, string> = {
-    production: 'Producción',
-    warehouse: 'Almacén',
-    office: 'Oficina',
-    quality: 'Control de Calidad',
-    maintenance: 'Mantenimiento',
-    general: 'General',
-  };
-
   const areaTypeColors: Record<string, string> = {
     production: 'bg-blue-100 text-blue-800',
     warehouse: 'bg-yellow-100 text-yellow-800',
@@ -66,7 +58,7 @@ const AreaCard = ({
           variant="default"
           className={areaTypeColors[area.area_type] || 'bg-gray-100 text-gray-800'}
         >
-          {areaTypeLabels[area.area_type] || area.area_type}
+          {areaTypeLabel(area.area_type)}
         </Badge>
       </div>
 

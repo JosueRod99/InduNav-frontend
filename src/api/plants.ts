@@ -46,6 +46,7 @@ export interface PlantSummary {
       kind: 'expired' | 'expiring' | 'audit';
     }[];
     without_supervisor: { total: number; areas: { id: string; name: string }[] };
+    certified_people: { type_id: string; name: string; expiring: number; expired: number }[]; // people certifications to renew
   };
   tours: {
     visits_30d: number;

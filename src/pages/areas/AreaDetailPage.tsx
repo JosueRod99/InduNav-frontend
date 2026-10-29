@@ -16,8 +16,11 @@ import ProductsTab from './tabs/ProductsTab';
 import EquipmentTab from './tabs/EquipmentTab';
 import AreaLayoutTab from './tabs/AreaLayoutTab';
 import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
+import AreaProcessesTab from './tabs/AreaProcessesTab';
+import { areaTypeLabel } from '../../constants/areaTypes';
+import { personName } from '../../utils/personName';
 
-type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery' | 'products' | 'equipment' | 'layout';
+type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery' | 'products' | 'processes' | 'equipment' | 'layout';
 
 const AreaDetailPage = () => {
   const { areaId } = useParams<{ areaId: string }>();
@@ -58,6 +61,7 @@ const AreaDetailPage = () => {
     { id: 'general', label: 'General' },
     { id: 'personal', label: 'Personal' },
     { id: 'products', label: 'Productos' },
+    { id: 'processes', label: 'Procesos' },
     { id: 'equipment', label: 'Equipos' },
     { id: 'layout', label: 'Layout' },
     { id: 'safety', label: 'Seguridad' },
@@ -74,6 +78,8 @@ const AreaDetailPage = () => {
         return <PersonalTab areaId={areaId!} area={area} />;
       case 'products':
         return <ProductsTab areaId={areaId!} area={area} />;
+      case 'processes':
+        return <AreaProcessesTab areaId={areaId!} plantId={area.plant_id} />;
       case 'equipment':
         return <EquipmentTab areaId={areaId!} area={area} />;
       case 'layout':
@@ -81,7 +87,7 @@ const AreaDetailPage = () => {
       case 'safety':
         return <SafetyTab areaId={areaId!} />;
       case 'certifications':
-        return <CertificationsTab areaId={areaId!} />;
+        return <CertificationsTab areaId={areaId!} plantId={area.plant_id} />;
       case 'documents':
         return <DocumentsTab areaId={areaId!} />;
       case 'gallery':
@@ -106,7 +112,7 @@ const AreaDetailPage = () => {
             <Badge
               variant={area.area_type === 'production' ? 'success' : 'default'}
             >
-              {area.area_type}
+              {areaTypeLabel(area.area_type)}
             </Badge>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">{area.name}</h1>
@@ -117,7 +123,7 @@ const AreaDetailPage = () => {
             <div className="mt-3 flex items-center gap-2 text-sm">
               <span className="text-gray-500">Supervisor:</span>
               <span className="font-semibold text-gray-900">
-                {area.supervisor.first_name} {area.supervisor.last_name}
+                {personName(area.supervisor)}
               </span>
               {area.supervisor.position && (
                 <span className="text-gray-500">• {area.supervisor.position}</span>
