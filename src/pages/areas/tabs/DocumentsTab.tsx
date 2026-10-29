@@ -141,7 +141,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             <Upload className="h-4 w-4" />
-            Subir Documento
+            Nuevo documento
           </button>
         </div>
 
@@ -216,7 +216,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
               <Upload className="h-4 w-4" />
-              Subir Primer Documento
+              Agregar primer documento
             </button>
           </div>
         </div>
@@ -276,14 +276,19 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
                 <tr key={doc.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="flex items-start gap-3">
-                      <div className="text-2xl mt-1">{getFileIcon(doc.file_type)}</div>
+                      <div className="text-2xl mt-1">{doc.document_type === 'pending' ? '🗂️' : getFileIcon(doc.file_type)}</div>
                       <div className="flex-1 min-w-0">
+                        {doc.document_code && <div className="font-mono text-xs font-semibold text-blue-700">{doc.document_code}</div>}
                         <div className="text-sm font-medium text-gray-900 truncate">
                           {doc.title}
                         </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {doc.file_name}
-                        </div>
+                        {doc.document_type === 'pending' ? (
+                          <span className="mt-0.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                            Sin archivo
+                          </span>
+                        ) : (
+                          <div className="text-xs text-gray-500 truncate">{doc.file_name}</div>
+                        )}
                         {doc.description && (
                           <div className="text-xs text-gray-600 mt-1 line-clamp-2">
                             {doc.description}
@@ -327,7 +332,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatFileSize(doc.file_size)}</div>
+                    <div className="text-sm text-gray-900">{doc.document_type === 'pending' ? '—' : formatFileSize(doc.file_size)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
@@ -341,24 +346,40 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handlePreview(doc)}
-                        className="text-green-600 hover:text-green-900 transition-colors"
-                        title="Ver archivo"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleNewVersion(doc)}
-                        className="text-purple-600 hover:text-purple-900 transition-colors"
-                        title="Nueva versión"
-                      >
-                        <GitBranch className="h-4 w-4" />
-                      </button>
+                      {doc.document_type === 'pending' ? (
+                        // Registered without file: uploading it creates the next version
+                        <button
+                          onClick={() => handleNewVersion(doc)}
+                          className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
+                          title="Subir el archivo (se guarda como nueva versión)"
+                        >
+                          <Upload className="h-3.5 w-3.5" /> Subir archivo
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handlePreview(doc)}
+                            className="text-green-600 hover:text-green-900 transition-colors"
+                            title="Ver archivo"
+                            aria-label={`Ver archivo de ${doc.title}`}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleNewVersion(doc)}
+                            className="text-purple-600 hover:text-purple-900 transition-colors"
+                            title="Nueva versión"
+                            aria-label={`Nueva versión de ${doc.title}`}
+                          >
+                            <GitBranch className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
                       <button
                         onClick={() => handleDocumentClick(doc)}
                         className="text-gray-600 hover:text-gray-900 transition-colors"
                         title="Ver detalles y editar"
+                        aria-label={`Detalles de ${doc.title}`}
                       >
                         <Eye className="h-4 w-4" />
                       </button>
@@ -371,6 +392,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
                         disabled={deleteDocumentMutation.isPending}
                         className="text-red-600 hover:text-red-900 transition-colors disabled:opacity-50"
                         title="Archivar"
+                        aria-label={`Archivar ${doc.title}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

@@ -11,10 +11,10 @@ export interface AreaDocument {
   version: string;
   parent_document_id?: string | null;
   is_latest_version: boolean;
-  document_type: 'uploaded' | 'external_link';
-  file_url: string;
-  file_name: string;
-  file_type: string;
+  document_type: 'uploaded' | 'external_link' | 'pending'; // pending = registered without file yet
+  file_url: string | null;
+  file_name: string | null;
+  file_type: string | null;
   file_size?: number | null;
   status: string;
   effective_date?: string | null;
@@ -40,12 +40,15 @@ export interface CreateDocumentRequest {
   document_code?: string;
   category: string;
   tags?: string[];
-  document_type?: 'uploaded' | 'external_link';
-  file_url: string;
-  file_name: string;
-  file_type: string;
+  document_type?: 'uploaded' | 'external_link' | 'pending';
+  file_url?: string;
+  file_name?: string;
+  file_type?: string;
   file_size?: number;
   status?: string;
+  /** Automatic code TYPE-KEY-NNN (instead of document_code) */
+  code_prefix?: string;
+  code_key?: string;
   effective_date?: Date | string;
   review_date?: Date | string;
   expiry_date?: Date | string;
@@ -146,6 +149,36 @@ export const createDocument = async (
 /**
  * Update document metadata (not file)
  */
+/** Code the next document of this type and key would get, e.g. PROC-RH-003 */
+export const getNextDocumentCode = async (areaId: string, prefix: string, key: string): Promise<string> => {
+  const response = await apiClient.get(`/organizational-areas/${areaId}/documents/next-code`, { params: { prefix, key } });
+  return response.data.data.code;
+};
+
+// Quality-system document types used in codes (TYPE-KEY-NNN)
+export const DOCUMENT_CODE_TYPES = [
+  { prefix: 'MAN', label: 'Manual' },
+  { prefix: 'POL', label: 'Política' },
+  { prefix: 'PROC', label: 'Procedimiento' },
+  { prefix: 'IT', label: 'Instrucción de trabajo' },
+  { prefix: 'FOR', label: 'Formato' },
+  { prefix: 'REG', label: 'Registro' },
+  { prefix: 'PLAN', label: 'Plan' },
+];
+
+/** Suggested code type for a category */
+export const codeTypeForCategory = (category: string) =>
+  ({
+    SOP: 'PROC',
+    QUALITY_PROCEDURE: 'PROC',
+    SAFETY_PROCEDURE: 'PROC',
+    WORK_INSTRUCTION: 'IT',
+    MANUAL: 'MAN',
+    FORM_TEMPLATE: 'FOR',
+    AUDIT_REPORT: 'REG',
+    REPORT: 'REG',
+  })[category] || null;
+
 export const updateDocument = async (
   documentId: string,
   data: UpdateDocumentRequest
@@ -183,7 +216,8 @@ export const getDocumentStats = async (areaId: string): Promise<DocumentStats> =
 /**
  * Get file icon based on MIME type
  */
-export const getFileIcon = (mimeType: string): string => {
+export const getFileIcon = (mimeType: string | null | undefined): string => {
+  if (!mimeType) return '🗂️'; // registered without file
   if (mimeType.includes('pdf')) return '📄';
   if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
   if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📊';

@@ -1,7 +1,10 @@
 import { useState, useRef } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Upload, Check, Link } from 'lucide-react';
-import { createDocument, getFileIcon } from '../../../api/areaDocuments';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { X, Upload, Check, Link, ClipboardList } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { codeTypeForCategory, createDocument, getFileIcon } from '../../../api/areaDocuments';
+import { getArea } from '../../../api/areas';
+import DocumentCodeField, { type DocumentCodeValue } from './DocumentCodeField';
 import apiClient from '../../../api/client';
 import Button from '../../../components/ui/Button';
 
@@ -13,7 +16,7 @@ interface UploadDocumentModalProps {
   plantId: string;
 }
 
-type DocumentSourceType = 'uploaded' | 'external_link';
+type DocumentSourceType = 'uploaded' | 'external_link' | 'pending'; // pending: registered now, file later
 
 const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId }: UploadDocumentModalProps) => {
   const queryClient = useQueryClient();
@@ -30,6 +33,10 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
   const [status, setStatus] = useState(''); // Empty for placeholder
   const [effectiveDate, setEffectiveDate] = useState('');
   const [uploading, setUploading] = useState(false);
+  // Area code is the default key of automatic document codes (PROC-<key>-001)
+  const { data: area } = useQuery({ queryKey: ['organizational-area', areaId], queryFn: () => getArea(areaId), enabled: isOpen });
+  const [code, setCode] = useState<DocumentCodeValue | null>(null);
+  const codeValue: DocumentCodeValue = code || { mode: 'auto', prefix: codeTypeForCategory(category) || 'PROC', key: (area?.code || '').toUpperCase() };
 
   const createDocumentMutation = useMutation({
     mutationFn: (data: any) => createDocument(areaId, data),
@@ -37,6 +44,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
       // Invalidar ambos queries (active y archived)
       queryClient.invalidateQueries({ queryKey: ['area-documents-active', areaId] });
       queryClient.invalidateQueries({ queryKey: ['area-documents-archived', areaId] });
+      queryClient.removeQueries({ queryKey: ['next-document-code'] }); // the next free number changed
       handleClose();
     },
   });
@@ -53,6 +61,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
     setStatus('');
     setEffectiveDate('');
     setUploading(false);
+    setCode(null);
     onClose();
   };
 
@@ -125,7 +134,9 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
 
   const handleUpload = async () => {
     // Validation
-    if (documentSource === 'uploaded') {
+    if (documentSource === 'pending') {
+      // No file now: it is uploaded later as version 2
+    } else if (documentSource === 'uploaded') {
       if (!selectedFile) {
         alert('Por favor selecciona un archivo.');
         return;
@@ -159,10 +170,38 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
       return;
     }
 
+    if (codeValue.mode === 'manual' && !codeValue.code.trim()) {
+      alert('Escribe el código o elige "Sin código".');
+      return;
+    }
+
     setUploading(true);
 
     try {
       const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      const codeFields =
+        codeValue.mode === 'auto'
+          ? { code_prefix: codeValue.prefix, code_key: codeValue.key }
+          : codeValue.mode === 'manual'
+          ? { document_code: codeValue.code.trim() }
+          : {};
+
+      if (documentSource === 'pending') {
+        await createDocumentMutation.mutateAsync({
+          organizational_area_id: areaId,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          category,
+          tags: tagsArray.length > 0 ? tagsArray : undefined,
+          document_type: 'pending',
+          status,
+          is_private: isPrivate,
+          effective_date: effectiveDate || undefined,
+          ...codeFields,
+        });
+        toast.success('Documento registrado. Sube el archivo cuando lo tengas.');
+        return;
+      }
 
       if (documentSource === 'uploaded') {
         // Step 1: Upload file to Cloudinary
@@ -185,6 +224,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
           description: description.trim() || undefined,
           category,
           tags: tagsArray.length > 0 ? tagsArray : undefined,
+          ...codeFields,
           document_type: 'uploaded',
           file_url: uploadResponse.data.url,
           file_name: selectedFile!.name,
@@ -206,6 +246,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
           description: description.trim() || undefined,
           category,
           tags: tagsArray.length > 0 ? tagsArray : undefined,
+          ...codeFields,
           document_type: 'external_link',
           file_url: cleanUrl,
           file_name: fileName,
@@ -217,7 +258,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
       }
     } catch (error: any) {
       console.error('Error creating document:', error);
-      alert('Error al crear el documento. Por favor intenta de nuevo.');
+      toast.error(error.response?.data?.message || 'Error al crear el documento. Por favor intenta de nuevo.');
       setUploading(false);
     }
   };
@@ -229,7 +270,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
       <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between rounded-t-lg flex-shrink-0">
-          <h2 className="text-xl font-semibold text-gray-900">Subir Documento</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Nuevo documento</h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -241,10 +282,20 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
 
         {/* Body - Horizontal Layout */}
         <div className="p-6 overflow-y-auto flex-1">
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* Left Column - File Selection or URL Input */}
             <div>
-              {documentSource === 'uploaded' ? (
+              {documentSource === 'pending' ? (
+                <div className="self-start rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+                  <ClipboardList className="mb-3 h-8 w-8 text-amber-600" />
+                  <p className="font-semibold">Registrar sin archivo</p>
+                  <p className="mt-1">
+                    Queda dado de alta con su código, título y estado (versión 1). Cuando tengas el archivo, usa <strong>Subir archivo</strong> en
+                    la lista de documentos y se guardará como <strong>versión 2</strong>.
+                  </p>
+                  <p className="mt-2 text-xs text-amber-800">Mientras no tenga archivo, no aparece en los tours.</p>
+                </div>
+              ) : documentSource === 'uploaded' ? (
                 <>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Archivo <span className="text-red-500">*</span>
@@ -344,10 +395,10 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   ¿Cómo quieres agregar el documento? <span className="text-red-500">*</span>
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setDocumentSource('uploaded')}
-                    className={`border-2 rounded-lg p-3 text-left transition-all ${
+                    className={`border-2 rounded-lg p-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 ${
                       documentSource === 'uploaded'
                         ? 'border-blue-600 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
@@ -372,7 +423,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
 
                   <button
                     onClick={() => setDocumentSource('external_link')}
-                    className={`border-2 rounded-lg p-3 text-left transition-all ${
+                    className={`border-2 rounded-lg p-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 ${
                       documentSource === 'external_link'
                         ? 'border-blue-600 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
@@ -394,8 +445,32 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
                       Google Drive, etc.
                     </p>
                   </button>
+
+                  <button
+                    onClick={() => setDocumentSource('pending')}
+                    className={`border-2 rounded-lg p-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 ${
+                      documentSource === 'pending' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    disabled={uploading}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <ClipboardList className={`h-5 w-5 ${documentSource === 'pending' ? 'text-blue-600' : 'text-gray-400'}`} />
+                      {documentSource === 'pending' && (
+                        <div className="bg-blue-600 rounded-full p-1">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <p className={`font-semibold text-sm mb-1 ${documentSource === 'pending' ? 'text-blue-900' : 'text-gray-900'}`}>
+                      Solo registrar
+                    </p>
+                    <p className="text-xs text-gray-600">El archivo después</p>
+                  </button>
                 </div>
               </div>
+
+              {/* Code: automatic TYPE-KEY-NNN, typed, or none */}
+              <DocumentCodeField areaId={areaId} value={codeValue} onChange={setCode} disabled={uploading} />
 
               {/* Title */}
               <div>
@@ -537,7 +612,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
           <Button
             onClick={handleUpload}
             disabled={
-              (documentSource === 'uploaded' ? !selectedFile : !externalUrl.trim()) ||
+              (documentSource === 'uploaded' ? !selectedFile : documentSource === 'external_link' ? !externalUrl.trim() : false) ||
               !title.trim() ||
               uploading
             }
@@ -550,7 +625,12 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
               </>
             ) : (
               <>
-                {documentSource === 'uploaded' ? (
+                {documentSource === 'pending' ? (
+                  <>
+                    <ClipboardList className="h-4 w-4" />
+                    Registrar documento
+                  </>
+                ) : documentSource === 'uploaded' ? (
                   <>
                     <Upload className="h-4 w-4" />
                     Subir Documento

@@ -115,7 +115,9 @@ export const StopFaq = ({ stop, language }: { stop: TourViewStop; language: Lang
                 aria-expanded={openItem === i}
               >
                 {tr(item.q, language)}
-                <ChevronDown className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${openItem === i ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${openItem === i ? 'rotate-180' : ''}`}
+                />
               </button>
               {openItem === i && (
                 <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
@@ -144,18 +146,16 @@ export const HighlightsSection = ({ stop, language }: { stop: TourViewStop; lang
 export const CustomSection = ({ section, language }: { section: TourSection; language: Lang }) => (
   <div className="space-y-6">
     {getSectionBlocks(section).map((block) =>
-      block.type === 'text' ? (
-        tr(block.body, language) && <Paragraphs key={block.id} text={tr(block.body, language)} />
-      ) : (
-        block.chart.points.length > 0 && (
-          <figure key={block.id} className="space-y-2">
-            {tr(block.title, language) && (
-              <figcaption className="text-sm font-semibold text-slate-900">{tr(block.title, language)}</figcaption>
-            )}
-            <SimpleChart chart={block.chart} language={language} title={tr(block.title, language)} />
-          </figure>
-        )
-      )
+      block.type === 'text'
+        ? tr(block.body, language) && <Paragraphs key={block.id} text={tr(block.body, language)} />
+        : block.chart.points.length > 0 && (
+            <figure key={block.id} className="space-y-2">
+              {tr(block.title, language) && (
+                <figcaption className="text-sm font-semibold text-slate-900">{tr(block.title, language)}</figcaption>
+              )}
+              <SimpleChart chart={block.chart} language={language} title={tr(block.title, language)} />
+            </figure>
+          ),
     )}
     {(section.images?.length ?? 0) > 0 && (
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -168,23 +168,41 @@ export const CustomSection = ({ section, language }: { section: TourSection; lan
 );
 
 export const PersonnelSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
-  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-    {stop.live.personnel.map((p) => (
-      <div key={p.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
-        {p.avatar_url ? (
-          <img src={p.avatar_url} alt={p.name} className="h-11 w-11 rounded-full object-cover" />
-        ) : (
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
-            <User className="h-5 w-5 text-slate-400" />
+  <div className="space-y-3">
+    {(stop.live.people_total ?? 0) > 0 && (
+      <p className="text-sm text-slate-700">
+        {t(language, 'Aquí trabajan', 'People working here:')} <strong className="text-slate-900">{stop.live.people_total}</strong>{' '}
+        {t(language, stop.live.people_total === 1 ? 'persona' : 'personas', '')}
+      </p>
+    )}
+    {(stop.live.headcount?.length ?? 0) > 0 && (
+      <ul className="flex flex-wrap gap-2">
+        {stop.live.headcount!.map((h) => (
+          <li key={`${h.position}-${h.shift}`} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
+            <strong className="text-slate-900">{h.quantity}</strong> {h.position}
+            {h.shift && <span className="text-slate-500"> · {h.shift}</span>}
+          </li>
+        ))}
+      </ul>
+    )}
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {stop.live.personnel.map((p) => (
+        <div key={p.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+          {p.avatar_url ? (
+            <img src={p.avatar_url} alt={p.name} className="h-11 w-11 rounded-full object-cover" />
+          ) : (
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
+              <User className="h-5 w-5 text-slate-400" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
+            {p.position && <p className="truncate text-xs text-slate-600">{p.position}</p>}
+            {p.is_primary && <p className="text-[11px] text-blue-600">{t(language, 'Asignación principal', 'Primary assignment')}</p>}
           </div>
-        )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
-          {p.position && <p className="truncate text-xs text-slate-600">{p.position}</p>}
-          {p.is_primary && <p className="text-[11px] text-blue-600">{t(language, 'Asignación principal', 'Primary assignment')}</p>}
         </div>
-      </div>
-    ))}
+      ))}
+    </div>
   </div>
 );
 
@@ -203,10 +221,15 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
       )}
       {s.required_ppe.length > 0 && (
         <div>
-          <h4 className="mb-2 text-sm font-semibold text-slate-900">{t(language, 'Equipo de protección requerido', 'Required protective equipment')}</h4>
+          <h4 className="mb-2 text-sm font-semibold text-slate-900">
+            {t(language, 'Equipo de protección requerido', 'Required protective equipment')}
+          </h4>
           <div className="flex flex-wrap gap-2">
             {s.required_ppe.map((ppe) => (
-              <span key={ppe} className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
+              <span
+                key={ppe}
+                className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900"
+              >
                 <HardHat className="h-3.5 w-3.5" />
                 {ppe}
               </span>
@@ -224,7 +247,9 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
                   <AlertTriangle className="h-4 w-4 text-orange-500" />
                   {h.name}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${SEVERITY_STYLES[h.severity] || 'bg-slate-100 text-slate-700'}`}>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${SEVERITY_STYLES[h.severity] || 'bg-slate-100 text-slate-700'}`}
+                >
                   {h.severity}
                 </span>
               </li>
@@ -308,7 +333,8 @@ export const ProductsSection = ({ stop, language }: { stop: TourViewStop; langua
           <p className="font-mono text-xs text-slate-500">{p.sku}</p>
           {p.description && <p className="mt-1 line-clamp-2 text-xs text-slate-600">{p.description}</p>}
           <p className="mt-2 text-[11px] font-medium text-blue-700">
-            {t(language, 'En esta área', 'In this area')}: {p.steps.map((s) => `${t(language, 'Paso', 'Step')} ${s.step_number} · ${s.step_name}`).join(', ')}
+            {t(language, 'En esta área', 'In this area')}:{' '}
+            {p.steps.map((s) => `${t(language, 'Paso', 'Step')} ${s.step_number} · ${s.step_name}`).join(', ')}
           </p>
         </div>
       </div>
@@ -319,7 +345,13 @@ export const ProductsSection = ({ stop, language }: { stop: TourViewStop; langua
 export const GallerySection = ({ stop }: { stop: TourViewStop }) => (
   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
     {stop.live.gallery.map((photo) => (
-      <a key={photo.id} href={photo.photo_url} target="_blank" rel="noopener noreferrer" className="group relative block overflow-hidden rounded-lg">
+      <a
+        key={photo.id}
+        href={photo.photo_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group relative block overflow-hidden rounded-lg"
+      >
         <img
           src={photo.thumbnail_url || photo.photo_url}
           alt={photo.caption || ''}
@@ -362,7 +394,12 @@ export const CertificationsSection = ({ stop, language }: { stop: TourViewStop; 
           {c.certification_body && <p className="text-xs text-slate-600">{c.certification_body}</p>}
           {c.expiry_date && (
             <p className="mt-1 text-[11px] text-slate-500">
-              {t(language, 'Vigente hasta', 'Valid until')} {new Date(c.expiry_date).toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US', { year: 'numeric', month: 'short', timeZone: 'UTC' })}
+              {t(language, 'Vigente hasta', 'Valid until')}{' '}
+              {new Date(c.expiry_date).toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US', {
+                year: 'numeric',
+                month: 'short',
+                timeZone: 'UTC',
+              })}
             </p>
           )}
         </div>

@@ -58,6 +58,11 @@ const LiveSectionPreview = ({ sectionKey, stop, areaId }: LiveSectionPreviewProp
               </li>
             ))}
             {more(live.personnel.length)}
+            {(live.headcount || []).map((h) => (
+              <li key={`${h.position}-${h.shift}`} className="text-xs text-gray-700">
+                <span className="font-medium">{h.position}</span> <span className="text-gray-500">· {h.quantity} personas (plantilla)</span>
+              </li>
+            ))}
           </ul>
         );
       case 'safety': {
@@ -151,7 +156,7 @@ const LiveSectionPreview = ({ sectionKey, stop, areaId }: LiveSectionPreviewProp
 
   const listLengths: Partial<Record<TourSectionKey, number>> = live
     ? {
-        personnel: live.personnel.length,
+        personnel: live.personnel.length + (live.headcount?.length || 0),
         equipment: live.equipment.length,
         products: live.products.length,
         gallery: live.gallery.length,

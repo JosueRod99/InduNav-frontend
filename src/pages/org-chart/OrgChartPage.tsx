@@ -8,6 +8,15 @@ import { getOrgChart, type OrgChartNode } from '../../api/employees';
 import Button from '../../components/ui/Button';
 import type { PlantScopedProps } from '../plants/plantScope';
 
+// Card HTML is built as a string: escape every value that comes from the data
+const esc = (value: unknown) =>
+  String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+const ROLE_SHORT = { supervisor: 'Supervisor', quality: 'Calidad', emergency: 'Emergencia' } as const;
+/** "Supervisor: Línea 1, Línea 3 · Calidad: Almacén" */
+const responsibilityText = (node: OrgChartNode) =>
+  (node.responsibilities || []).map((r) => `${ROLE_SHORT[r.role]}: ${r.areas.join(', ')}`).join(' · ');
+
 const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
@@ -80,7 +89,7 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
       .container(chartRef.current)
       .data(processedData)
       .nodeWidth(() => 280)
-      .nodeHeight(() => 160)
+      .nodeHeight((d: any) => (responsibilityText(d.data) ? 186 : 160))
       .childrenMargin(() => 60)
       .compactMarginBetween(() => 40)
       .compactMarginPair(() => 35)
@@ -88,6 +97,20 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
       .nodeContent((d: any) => {
         const node: OrgChartNode = d.data;
         const isVirtual = node.id === '__virtual_root__';
+
+        // Headcount box (people counted by position, without names)
+        if (node.is_headcount) {
+          return `
+            <div style="width: 100%; height: 100%; border-radius: 12px; border: 2px dashed #94A3B8; background: #F8FAFC;
+                        color: #0F172A; padding: 16px; display: flex; flex-direction: column; justify-content: center; gap: 6px;">
+              <div style="font-size: 30px; font-weight: 800; line-height: 1; color: #1D4ED8;">${esc(node.quantity)}</div>
+              <div style="font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(node.position)}</div>
+              <div style="font-size: 12px; color: #475569;">
+                Plantilla · ${esc(node.department)}${node.shift ? ` · ${esc(node.shift)}` : ''}
+              </div>
+            </div>
+          `;
+        }
 
         return `
           <div style="
@@ -122,7 +145,7 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   overflow: hidden;
                   white-space: nowrap;
                 ">
-                  ${node.name || 'Sin nombre'}
+                  ${esc(node.name || 'Sin nombre')}
                 </div>
                 <div style="
                   font-size: 11px;
@@ -131,7 +154,7 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   font-weight: 500;
                   letter-spacing: 0.5px;
                 ">
-                  ${node.employee_number || ''}
+                  ${esc(node.employee_number || '')}
                 </div>
               </div>
 
@@ -144,7 +167,7 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   opacity: 0.95;
                   line-height: 1.4;
                 ">
-                  ${node.position || 'Sin puesto'}
+                  ${esc(node.position || 'Sin puesto')}
                 </div>
 
                 <div style="
@@ -162,9 +185,25 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                     font-weight: 500;
                     font-size: 11px;
                   ">
-                    ${node.department || 'Sin dpto.'}
+                    ${esc(node.department || 'Sin dpto.')}
                   </span>
                 </div>
+
+                ${responsibilityText(node) ? `
+                  <div title="${esc(responsibilityText(node))}" style="
+                    font-size: 11px;
+                    font-weight: 600;
+                    background: rgba(250, 204, 21, 0.25);
+                    border-radius: 6px;
+                    padding: 3px 8px;
+                    margin-bottom: 8px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                  ">
+                    ★ ${esc(responsibilityText(node))}
+                  </div>
+                ` : ''}
 
                 ${node.plant ? `
                   <div style="
@@ -177,7 +216,7 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                     border-top: 1px solid rgba(255, 255, 255, 0.15);
                   ">
                     <span style="font-size: 12px;">📍</span>
-                    <span style="font-weight: 500;">${node.plant}</span>
+                    <span style="font-weight: 500;">${esc(node.plant)}</span>
                   </div>
                 ` : ''}
               </div>
@@ -204,7 +243,7 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   font-weight: 700;
                   margin-bottom: 8px;
                 ">
-                  ${node.name}
+                  ${esc(node.name)}
                 </div>
                 <div style="
                   font-size: 11px;

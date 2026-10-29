@@ -29,6 +29,7 @@ export interface PlantSummary {
     areas: number;
     products: number | null;
     employees: number;
+    headcount: number; // people counted by position, without names
     tours: number;
     tours_published: number;
     equipment_by_status: Partial<Record<'active' | 'maintenance' | 'out_of_service' | 'retired', number>> | null;
@@ -44,6 +45,7 @@ export interface PlantSummary {
       area_name: string;
       kind: 'expired' | 'expiring' | 'audit';
     }[];
+    without_supervisor: { total: number; areas: { id: string; name: string }[] };
   };
   tours: {
     visits_30d: number;

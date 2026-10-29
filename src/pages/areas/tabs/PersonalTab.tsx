@@ -13,6 +13,9 @@ import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import EmployeeDetailModal from '../../../components/employees/EmployeeDetailModal';
 import ManageAssignmentsModal from '../modals/ManageAssignmentsModal';
+import { personName } from '../../../utils/personName';
+import { getResponsiblesByArea, roleLabel } from '../../../api/areaResponsibles';
+import AreaHeadcountSection from '../../../components/headcount/AreaHeadcountSection';
 
 interface PersonalTabProps {
   areaId: string;
@@ -31,6 +34,11 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
   const { data: employees, isLoading } = useQuery({
     queryKey: ['area-employees', areaId],
     queryFn: () => getEmployeesByArea(areaId),
+  });
+  // Who is in charge of the area (they may work in another area)
+  const { data: responsibles = [] } = useQuery({
+    queryKey: ['area-responsibles', areaId],
+    queryFn: () => getResponsiblesByArea(areaId),
   });
 
   // Mutations
@@ -106,14 +114,48 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
   // Ensure employees is always an array
   const employeesList = Array.isArray(employees) ? employees : [];
 
+  // Responsibles strip: role badge, name, shift and where they work when it is not this area
+  const responsiblesStrip = responsibles.length > 0 && (
+    <section className="rounded-lg border border-blue-200 bg-blue-50/60 p-4" aria-label="Responsables del área">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700">Responsables del área</p>
+      <ul className="flex flex-wrap gap-2">
+        {responsibles.map((r) => (
+          <li key={r.id}>
+            <button
+              type="button"
+              onClick={() => setSelectedEmployeeId(r.employee_id)}
+              className="flex items-center gap-2 rounded-lg border border-blue-100 bg-white px-3 py-1.5 text-left text-sm hover:border-blue-300"
+            >
+              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[11px] font-semibold text-blue-800">{roleLabel(r.role)}</span>
+              <span className="font-medium text-gray-900">{personName(r)}</span>
+              {r.shift && <span className="text-xs text-gray-500">· {r.shift}</span>}
+              {!r.works_here && <span className="text-xs text-gray-500">· trabaja en {r.works_in || 'otra área'}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-gray-500">Se asignan en la pestaña General › Responsables o desde la ficha del empleado.</p>
+    </section>
+  );
+
   if (employeesList.length === 0) {
     return (
-      <div className="text-center py-12">
-        <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Sin Empleados Asignados</h3>
-        <p className="text-gray-600">
-          Aún no hay empleados asignados a esta área.
-        </p>
+      <div className="space-y-6">
+        {responsiblesStrip}
+        <AreaHeadcountSection areaId={areaId} namedCount={0} />
+        <div className="text-center py-12">
+          <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Sin empleados con nombre asignados</h3>
+          <p className="text-gray-600 mb-4">
+            Aún no hay empleados asignados a esta área.
+          </p>
+          <Button onClick={() => setIsManageModalOpen(true)} className="gap-2">
+            <UserPlus className="h-4 w-4" />
+            Asignar Empleados
+          </Button>
+        </div>
+        <ManageAssignmentsModal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} areaId={areaId} area={area} />
+        <EmployeeDetailModal isOpen={!!selectedEmployeeId} onClose={() => setSelectedEmployeeId(null)} employeeId={selectedEmployeeId} />
       </div>
     );
   }
@@ -125,44 +167,10 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
 
   return (
     <div className="space-y-8">
-      {/* Supervisor Card */}
-      {area?.supervisor && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="bg-blue-600 text-white rounded-full p-2">
-                  <Award className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">
-                    Supervisor del Área
-                  </p>
-                  <h3 className="text-xl font-bold text-gray-900">
-                    {area.supervisor.first_name} {area.supervisor.last_name}
-                  </h3>
-                </div>
-              </div>
-              {area.supervisor.position && (
-                <p className="text-sm text-gray-700 ml-14">{area.supervisor.position}</p>
-              )}
-              <div className="mt-3 ml-14 space-y-1">
-                {area.supervisor.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-gray-500" />
-                    <a
-                      href={`mailto:${area.supervisor.email}`}
-                      className="text-sm text-blue-600 hover:text-blue-700"
-                    >
-                      {area.supervisor.email}
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {responsiblesStrip}
+
+      {/* People counted by position, without names */}
+      <AreaHeadcountSection areaId={areaId} namedCount={employeesList.length} />
 
       {/* Header with Manage Button and View Toggle */}
       <div className="flex items-center justify-between">
@@ -280,7 +288,7 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
                       >
                         <div className="flex flex-col">
                           <div className="text-sm font-medium text-gray-900">
-                            {employee.first_name} {employee.last_name}
+                            {personName(employee)}
                           </div>
                           {employee.employee_number && (
                             <div className="text-xs text-gray-500 font-mono">
@@ -527,7 +535,7 @@ const EmployeeCard = ({ employee, onClick }: EmployeeCardProps) => {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <h4 className="font-semibold text-gray-900">
-            {employee.first_name} {employee.last_name}
+            {personName(employee)}
           </h4>
           <p className="text-sm text-gray-600 mt-1">{employee.position}</p>
         </div>
@@ -617,7 +625,7 @@ const EditAssignmentModal = ({ isOpen, onClose, assignment, onSave, isLoading }:
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Editar Asignación</h2>
             <p className="text-sm text-gray-600 mt-1">
-              {assignment.first_name} {assignment.last_name}
+              {personName(assignment)}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">

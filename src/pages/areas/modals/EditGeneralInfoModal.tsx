@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
 import { updateArea, type OrganizationalArea } from '../../../api/areas';
-import { getEmployees } from '../../../api/employees';
 
 interface EditGeneralInfoModalProps {
   isOpen: boolean;
@@ -38,13 +37,6 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
     emergency_contact_id: area.emergency_contact_id || '',
     quality_manager_id: area.quality_manager_id || '',
     last_incident_date: calculateLastIncidentDate(),
-  });
-
-  // Fetch employees for dropdowns
-  const { data: employeesData } = useQuery({
-    queryKey: ['employees', area.organization_id],
-    queryFn: () => getEmployees({ organization_id: area.organization_id, limit: 500 }),
-    enabled: isOpen,
   });
 
   useEffect(() => {
@@ -105,9 +97,6 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
       capacity: formData.capacity ? parseInt(formData.capacity) : null,
       square_meters: formData.square_meters ? parseFloat(formData.square_meters) : null,
       cost_center: formData.cost_center || null,
-      supervisor_id: formData.supervisor_id || null,
-      emergency_contact_id: formData.emergency_contact_id || null,
-      quality_manager_id: formData.quality_manager_id || null,
       days_without_accident: calculateDaysWithoutAccident(),
       metadata: cleanMetadata, // Clean metadata without days_without_accident
     };
@@ -274,72 +263,10 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
             />
           </div>
 
-          {/* Responsible People Section */}
-          <div className="pt-4 border-t border-gray-200">
-            <h3 className="text-md font-semibold text-gray-900 mb-4">Responsables</h3>
-
-            <div className="space-y-4">
-              {/* Supervisor */}
-              <div>
-                <label htmlFor="supervisor_id" className="block text-sm font-medium text-gray-700 mb-1">
-                  Supervisor del Área
-                </label>
-                <select
-                  id="supervisor_id"
-                  value={formData.supervisor_id}
-                  onChange={(e) => setFormData({ ...formData, supervisor_id: e.target.value })}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                >
-                  <option value="">Sin asignar</option>
-                  {employeesData?.employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.first_name} {emp.last_name} {emp.position ? `- ${emp.position}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Quality Manager */}
-              <div>
-                <label htmlFor="quality_manager_id" className="block text-sm font-medium text-gray-700 mb-1">
-                  Responsable de Calidad
-                </label>
-                <select
-                  id="quality_manager_id"
-                  value={formData.quality_manager_id}
-                  onChange={(e) => setFormData({ ...formData, quality_manager_id: e.target.value })}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                >
-                  <option value="">Sin asignar</option>
-                  {employeesData?.employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.first_name} {emp.last_name} {emp.position ? `- ${emp.position}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Emergency Contact */}
-              <div>
-                <label htmlFor="emergency_contact_id" className="block text-sm font-medium text-gray-700 mb-1">
-                  Contacto de Emergencia
-                </label>
-                <select
-                  id="emergency_contact_id"
-                  value={formData.emergency_contact_id}
-                  onChange={(e) => setFormData({ ...formData, emergency_contact_id: e.target.value })}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                >
-                  <option value="">Sin asignar</option>
-                  {employeesData?.employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.first_name} {emp.last_name} {emp.position ? `- ${emp.position}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+          {/* Responsibles are assigned in the "Responsables" section of the General tab */}
+          <p className="pt-4 border-t border-gray-200 text-xs text-gray-500">
+            Los responsables (supervisores, calidad y emergencia) se asignan en la sección <strong>Responsables</strong> de esta pestaña.
+          </p>
 
           {/* Safety Section */}
           <div className="pt-4 border-t border-gray-200">

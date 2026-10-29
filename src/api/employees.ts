@@ -5,6 +5,7 @@ export interface Employee {
   organization_id: string;
   plant_id: string | null;
   area_id: string | null;
+  name_prefix?: string | null; // title: Ing., Lic., C.P.…
   first_name: string;
   last_name: string;
   email: string;
@@ -33,6 +34,7 @@ export interface Employee {
   };
   manager?: {
     id: string;
+    name_prefix?: string | null;
     first_name: string;
     last_name: string;
   };
@@ -57,12 +59,17 @@ export interface OrgChartNode {
   parentId: string | null;
   area?: string;
   plant?: string;
+  responsibilities?: { role: 'supervisor' | 'quality' | 'emergency'; areas: string[] }[]; // areas in charge
+  is_headcount?: boolean; // "Ayudantes generales (10)": unnamed staff of an area, not a person
+  quantity?: number;
+  shift?: string | null;
 }
 
 export interface CreateEmployeeRequest {
   organization_id: string;
   plant_id?: string;
   area_id?: string;
+  name_prefix?: string | null;
   first_name: string;
   last_name: string;
   email: string;
@@ -77,6 +84,7 @@ export interface CreateEmployeeRequest {
 export interface UpdateEmployeeRequest {
   plant_id?: string;
   area_id?: string;
+  name_prefix?: string | null;
   first_name?: string;
   last_name?: string;
   email?: string;
@@ -176,4 +184,38 @@ export const checkEmployeeNumber = async (organizationId: string, employeeNumber
     params: { organization_id: organizationId, employee_number: employeeNumber, exclude_id: excludeId },
   });
   return data.available;
+};
+
+// Spreadsheet import (preview with dryRun, then save)
+export interface EmployeeImportRow {
+  row: number;
+  employee_number?: string;
+  name_prefix?: string;
+  first_name?: string;
+  last_name?: string;
+  position?: string;
+  department?: string;
+  area?: string;
+  manager?: string;
+  email?: string;
+  phone?: string;
+  hire_date?: string; // YYYY-MM-DD
+}
+
+export interface EmployeeImportResult {
+  imported: boolean;
+  summary: { create: number; update: number; errors: number; warnings: number };
+  rows: {
+    row: number;
+    action: 'create' | 'update' | 'error';
+    name: string;
+    area: string | null;
+    manager: string | null;
+    messages: { level: 'error' | 'warning'; text: string }[];
+  }[];
+}
+
+export const importEmployees = async (plantId: string, rows: EmployeeImportRow[], dryRun: boolean): Promise<EmployeeImportResult> => {
+  const { data } = await apiClient.post('/employees/import', { plant_id: plantId, rows, dry_run: dryRun });
+  return data;
 };

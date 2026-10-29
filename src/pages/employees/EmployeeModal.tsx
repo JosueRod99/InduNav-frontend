@@ -11,6 +11,7 @@ import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import { createAssignment } from '../../api/areaAssignments';
 import { DEPARTMENT_OPTIONS } from '../../constants/departments';
+import { NAME_PREFIXES, personName } from '../../utils/personName';
 
 interface EmployeeModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
     organization_id: organizationId || '',
     plant_id: '',
     area_id: '', // Keep for backward compatibility, but won't be used
+    name_prefix: '',
     first_name: '',
     last_name: '',
     email: '',
@@ -88,14 +90,15 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
         organization_id: employee.organization_id,
         plant_id: employee.plant_id || '',
         area_id: employee.area_id || '',
+        name_prefix: employee.name_prefix || '',
         first_name: employee.first_name,
         last_name: employee.last_name,
-        email: employee.email,
+        email: employee.email || '',
         phone: employee.phone || '',
-        position: employee.position,
-        department: employee.department,
-        employee_number: employee.employee_number,
-        hire_date: new Date(employee.hire_date).toISOString().split('T')[0],
+        position: employee.position || '',
+        department: employee.department || '',
+        employee_number: employee.employee_number || '',
+        hire_date: employee.hire_date ? new Date(employee.hire_date).toISOString().split('T')[0] : '',
         reports_to: employee.reports_to || '',
       });
     } else if (organizationId) {
@@ -153,7 +156,13 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
       area_id: formData.area_id || undefined,
       phone: formData.phone || undefined,
       reports_to: formData.reports_to === '' ? null : formData.reports_to || null,
-    };
+      // Optional fields: empty means "not captured"
+      email: formData.email?.trim() || null,
+      employee_number: formData.employee_number?.trim() || null,
+      position: formData.position?.trim() || null,
+      department: formData.department || null,
+      hire_date: formData.hire_date || undefined,
+    } as unknown as CreateEmployeeRequest;
 
     if (isEditing && employee) {
       updateMutation.mutate({ id: employee.id, payload });
@@ -209,7 +218,26 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
         </div>
 
         {/* Personal Info */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-[6.5rem_1fr_1fr] gap-4">
+          <div>
+            <label htmlFor="name_prefix" className="block text-sm font-medium text-gray-700 mb-1">
+              Título
+            </label>
+            <Input
+              id="name_prefix"
+              name="name_prefix"
+              value={formData.name_prefix || ''}
+              onChange={handleChange}
+              placeholder="Ing."
+              maxLength={20}
+              list="name-prefix-options"
+            />
+            <datalist id="name-prefix-options">
+              {NAME_PREFIXES.map((prefix) => (
+                <option key={prefix} value={prefix} />
+              ))}
+            </datalist>
+          </div>
           <div>
             <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">
               Nombre <span className="text-red-500">*</span>
@@ -243,7 +271,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email <span className="text-red-500">*</span>
+              Email
             </label>
             <Input
               id="email"
@@ -252,7 +280,6 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
               value={formData.email}
               onChange={handleChange}
               placeholder="juan.perez@empresa.com"
-              required
             />
           </div>
 
@@ -275,7 +302,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="position" className="block text-sm font-medium text-gray-700 mb-1">
-              Puesto <span className="text-red-500">*</span>
+              Puesto
             </label>
             <Input
               id="position"
@@ -283,7 +310,6 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
               value={formData.position}
               onChange={handleChange}
               placeholder="Gerente de Operaciones"
-              required
             />
           </div>
 
@@ -294,9 +320,13 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
               label="Departamento"
               value={formData.department}
               onChange={handleChange}
-              options={DEPARTMENT_OPTIONS}
+              // Departments imported from Excel may not be in the fixed list: keep them selectable
+              options={
+                formData.department && !DEPARTMENT_OPTIONS.some((o) => o.value === formData.department)
+                  ? [...DEPARTMENT_OPTIONS, { value: formData.department, label: formData.department }]
+                  : DEPARTMENT_OPTIONS
+              }
               placeholder="Selecciona un departamento"
-              required
             />
           </div>
         </div>
@@ -304,7 +334,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="employee_number" className="block text-sm font-medium text-gray-700 mb-1">
-              Número de Empleado <span className="text-red-500">*</span>
+              Número de Empleado
             </label>
             <Input
               id="employee_number"
@@ -312,13 +342,12 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
               value={formData.employee_number}
               onChange={handleChange}
               placeholder="EMP-001"
-              required
             />
           </div>
 
           <div>
             <label htmlFor="hire_date" className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha de Contratación <span className="text-red-500">*</span>
+              Fecha de Contratación
             </label>
             <Input
               id="hire_date"
@@ -326,7 +355,6 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
               type="date"
               value={formData.hire_date}
               onChange={handleChange}
-              required
             />
           </div>
         </div>
@@ -367,7 +395,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
                   ?.filter((emp) => emp.id !== employee?.id) // Exclude current employee when editing
                   .map((emp) => ({
                     value: emp.id,
-                    label: `${emp.first_name} ${emp.last_name} - ${emp.position}`,
+                    label: `${personName(emp)} - ${emp.position}`,
                   })) || []),
               ];
               console.log('🎯 Manager options generated:', {

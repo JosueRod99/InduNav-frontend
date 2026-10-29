@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { X, History, Upload, ExternalLink } from 'lucide-react';
 import {
@@ -25,6 +26,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
   const queryClient = useQueryClient();
 
   const [title, setTitle] = useState('');
+  const [documentCode, setDocumentCode] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('SOP');
   const [tags, setTags] = useState('');
@@ -45,6 +47,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
   useEffect(() => {
     if (isOpen && document) {
       setTitle(document.title);
+      setDocumentCode(document.document_code || '');
       setDescription(document.description || '');
       setCategory(document.category);
       setTags(document.tags?.join(', ') || '');
@@ -54,6 +57,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
     } else if (!isOpen) {
       // Reset when modal closes
       setTitle('');
+      setDocumentCode('');
       setDescription('');
       setCategory('SOP');
       setTags('');
@@ -72,6 +76,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
       queryClient.invalidateQueries({ queryKey: ['area-documents-archived', document!.organizational_area_id] });
       onClose();
     },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo guardar el documento'),
   });
 
   const handleUpdate = async () => {
@@ -81,6 +86,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
 
     updateDocumentMutation.mutate({
       title: title.trim(),
+      document_code: documentCode.trim().toUpperCase() || null, // shared by every version
       description: description.trim() || undefined,
       category,
       tags: tagsArray.length > 0 ? tagsArray : undefined,
@@ -129,7 +135,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-600">Nombre:</span>
-                <p className="text-gray-900 font-medium truncate">{document.file_name}</p>
+                <p className="text-gray-900 font-medium truncate">{document.file_name || 'Sin archivo (pendiente de subir)'}</p>
               </div>
               <div>
                 <span className="text-gray-600">Tamaño:</span>
@@ -152,10 +158,14 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
             </div>
 
             <div className="flex gap-2 mt-4">
-              <Button onClick={handleDownload} variant="outline" size="sm" className="gap-2">
-                <ExternalLink className="h-4 w-4" />
-                Abrir
-              </Button>
+              {document.file_url ? (
+                <Button onClick={handleDownload} variant="outline" size="sm" className="gap-2">
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir
+                </Button>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">Sin archivo</span>
+              )}
               <Button
                 onClick={() => setShowVersions(!showVersions)}
                 variant="outline"
@@ -233,13 +243,13 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
                           <span className="text-xs text-gray-500">
                             {new Date(ver.created_at).toLocaleDateString()}
                           </span>
-                          <Button
-                            onClick={() => window.open(ver.file_url, '_blank')}
-                            variant="outline"
-                            size="sm"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
+                          {ver.file_url ? (
+                            <Button onClick={() => window.open(ver.file_url!, '_blank')} variant="outline" size="sm">
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-amber-700">Sin archivo</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -252,6 +262,22 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
           {/* Edit Form */}
           <div className="flex flex-col gap-4">
             <h3 className="text-sm font-semibold text-gray-900">Editar Información</h3>
+
+            {/* Code (shared by every version; must be unique in the organization) */}
+            <div>
+              <label htmlFor="document-code" className="block text-sm font-medium text-gray-700 mb-2">
+                Código
+              </label>
+              <input
+                id="document-code"
+                type="text"
+                value={documentCode}
+                onChange={(e) => setDocumentCode(e.target.value.toUpperCase())}
+                maxLength={50}
+                placeholder="Ej. PROC-RH-001"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
             {/* Title */}
             <div>

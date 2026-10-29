@@ -46,6 +46,7 @@ import {
 } from './sections/StopSections';
 import { CUSTOM_SECTION_ICONS, DEFAULT_CUSTOM_SECTION_ICON } from '../../components/tours/customSectionIcons';
 import LocationSection from './sections/LocationSection';
+import { CompanySection, PlantSection } from './sections/CompanySections';
 import NarrationPlayer from './components/NarrationPlayer';
 import { useVisitTracking, type VisitSource } from './useVisitTracking';
 
@@ -554,8 +555,11 @@ const TourCover = ({
   onOpenStop: (index: number) => void;
 }) => {
   const lang = (es: string, en: string) => (language === 'es' ? es : en);
-  const cover = view.tour.cover_image_url || view.stops.find((s) => s.image_url)?.image_url || null;
+  const company = view.tour.organization.profile;
+  // Tour cover, else the plant's (or company's) cover photo, else the first area photo
+  const cover = view.tour.cover_image_url || company?.plant_cover_url || view.stops.find((s) => s.image_url)?.image_url || null;
   const description = tr(view.tour.description, language);
+  const tagline = tr(company?.tagline, language);
 
   return (
     <div className="space-y-5">
@@ -570,6 +574,7 @@ const TourCover = ({
               )}
               <span className="text-sm font-medium text-white/90">
                 {view.tour.organization.name} · {view.tour.plant_name}
+                {tagline && <span className="block text-xs font-normal text-white/75">{tagline}</span>}
               </span>
             </div>
           )}
@@ -624,6 +629,9 @@ const TourCover = ({
           ))}
         </ol>
       </section>
+
+      <CompanySection view={view} language={language} />
+      <PlantSection view={view} language={language} />
     </div>
   );
 };

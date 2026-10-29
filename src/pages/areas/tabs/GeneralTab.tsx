@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Users, Building2, Calendar, User, Shield, Award, Edit, Phone } from 'lucide-react';
+import { Users, Building2, Calendar, Shield, Edit } from 'lucide-react';
 import type { OrganizationalArea } from '../../../api/areas';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
 import EditGeneralInfoModal from '../modals/EditGeneralInfoModal';
 import EmployeeDetailModal from '../../../components/employees/EmployeeDetailModal';
+import AreaResponsiblesSection from '../../../components/responsibles/AreaResponsiblesSection';
 
 interface GeneralTabProps {
   area: OrganizationalArea;
@@ -81,45 +82,8 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
         </div>
       </div>
 
-      {/* Key Contacts */}
-      <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Users className="h-5 w-5 text-blue-600" />
-          Contactos Clave
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <ContactCard
-            role="Supervisor"
-            name={area.supervisor ? `${area.supervisor.first_name} ${area.supervisor.last_name}` : 'Sin asignar'}
-            position={area.supervisor?.position}
-            email={area.supervisor?.email}
-            phone={area.supervisor?.phone}
-            employeeId={area.supervisor?.id}
-            onEmployeeClick={() => area.supervisor?.id && setSelectedEmployeeId(area.supervisor.id)}
-            icon={<User className="h-5 w-5 text-blue-600" />}
-          />
-          <ContactCard
-            role="Responsable de Calidad"
-            name={area.quality_manager ? `${area.quality_manager.first_name} ${area.quality_manager.last_name}` : 'Sin asignar'}
-            position={area.quality_manager?.position}
-            email={area.quality_manager?.email}
-            phone={area.quality_manager?.phone}
-            employeeId={area.quality_manager?.id}
-            onEmployeeClick={() => area.quality_manager?.id && setSelectedEmployeeId(area.quality_manager.id)}
-            icon={<Award className="h-5 w-5 text-purple-600" />}
-          />
-          <ContactCard
-            role="Contacto de Emergencia"
-            name={area.emergency_contact ? `${area.emergency_contact.first_name} ${area.emergency_contact.last_name}` : 'Sin asignar'}
-            position={area.emergency_contact?.position}
-            email={area.emergency_contact?.email}
-            phone={area.emergency_contact?.phone}
-            employeeId={area.emergency_contact?.id}
-            onEmployeeClick={() => area.emergency_contact?.id && setSelectedEmployeeId(area.emergency_contact.id)}
-            icon={<Shield className="h-5 w-5 text-red-600" />}
-          />
-        </div>
-      </div>
+      {/* Who is in charge (several people per role, assigned here or from the employee) */}
+      <AreaResponsiblesSection area={area} onOpenEmployee={setSelectedEmployeeId} />
 
       {/* Shift Schedule */}
       {shiftSchedule && shiftSchedule.shifts && shiftSchedule.shifts.length > 0 && (
@@ -198,62 +162,5 @@ const InfoCard = ({ label, value, icon }: InfoCardProps) => (
     </div>
   </div>
 );
-
-interface ContactCardProps {
-  role: string;
-  name: string;
-  position?: string;
-  email?: string;
-  phone?: string;
-  employeeId?: string;
-  onEmployeeClick?: () => void;
-  icon: React.ReactNode;
-}
-
-const ContactCard = ({ role, name, position, email, phone, employeeId, onEmployeeClick, icon }: ContactCardProps) => {
-  const hasEmployee = !!employeeId;
-
-  return (
-    <div
-      className={`border border-gray-200 rounded-lg p-4 transition-all ${hasEmployee ? 'hover:border-blue-400 hover:shadow-md cursor-pointer' : 'hover:border-gray-300'
-        }`}
-      onClick={hasEmployee ? onEmployeeClick : undefined}
-    >
-      <div className="flex items-start gap-3 mb-3">
-        {icon}
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-500">{role}</p>
-          <p className={`mt-1 font-semibold ${hasEmployee ? 'text-blue-600' : 'text-gray-900'}`}>
-            {name}
-          </p>
-
-        </div>
-      </div>
-      {position && <p className="text-sm text-gray-600 mb-2">{position}</p>}
-      <div className="space-y-1">
-        {email && (
-          <a
-            href={`mailto:${email}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
-          >
-            <span>📧</span>
-            {email}
-          </a>
-        )}
-        {phone && (
-          <a
-            href={`tel:${phone}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
-          >
-            <Phone className="h-3 w-3" />
-            {phone}
-          </a>
-        )}
-      </div>
-    </div>
-  );
-};
 
 export default GeneralTab;

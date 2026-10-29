@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Loader2, Save } from 'lucide-react';
@@ -8,6 +9,7 @@ import type { Plant } from '../../types';
 import { PLANT_TIMEZONES } from './timezones';
 import { MANAGERS } from './plantTabs';
 import { useAuthStore } from '../../store/authStore';
+import PhotoGallery from '../../components/media/PhotoGallery';
 
 // "Configuración" tab of the plant workspace: the plant's own details, edited in place.
 // Platform admins and organization owners edit; everyone else sees them read-only.
@@ -152,6 +154,30 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
           <dd className="inline">{new Date(plant.created_at).toLocaleDateString('es-MX', { dateStyle: 'long' })}</dd>
         </div>
       </dl>
+
+      {/* Company-wide texts live on the organization's profile, not here */}
+      {canEdit && (
+        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          La misión, visión, valores, logo y fotos de la empresa se capturan en el{' '}
+          <Link to={`/organizations/${plant.organization_id}/perfil`} className="font-semibold underline hover:no-underline">
+            Perfil de la empresa
+          </Link>
+          {' '}y se muestran en todos sus tours.
+        </p>
+      )}
+
+      {/* Photos save on their own when uploaded (not with the form's button) */}
+      <section className="rounded-lg border border-gray-200 bg-white">
+        <div className="border-b border-gray-200 px-4 py-3">
+          <h3 className="text-sm font-semibold text-gray-900">Fotos de la planta</h3>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Se muestran en los tours de esta planta; la portada abre los tours que no tienen portada propia.
+          </p>
+        </div>
+        <div className="p-4">
+          <PhotoGallery organizationId={plant.organization_id} plantId={plant.id} canEdit={canEdit} emptyText="Aún no hay fotos de la planta." />
+        </div>
+      </section>
 
       {canEdit ? (
         <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t border-gray-200 bg-gray-50/95 py-3 backdrop-blur">

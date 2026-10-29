@@ -1,7 +1,7 @@
 import { Suspense, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, ChevronRight, Factory, Loader2, Pencil, Settings, Users } from 'lucide-react';
+import { Building2, ChevronRight, Factory, IdCard, Loader2, Pencil, Settings, Users } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import { getOrganization } from '../../api/organizations';
@@ -14,9 +14,11 @@ import OrganizationModal from './OrganizationModal';
 
 import PlantsPage from '../plants/PlantsPage';
 import UsersPage from '../users/UsersPage';
+import OrganizationProfileTab from './OrganizationProfileTab';
 
 const TABS = [
   { id: 'plantas', label: 'Plantas', Icon: Factory, adminOnly: false },
+  { id: 'perfil', label: 'Perfil', Icon: IdCard, adminOnly: false }, // company profile shown in the tours
   { id: 'usuarios', label: 'Usuarios', Icon: Users, adminOnly: true },
   { id: 'configuracion', label: 'Configuración', Icon: Settings, adminOnly: false },
 ] as const;
@@ -108,6 +110,9 @@ const OrganizationWorkspacePage = () => {
         }
       >
         {activeTab === 'plantas' && <PlantsPage organizationId={organization.id} />}
+        {activeTab === 'perfil' && (
+          <OrganizationProfileTab organizationId={organization.id} canEdit={isPlatformAdmin || user?.role?.name === 'org_owner'} />
+        )}
         {activeTab === 'usuarios' && <UsersPage organizationId={organization.id} />}
         {activeTab === 'configuracion' && (
           <section className="max-w-2xl rounded-lg border border-gray-200 bg-white">

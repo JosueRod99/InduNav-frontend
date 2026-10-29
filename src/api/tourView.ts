@@ -56,6 +56,8 @@ export interface TourViewStop {
   audio: Partial<Record<TourLanguage, string | null>>;
   live: {
     personnel: { id: string; name: string; position: string | null; avatar_url: string | null; is_primary: boolean }[];
+    headcount?: { position: string; quantity: number; shift: string | null }[]; // unnamed staff by position
+    people_total?: number; // named + headcount
     safety: {
       required_ppe: string[];
       hazards: { name: string; type: string; severity: string }[];
@@ -99,6 +101,25 @@ export interface TourViewStop {
   };
 }
 
+interface TourPhoto {
+  image_url: string;
+  caption: string | null;
+}
+
+/** Company profile as tours show it: blocks switched off in the profile come back empty */
+export interface TourCompanyProfile {
+  tagline: Translations | null;
+  about: Translations | null;
+  mission: Translations | null;
+  vision: Translations | null;
+  values: { title: Translations; description: Translations }[];
+  industry: string | null;
+  contact: { website: string | null; phone: string | null; email: string | null; address: string | null } | null;
+  photos: TourPhoto[];
+  plant: { description: string | null; photos: TourPhoto[] } | null;
+  plant_cover_url: string | null;
+}
+
 export interface TourView {
   tour: {
     id: string;
@@ -107,7 +128,7 @@ export interface TourView {
     languages: TourLanguage[];
     cover_image_url: string | null;
     plant_name: string;
-    organization: { name: string | null; logo_url: string | null };
+    organization: { name: string | null; logo_url: string | null; profile: TourCompanyProfile | null };
     status: 'draft' | 'published' | 'archived';
     public_code: string | null;
     version: number | null;

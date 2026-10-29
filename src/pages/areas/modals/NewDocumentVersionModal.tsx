@@ -182,7 +182,7 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
       }
     } catch (error: any) {
       console.error('Error creating document version:', error);
-      alert('Error al crear nueva versión. Por favor intenta de nuevo.');
+      alert(error.response?.data?.message || 'Error al crear nueva versión. Por favor intenta de nuevo.');
       setUploading(false);
     }
   };
@@ -195,9 +195,15 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between rounded-t-lg flex-shrink-0">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Nueva Versión de Documento</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {document.document_type === 'pending' ? 'Subir archivo' : 'Nueva Versión de Documento'}
+            </h2>
             <p className="text-sm text-gray-600 mt-1">
-              {document.title} <span className="text-gray-400">•</span> Versión actual: v{document.version}
+              {document.document_code && <span className="font-mono text-blue-700">{document.document_code} · </span>}
+              {document.title} <span className="text-gray-400">•</span>{' '}
+              {document.document_type === 'pending'
+                ? `Registrado sin archivo (v${document.version}); el archivo se guardará como v${Number.parseInt(document.version, 10) + 1}.0`
+                : `Versión actual: v${document.version}`}
             </p>
           </div>
           <button
@@ -211,7 +217,7 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
 
         {/* Body - Horizontal Layout */}
         <div className="p-6 overflow-y-auto flex-1">
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* Left Column - File Selection or URL Input */}
             <div>
               {documentSource === 'uploaded' ? (

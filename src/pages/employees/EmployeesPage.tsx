@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Users, MapPin, Building2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, MapPin, Building2, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import EmployeeModal from './EmployeeModal';
 import { getEmployees, deleteEmployee, type Employee } from '../../api/employees';
 import { getOrganizations } from '../../api/organizations';
-import { getPlants } from '../../api/plants';
+import { getPlant, getPlants } from '../../api/plants';
 import type { PlantScopedProps } from '../plants/plantScope';
+import { personName } from '../../utils/personName';
+import ImportEmployeesModal from './import/ImportEmployeesModal';
+import EmployeeDetailModal from '../../components/employees/EmployeeDetailModal';
 
 const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
@@ -19,6 +22,10 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null); // record with responsibilities
+  // Plant name for the import (already cached by the plant workspace)
+  const { data: plant } = useQuery({ queryKey: ['plant', plantId], queryFn: () => getPlant(plantId!), enabled: embedded });
   const queryClient = useQueryClient();
 
   // Fetch organizations
@@ -67,7 +74,7 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   };
 
   const handleDelete = (employee: Employee) => {
-    if (window.confirm(`¿Estás seguro de eliminar a ${employee.first_name} ${employee.last_name}?`)) {
+    if (window.confirm(`¿Estás seguro de eliminar a ${personName(employee)}?`)) {
       deleteMutation.mutate(employee.id);
     }
   };
@@ -84,7 +91,7 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
 
   // Get unique departments from employees
   const departments = Array.from(
-    new Set(employeesData?.employees.map((e) => e.department) || [])
+    new Set(employeesData?.employees.map((e) => e.department).filter(Boolean) || [])
   ).sort();
 
   return (
@@ -101,10 +108,19 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
         )}
 
         {selectedOrg && (
-          <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Empleado
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {/* Import works on one plant: available inside the plant workspace */}
+            {embedded && (
+              <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+                <FileSpreadsheet className="h-4 w-4" />
+                Importar Excel
+              </Button>
+            )}
+            <Button onClick={handleCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo Empleado
+            </Button>
+          </div>
         )}
       </div>
 
@@ -261,7 +277,13 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {employee.first_name} {employee.last_name}
+                          <button
+                            type="button"
+                            onClick={() => setDetailEmployeeId(employee.id)}
+                            className="text-left hover:text-blue-700 hover:underline"
+                          >
+                            {personName(employee)}
+                          </button>
                         </div>
                         <div className="text-sm text-gray-500">{employee.email}</div>
                       </div>
@@ -306,7 +328,7 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {employee.manager ? (
                         <div className="text-sm text-gray-900">
-                          {employee.manager.first_name} {employee.manager.last_name}
+                          {personName(employee.manager)}
                         </div>
                       ) : (
                         <span className="text-sm text-gray-400">-</span>
@@ -322,11 +344,15 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                         <button
                           onClick={() => handleEdit(employee)}
                           className="text-blue-600 hover:text-blue-900"
+                          aria-label={`Editar a ${personName(employee)}`}
+                          title="Editar"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(employee)}
+                          aria-label={`Eliminar a ${personName(employee)}`}
+                          title="Eliminar"
                           className="text-red-600 hover:text-red-900"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -356,6 +382,10 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
         employee={editingEmployee}
         organizationId={selectedOrg}
       />
+      <EmployeeDetailModal isOpen={!!detailEmployeeId} onClose={() => setDetailEmployeeId(null)} employeeId={detailEmployeeId} />
+      {embedded && (
+        <ImportEmployeesModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} plantId={plantId!} plantName={plant?.name || 'la planta'} />
+      )}
     </div>
   );
 };

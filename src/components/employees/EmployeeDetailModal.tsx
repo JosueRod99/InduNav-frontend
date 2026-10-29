@@ -3,6 +3,8 @@ import { X, User, Mail, Phone, Briefcase, Building2, Calendar, MapPin, Award, Us
 import { getEmployee } from '../../api/employees';
 import { getAssignmentsByEmployee } from '../../api/areaAssignments';
 import Badge from '../ui/Badge';
+import { personName } from '../../utils/personName';
+import EmployeeResponsibilities from '../responsibles/EmployeeResponsibilities';
 
 interface EmployeeDetailModalProps {
   isOpen: boolean;
@@ -42,7 +44,7 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {isLoading ? 'Cargando...' : `${employee?.first_name} ${employee?.last_name}`}
+                {isLoading ? 'Cargando...' : personName(employee)}
               </h2>
               {employee?.employee_number && (
                 <p className="text-sm text-gray-500 font-mono">{employee.employee_number}</p>
@@ -83,7 +85,7 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
                 <InfoRow
                   icon={<Calendar className="h-4 w-4 text-gray-500" />}
                   label="Fecha de Contratación"
-                  value={new Date(employee.hire_date).toLocaleDateString()}
+                  value={employee.hire_date ? new Date(employee.hire_date).toLocaleDateString('es-MX') : 'No registrada'}
                 />
                 {employee.organization && (
                   <InfoRow
@@ -246,6 +248,9 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
                 </div>
               )}
             </div>
+
+            {/* Areas this person is in charge of (independent of where they work) */}
+            <EmployeeResponsibilities employee={employee} />
 
             {/* Status */}
             <div className="pt-4 border-t border-gray-200">
