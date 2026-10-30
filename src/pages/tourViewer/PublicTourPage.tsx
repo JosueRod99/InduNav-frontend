@@ -27,11 +27,6 @@ const PublicTourPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  const title = view?.tour.title.es;
-  useEffect(() => {
-    if (title) document.title = title;
-  }, [title]);
-
   if (isLoading) {
     return (
       <Centered>

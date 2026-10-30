@@ -70,10 +70,6 @@ const PlantWorkspacePage = () => {
     enabled: !!plant?.organization_id,
   });
 
-  useEffect(() => {
-    if (plant?.name) document.title = `${plant.name} · InduNav`;
-  }, [plant?.name]);
-
   // On small screens the tab bar scrolls: keep the active tab visible
   const activeTabRef = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
