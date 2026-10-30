@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Trash2, Square, Upload, PenTool, LayoutGrid } from 'lucide-react';
+import { MapPin, Trash2, Square, Upload, PenTool, LayoutGrid, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -10,11 +10,13 @@ import LinkAreaModal from './LinkAreaModal';
 import LayoutModal from './LayoutModal';
 import { getPlants } from '../../api/plants';
 import { getLayouts } from '../../api/layouts';
-import { getAreasByLayout } from '../../api/areaRepresentations';
-import { deleteRepresentation, updateRepresentation, type AreaPhysicalRepresentation } from '../../api/areaRepresentations';
+import { getAreasByLayout, getRepresentationsByArea } from '../../api/areaRepresentations';
+import { floorLabel, sortFloors } from '../../utils/floors';
+import { deleteRepresentation, updateRepresentation, type AreaGeometry, type AreaPhysicalRepresentation } from '../../api/areaRepresentations';
 import { useAuthStore } from '../../store/authStore';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
+import { addZone, removeZone, replaceZone, ringFromLeaflet, zoneAsPolygon, zonesOf } from '../../utils/areaGeometry';
 
 const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
@@ -22,9 +24,11 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   const [selectedPlantId, setSelectedPlantId] = useState<string>(plantId ?? '');
   const [selectedFloor, setSelectedFloor] = useState<number>(0);
   const [selectedArea, setSelectedArea] = useState<AreaPhysicalRepresentation | null>(null);
+  const [selectedZone, setSelectedZone] = useState(0); // zone of the selected area (areas can have several)
   const [isLinkAreaModalOpen, setIsLinkAreaModalOpen] = useState(false);
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
+  const [addingZone, setAddingZone] = useState(false); // drawing another zone of the selected area
   const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
   // Names on the map (always / on hover) and the area under the mouse, shared by map and list
@@ -64,6 +68,26 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
     enabled: !!currentLayout?.id,
   });
 
+  // Other floors where the selected area is drawn (same area, not a duplicate)
+  const { data: selectedAreaDrawings = [] } = useQuery({
+    queryKey: ['area-representations', selectedArea?.organizational_area_id],
+    queryFn: () => getRepresentationsByArea(selectedArea!.organizational_area_id),
+    enabled: !!selectedArea,
+  });
+  const otherFloors = sortFloors(
+    selectedAreaDrawings
+      .filter((r) => r.layout && !r.layout.organizational_area_id && r.floor_level !== selectedFloor)
+      .map((r) => r.floor_level)
+  );
+
+  const goToFloor = (level: number) => {
+    setSelectedArea(null);
+    setDrawMode(false);
+    setEditMode(false);
+    setAddingZone(false);
+    setSelectedFloor(level);
+  };
+
   // Delete representation mutation
   const deleteMutation = useMutation({
     mutationFn: deleteRepresentation,
@@ -78,12 +102,12 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
     },
   });
 
-  // Update representation geometry mutation
+  // Update representation geometry mutation (edit, add or remove a zone)
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; geometry: any }) =>
+    mutationFn: (data: { id: string; geometry: AreaGeometry; message: string }) =>
       updateRepresentation(data.id, { geometry: data.geometry }),
-    onSuccess: () => {
-      toast.success('Geometría actualizada exitosamente');
+    onSuccess: (_, data) => {
+      toast.success(data.message);
       queryClient.invalidateQueries({ queryKey: ['layout-areas'] });
       queryClient.invalidateQueries({ queryKey: ['area-representations'] });
       setSelectedArea(null);
@@ -93,12 +117,18 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
     },
   });
 
-  const handleAreaClick = (area: AreaPhysicalRepresentation) => {
+  const handleAreaClick = (area: AreaPhysicalRepresentation, zoneIndex: number) => {
     setSelectedArea(area);
+    setSelectedZone(zoneIndex);
   };
 
   const handleDeleteArea = () => {
-    if (selectedArea && window.confirm('¿Estás seguro de eliminar esta representación física del área?')) {
+    const zones = selectedArea ? zonesOf(selectedArea.geometry).length : 0;
+    const message =
+      zones > 1
+        ? `¿Quitar ${selectedArea!.display_name || selectedArea!.organizational_area?.name} del plano? Se borran sus ${zones} zonas; el área sigue existiendo.`
+        : '¿Estás seguro de eliminar esta representación física del área?';
+    if (selectedArea && window.confirm(message)) {
       deleteMutation.mutate(selectedArea.id);
     }
   };
@@ -106,7 +136,26 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   const handleStartDrawing = () => {
     setDrawMode(true);
     setEditMode(false);
+    setAddingZone(false);
     setSelectedArea(null);
+  };
+
+  const handleStartAddingZone = () => {
+    if (!selectedArea) return;
+    setAddingZone(true);
+    setDrawMode(true);
+    setEditMode(false);
+  };
+
+  const cancelDrawing = () => {
+    setDrawMode(false);
+    setAddingZone(false);
+  };
+
+  const handleDeleteZone = () => {
+    if (!selectedArea) return;
+    if (!window.confirm(`¿Eliminar la zona ${selectedZone + 1} de ${selectedAreaName}? Las demás zonas del área se conservan.`)) return;
+    updateMutation.mutate({ id: selectedArea.id, geometry: removeZone(selectedArea.geometry, selectedZone), message: 'Zona eliminada' });
   };
 
   const handleStartEditing = () => {
@@ -117,6 +166,11 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   };
 
   const handleAreaDrawn = (coordinates: number[][]) => {
+    if (addingZone && selectedArea) {
+      cancelDrawing();
+      updateMutation.mutate({ id: selectedArea.id, geometry: addZone(selectedArea.geometry, ringFromLeaflet(coordinates)), message: 'Zona agregada' });
+      return;
+    }
     setDrawnCoordinates(coordinates);
     setDrawMode(false);
     setEditMode(false);
@@ -125,19 +179,17 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
 
   const handleAreaEdited = async (coordinates: number[][]) => {
     if (!selectedArea) return;
-
-    // Convert Leaflet coordinates [lat, lng] to GeoJSON [lng, lat]
-    const geoJsonCoords = coordinates.map(coord => [coord[1], coord[0]]);
-    const closedCoords = [...geoJsonCoords, geoJsonCoords[0]];
-
-    const updatedGeometry = {
-      type: 'Polygon' as const,
-      coordinates: [closedCoords],
-    };
-
-    updateMutation.mutate({ id: selectedArea.id, geometry: updatedGeometry });
+    // Only the edited zone changes; the other zones of the area stay as they are
+    updateMutation.mutate({
+      id: selectedArea.id,
+      geometry: replaceZone(selectedArea.geometry, selectedZone, ringFromLeaflet(coordinates)),
+      message: 'Forma actualizada',
+    });
     setEditMode(false);
   };
+
+  const selectedAreaName = selectedArea?.display_name || selectedArea?.organizational_area?.name || 'el área';
+  const selectedZoneCount = selectedArea ? zonesOf(selectedArea.geometry).length : 0;
 
   const handleCloseModal = () => {
     setIsLinkAreaModalOpen(false);
@@ -180,7 +232,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                   )}
                 </>
               ) : drawMode ? (
-                <Button onClick={() => setDrawMode(false)} variant="outline">
+                <Button onClick={cancelDrawing} variant="outline">
                   Cancelar Dibujo
                 </Button>
               ) : (
@@ -257,17 +309,20 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
               areas={areaRepresentations}
               onAreaClick={handleAreaClick}
               selectedAreaId={selectedArea?.id}
+              selectedZoneIndex={selectedZone}
               showAreaLabels
               labelMode={labelMode}
               highlightedId={drawMode || editMode ? null : hovered?.id ?? null}
               onShapeHover={(id) => !drawMode && !editMode && setHovered(id ? { id, from: 'map' } : null)}
               drawMode={drawMode}
+              drawTitle={addingZone ? `Nueva zona de ${selectedAreaName}` : undefined}
               editMode={editMode}
               editingArea={
                 editMode && selectedArea
                   ? {
                       id: selectedArea.id,
-                      geometry: selectedArea.geometry,
+                      geometry: zoneAsPolygon(selectedArea.geometry, selectedZone),
+                      zoneIndex: selectedZone,
                       name: selectedArea.display_name || selectedArea.organizational_area?.name,
                       color: selectedArea.display_color || selectedArea.organizational_area?.color || undefined,
                     }
@@ -275,7 +330,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
               }
               onAreaDrawn={handleAreaDrawn}
               onAreaEdited={handleAreaEdited}
-              onCancelDraw={() => setDrawMode(false)}
+              onCancelDraw={cancelDrawing}
               onCancelEdit={() => setEditMode(false)}
             />
           </div>
@@ -300,6 +355,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                   const area = areaRep.organizational_area;
                   const displayName = areaRep.display_name || area?.name || 'Sin nombre';
                   const displayColor = areaRep.display_color || area?.color || '#3B82F6';
+                  const zoneCount = zonesOf(areaRep.geometry).length;
 
                   return (
                     <div
@@ -308,7 +364,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                         if (el) listRows.current.set(areaRep.id, el);
                         else listRows.current.delete(areaRep.id);
                       }}
-                      onClick={() => setSelectedArea(areaRep)}
+                      onClick={() => handleAreaClick(areaRep, 0)}
                       onMouseEnter={() => setHovered({ id: areaRep.id, from: 'list' })}
                       onMouseLeave={() => setHovered(null)}
                       className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
@@ -327,6 +383,9 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                         <span className="font-medium text-sm text-gray-900">
                           {displayName}
                         </span>
+                        {zoneCount > 1 && (
+                          <span className="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{zoneCount} zonas</span>
+                        )}
                       </div>
 
                       {area?.code && (
@@ -371,9 +430,31 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                   </div>
                 )}
 
+                {otherFloors.length > 0 && (
+                  <p className="mb-3 flex flex-wrap items-center gap-1 text-xs text-gray-600">
+                    También en:
+                    {otherFloors.map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => goToFloor(level)}
+                        className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700 hover:bg-blue-100"
+                      >
+                        {floorLabel(level)}
+                      </button>
+                    ))}
+                  </p>
+                )}
+
+                {selectedZoneCount > 1 && (
+                  <p className="mb-3 text-xs text-gray-600">
+                    Zona <strong>{selectedZone + 1}</strong> de {selectedZoneCount} seleccionada (resaltada en el plano). Da clic en otra zona
+                    del área para elegirla.
+                  </p>
+                )}
+
                 <div className="space-y-2">
                   <Button
-                    onClick={() => navigate(`/areas/${selectedArea.organizational_area_id}?tab=layout`)}
+                    onClick={() => navigate(`/areas/${selectedArea.organizational_area_id}?tab=layout&floor=${selectedFloor}`)}
                     className="w-full gap-2 justify-center"
                   >
                     <LayoutGrid className="h-4 w-4" />
@@ -385,14 +466,28 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                     variant="outline"
                   >
                     <PenTool className="h-4 w-4" />
-                    Editar Geometría
+                    {selectedZoneCount > 1 ? `Editar zona ${selectedZone + 1}` : 'Editar Geometría'}
                   </Button>
+                  <Button onClick={handleStartAddingZone} className="w-full gap-2 justify-center" variant="outline">
+                    <Plus className="h-4 w-4" />
+                    Agregar otra zona
+                  </Button>
+                  {selectedZoneCount > 1 && (
+                    <Button
+                      onClick={handleDeleteZone}
+                      className="w-full gap-2 justify-center border-red-300 text-red-700 hover:bg-red-50"
+                      variant="outline"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Eliminar zona {selectedZone + 1}
+                    </Button>
+                  )}
                   <Button
                     onClick={handleDeleteArea}
                     className="w-full gap-2 justify-center bg-red-600 hover:bg-red-700"
                   >
                     <Trash2 className="h-4 w-4" />
-                    Eliminar Representación
+                    {selectedZoneCount > 1 ? 'Quitar el área del plano' : 'Eliminar Representación'}
                   </Button>
                 </div>
               </div>

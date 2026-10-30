@@ -5,16 +5,18 @@ import { Check, RotateCcw, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import type { AreaPhysicalRepresentation, GeoJSONPolygon } from '../../api/areaRepresentations';
 import Button from '../../components/ui/Button';
+import { zonesOf } from '../../utils/areaGeometry';
 import {
   EQUIPMENT_STATUS_COLORS,
   EQUIPMENT_STATUS_LABELS,
   type EquipmentStatus,
 } from '../../api/equipment';
 
-// Any polygon that can be edited point by point (area representation or equipment footprint)
+// Any polygon that can be edited point by point (one zone of an area, or an equipment footprint)
 export interface EditableShape {
   id: string;
   geometry: GeoJSONPolygon;
+  zoneIndex?: number; // zone of the area being edited (areas can have several zones)
   color?: string;
   name?: string;
 }
@@ -37,10 +39,12 @@ const STATUS_DASH: Partial<Record<EquipmentStatus, string>> = {
 interface LayoutMapProps {
   imageUrl: string | null;
   imageBounds?: L.LatLngBoundsExpression; // defaults to the full 0–1000 canvas
-  outline?: number[][] | null; // boundary of the parent area, GeoJSON [x, y]
+  outlines?: number[][][] | null; // boundary of each zone of the parent area, GeoJSON [x, y]
+  outline?: number[][] | null; // single boundary (the demo tour still passes this)
   areas: AreaPhysicalRepresentation[];
-  onAreaClick?: (area: AreaPhysicalRepresentation) => void;
+  onAreaClick?: (area: AreaPhysicalRepresentation, zoneIndex: number) => void;
   selectedAreaId?: string | null;
+  selectedZoneIndex?: number | null; // zone of the selected area to outline thicker (areas with several zones)
   footprints?: MapFootprint[];
   onFootprintClick?: (footprint: MapFootprint) => void;
   selectedFootprintId?: string | null;
@@ -69,6 +73,10 @@ const DEFAULT_FOOTPRINT_COLOR = '#334155';
 const OUTSIDE_MASK_RING: L.LatLngExpression[] = [[-5000, -5000], [-5000, 6000], [6000, 6000], [6000, -5000]];
 
 const toLeaflet = (coords: number[][]) => coords.map((c) => [c[1], c[0]] as L.LatLngExpression);
+
+// Part of a shape's React key: Leaflet does not move a permanent tooltip when the polygon's points
+// change, so a reshaped polygon is mounted again and its name label lands on the new position
+const shapeKey = (ring: number[][]) => `${ring.length}:${ring.reduce((sum, [x, y]) => sum + x * 3 + y, 0).toFixed(2)}`;
 
 // Component to fit the map to the layout canvas
 function MapBoundsHandler() {
@@ -343,7 +351,10 @@ function EditingHandler({
   const polygonRef = useRef<L.Polygon | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
 
-  // Load points from editing area
+  // Load the points once when editing starts (or switches to another shape/zone). Keyed by id and
+  // zone, not by the object: callers build a new object on every render, and a background refetch
+  // re-rendering them must not wipe the points being edited.
+  const editKey = editMode && editingArea ? `${editingArea.id}:${editingArea.zoneIndex ?? 0}` : null;
   useEffect(() => {
     if (!editMode || !editingArea) {
       setPoints([]);
@@ -359,7 +370,8 @@ function EditingHandler({
       const leafletPoints = uniqueCoords.map(coord => L.latLng(coord[1], coord[0]));
       setPoints(leafletPoints);
     }
-  }, [editMode, editingArea]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editKey]);
 
   // Clear all markers and polygon
   const clearDrawing = () => {
@@ -635,10 +647,12 @@ interface ExtendedLayoutMapProps extends LayoutMapProps {
 const LayoutMap = ({
   imageUrl,
   imageBounds = CANVAS_BOUNDS,
+  outlines,
   outline,
   areas,
   onAreaClick,
   selectedAreaId,
+  selectedZoneIndex = null,
   footprints = [],
   onFootprintClick,
   selectedFootprintId,
@@ -659,7 +673,9 @@ const LayoutMap = ({
   onCancelDraw,
   onCancelEdit
 }: ExtendedLayoutMapProps) => {
-  const isEditing = (id: string) => editMode && editingArea?.id === id;
+  const parentZones = (outlines || (outline ? [outline] : [])).filter((ring) => ring.length >= 3);
+  const isEditing = (id: string, zoneIndex = 0) =>
+    editMode && editingArea?.id === id && (editingArea.zoneIndex ?? 0) === zoneIndex;
   const hoverHandlers = (id: string) =>
     onShapeHover
       ? { mouseover: () => onShapeHover(id), mouseout: () => onShapeHover(null) }
@@ -729,65 +745,68 @@ const LayoutMap = ({
           </>
         )}
 
-        {/* Dim everything outside the parent area so the view focuses on it */}
-        {outline && outline.length >= 3 && (
+        {/* Dim everything outside the parent area (every zone is a hole) so the view focuses on it */}
+        {parentZones.length > 0 && (
           <Polygon
-            positions={[OUTSIDE_MASK_RING, toLeaflet(outline)]}
+            positions={[OUTSIDE_MASK_RING, ...parentZones.map(toLeaflet)]}
             pathOptions={{ stroke: false, fillColor: '#F8FAFC', fillOpacity: 0.7 }}
             interactive={false}
           />
         )}
 
-        {/* Boundary of the parent area (area internal layouts) */}
-        {outline && outline.length >= 3 && (
+        {/* Boundary of each zone of the parent area (area internal layouts) */}
+        {parentZones.map((ring, i) => (
           <Polygon
-            positions={toLeaflet(outline)}
+            key={`outline-${i}`}
+            positions={toLeaflet(ring)}
             pathOptions={{ color: '#1E3A8A', weight: 3, dashArray: '8 6', fill: false }}
             interactive={false}
           />
+        ))}
+
+        {/* Every zone of an area is drawn with the area's color and its own name label */}
+        {areas.flatMap((area) =>
+          zonesOf(area.geometry).map((ring, zoneIndex) => {
+            // Don't render the zone being edited (EditingHandler handles it)
+            if (isEditing(area.id, zoneIndex)) return null;
+
+            // Get color from display_color, or fall back to organizational area color
+            const areaColor = area.display_color || area.organizational_area?.color || '#3B82F6';
+            const isHighlighted = highlightedId === area.id;
+            const isActive = selectedAreaId === area.id || isHighlighted;
+            const isSelectedZone = selectedAreaId === area.id && selectedZoneIndex === zoneIndex;
+            const labelPermanent = labelMode === 'permanent' || isActive;
+
+            return (
+              <Polygon
+                key={`${area.id}-${zoneIndex}-${shapeKey(ring)}`}
+                positions={toLeaflet(ring)}
+                pathOptions={{
+                  color: areaColor,
+                  fillColor: areaColor,
+                  fillOpacity: isActive ? 0.6 : 0.3,
+                  weight: isHighlighted || isSelectedZone ? 4 : isActive ? 3 : 2,
+                }}
+                eventHandlers={{
+                  click: () => onAreaClick?.(area, zoneIndex),
+                  ...hoverHandlers(area.id),
+                }}
+              >
+                {showAreaLabels && (
+                  // key forces a remount: Leaflet does not toggle `permanent` on an existing tooltip
+                  <Tooltip
+                    key={labelPermanent ? 'permanent' : 'hover'}
+                    permanent={labelPermanent}
+                    direction="center"
+                    className="area-name-label"
+                  >
+                    {area.display_name || area.organizational_area?.name}
+                  </Tooltip>
+                )}
+              </Polygon>
+            );
+          })
         )}
-
-        {areas.map((area) => {
-          if (!area.geometry?.coordinates?.[0]) return null;
-
-          // Don't render the shape being edited (EditingHandler handles it)
-          if (isEditing(area.id)) return null;
-
-          // Get color from display_color, or fall back to organizational area color
-          const areaColor = area.display_color || area.organizational_area?.color || '#3B82F6';
-          const isHighlighted = highlightedId === area.id;
-          const isActive = selectedAreaId === area.id || isHighlighted;
-          const labelPermanent = labelMode === 'permanent' || isActive;
-
-          return (
-            <Polygon
-              key={area.id}
-              positions={toLeaflet(area.geometry.coordinates[0])}
-              pathOptions={{
-                color: areaColor,
-                fillColor: areaColor,
-                fillOpacity: isActive ? 0.6 : 0.3,
-                weight: isHighlighted ? 4 : isActive ? 3 : 2,
-              }}
-              eventHandlers={{
-                click: () => onAreaClick?.(area),
-                ...hoverHandlers(area.id),
-              }}
-            >
-              {showAreaLabels && (
-                // key forces a remount: Leaflet does not toggle `permanent` on an existing tooltip
-                <Tooltip
-                  key={labelPermanent ? 'permanent' : 'hover'}
-                  permanent={labelPermanent}
-                  direction="center"
-                  className="area-name-label"
-                >
-                  {area.display_name || area.organizational_area?.name}
-                </Tooltip>
-              )}
-            </Polygon>
-          );
-        })}
 
         {/* Route through the areas (tour order) */}
         {route && route.length >= 2 && (
@@ -809,7 +828,7 @@ const LayoutMap = ({
 
           return (
             <Polygon
-              key={fp.id}
+              key={`${fp.id}-${shapeKey(fp.geometry.coordinates[0])}`}
               positions={toLeaflet(fp.geometry.coordinates[0])}
               pathOptions={{
                 color: isSelected ? '#F59E0B' : isHighlighted ? '#2563EB' : '#0F172A',

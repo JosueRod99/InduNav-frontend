@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Building2, LayoutGrid, MapPin, Package, Wrench, X } from 'lucide-react';
 import LayoutMap, { type MapFootprint } from '../../layouts/LayoutMap';
 import type { AreaPhysicalRepresentation, GeoJSONPolygon } from '../../../api/areaRepresentations';
+import { geometryFromZones } from '../../../utils/areaGeometry';
 import {
   EQUIPMENT_STATUS_COLORS,
   EQUIPMENT_STATUS_LABELS,
@@ -21,14 +22,14 @@ import {
 export interface ViewerArea {
   id: string;
   name: string;
-  polygon: number[][]; // GeoJSON ring in plant layout coordinates
+  zones: number[][][]; // GeoJSON ring of each zone, plant layout coordinates
   description?: string;
 }
 
 export interface ViewerShape {
   id: string;
   name: string;
-  polygon: number[][]; // area interior layout coordinates
+  zones: number[][][]; // area interior layout coordinates
   color?: string;
 }
 
@@ -45,7 +46,7 @@ export interface ViewerEquipment {
 export interface ViewerInterior {
   imageUrl: string | null;
   imageBounds?: [[number, number], [number, number]];
-  outline?: number[][] | null;
+  outlines?: number[][][] | null;
   subAreas: ViewerShape[];
   equipment: ViewerEquipment[];
 }
@@ -87,21 +88,23 @@ const bbox = (ring: number[][]) => ({
   y2: Math.max(...ring.map((p) => p[1])),
 });
 
-// Equipment belongs to the zone whose bounding box contains its center
-const isInside = (inner: number[][], outer: number[][]) => {
+// Equipment belongs to the subarea one of whose zones' bounding box contains its center
+const isInside = (inner: number[][], zones: number[][][]) => {
   const a = bbox(inner);
-  const b = bbox(outer);
   const cx = (a.x1 + a.x2) / 2;
   const cy = (a.y1 + a.y2) / 2;
-  return cx >= b.x1 && cx <= b.x2 && cy >= b.y1 && cy <= b.y2;
+  return zones.some((zone) => {
+    const b = bbox(zone);
+    return cx >= b.x1 && cx <= b.x2 && cy >= b.y1 && cy <= b.y2;
+  });
 };
 
 // LayoutMap renders AreaPhysicalRepresentation; build a minimal one for display only
-const toRepresentation = (id: string, name: string, ring: number[][], color: string): AreaPhysicalRepresentation => ({
+const toRepresentation = (id: string, name: string, zones: number[][][], color: string): AreaPhysicalRepresentation => ({
   id,
   organizational_area_id: id,
   layout_id: null,
-  geometry: polygonOf(ring),
+  geometry: geometryFromZones(zones),
   floor_level: 0,
   display_name: name,
   display_color: color,
@@ -163,8 +166,8 @@ const TourMapViewer = ({
     return {
       imageUrl: interior.imageUrl,
       imageBounds: interior.imageBounds,
-      outline: interior.outline || null,
-      subAreas: interior.subAreas.map((s) => toRepresentation(s.id, s.name, s.polygon, s.color || '#3B82F6')),
+      outlines: interior.outlines || null,
+      subAreas: interior.subAreas.map((s) => toRepresentation(s.id, s.name, s.zones, s.color || '#3B82F6')),
       footprints: interior.equipment.map<MapFootprint>((e) => ({
         id: e.id,
         geometry: polygonOf(e.polygon),
@@ -177,7 +180,7 @@ const TourMapViewer = ({
   const plantAreas = useMemo(
     () =>
       areas.map((a) =>
-        toRepresentation(a.id, a.name, a.polygon, a.id === currentAreaId ? CURRENT_AREA_COLOR : OTHER_AREA_COLOR)
+        toRepresentation(a.id, a.name, a.zones, a.id === currentAreaId ? CURRENT_AREA_COLOR : OTHER_AREA_COLOR)
       ),
     [areas, currentAreaId]
   );
@@ -190,7 +193,7 @@ const TourMapViewer = ({
   const selectedEquipment = view === 'interior' ? equipment.find((e) => e.id === selectedId) : undefined;
   const hasSelection = !!(selectedArea || selectedZone || selectedEquipment);
 
-  const zoneOf = (e: ViewerEquipment) => subAreas.find((s) => isInside(e.polygon, s.polygon));
+  const zoneOf = (e: ViewerEquipment) => subAreas.find((s) => isInside(e.polygon, s.zones));
 
   // ---------- Pieces ----------
   const listRow = (id: string, swatch: ReactNode, title: string, subtitle?: ReactNode) => (
@@ -308,7 +311,7 @@ const TourMapViewer = ({
             <p className="text-sm font-semibold text-slate-900">{selectedZone.name}</p>
           </div>
           {(() => {
-            const inZone = equipment.filter((e) => isInside(e.polygon, selectedZone.polygon));
+            const inZone = equipment.filter((e) => isInside(e.polygon, selectedZone.zones));
             return inZone.length === 0 ? (
               <p className="text-xs text-slate-500">{tr('Sin equipos en esta zona', 'No machines in this zone')}</p>
             ) : (
@@ -451,7 +454,7 @@ const TourMapViewer = ({
               key={`interior-${currentAreaId}`}
               imageUrl={interiorView.imageUrl}
               imageBounds={interiorView.imageBounds}
-              outline={interiorView.outline}
+              outlines={interiorView.outlines}
               areas={interiorView.subAreas}
               onAreaClick={(a) => setSelectedId(a.id)}
               selectedAreaId={selectedZone?.id ?? null}

@@ -139,8 +139,12 @@ const LinkAreaModal = ({
   const linkAreaMutation = useMutation({
     mutationFn: (payload: Omit<CreatePhysicalRepresentationRequest, 'organizational_area_id'>) =>
       createRepresentation(selectedAreaId!, payload),
-    onSuccess: () => {
-      toast.success('Área vinculada exitosamente al layout');
+    onSuccess: (representation) => {
+      toast.success(
+        representation.added_zone
+          ? 'El área ya estaba dibujada en este plano: se agregó como otra zona'
+          : 'Área vinculada exitosamente al layout'
+      );
       queryClient.invalidateQueries({ queryKey: ['areas'] });
       queryClient.invalidateQueries({ queryKey: ['layout-areas'] });
       queryClient.invalidateQueries({ queryKey: ['area-representations'] });

@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { GeoJSONPolygon } from './areaRepresentations';
+import type { AreaGeometry, GeoJSONPolygon } from './areaRepresentations';
 import type { EquipmentStatus, EquipmentType } from './equipment';
 import type { StopContent, TourLanguage, TourSection, Translations } from './tourBuilder';
 
@@ -18,14 +18,16 @@ export interface TourViewEquipment {
 }
 
 export interface TourViewInterior {
+  floor_level?: number;
   image_url: string | null;
   layout_data: {
     source?: 'plant_crop' | 'image' | 'blank';
     plant_image_url?: string | null;
     crop?: { x: number; y: number; scale: number };
     outline?: number[][];
+    outlines?: number[][][];
   };
-  sub_areas: { id: string; name: string; color: string | null; geometry: GeoJSONPolygon }[];
+  sub_areas: { id: string; name: string; color: string | null; geometry: AreaGeometry }[];
   footprints: {
     id: string;
     code: string;
@@ -108,7 +110,8 @@ export interface TourViewStop {
     }[];
     certified_people?: { name: string; count: number }[]; // people certifications of the area's staff, counts only
     location_available: boolean;
-    interior: TourViewInterior | null;
+    interior: TourViewInterior | null; // first floor's
+    interiors?: TourViewInterior[]; // one per floor the area has an internal layout on
   };
 }
 
@@ -144,12 +147,16 @@ export interface TourView {
     public_code: string | null;
     version: number | null;
   };
-  plant_layout: {
-    image_url: string | null;
-    areas: { area_id: string; name: string; geometry: GeoJSONPolygon }[];
-  } | null;
+  plant_layout: TourViewPlantLayout | null; // ground floor
+  plant_layouts?: TourViewPlantLayout[]; // every floor, ground floor first
   stops: TourViewStop[];
   is_preview: boolean;
+}
+
+export interface TourViewPlantLayout {
+  floor_level?: number;
+  image_url: string | null;
+  areas: { area_id: string; name: string; geometry: AreaGeometry }[];
 }
 
 /** Draft preview for the editor (authenticated) */

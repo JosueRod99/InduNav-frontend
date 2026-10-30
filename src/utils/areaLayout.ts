@@ -1,4 +1,5 @@
-import type { GeoJSONPolygon } from '../api/areaRepresentations';
+import type { AreaGeometry } from '../api/areaRepresentations';
+import { zonesBounds, zonesOf } from './areaGeometry';
 
 // Todos los layouts usan el mismo lienzo de Leaflet (CRS.Simple) de 0 a 1000
 export const LAYOUT_SIZE = 1000;
@@ -24,20 +25,40 @@ export interface AreaLayoutData {
   plant_image_url?: string | null;
   crop?: PlantCrop;
   outline?: number[][]; // contorno del área en coordenadas del layout interno, GeoJSON [x, y]
+  outlines?: number[][][]; // un contorno por zona (áreas con varias zonas); tiene prioridad sobre outline
 }
 
+type LayoutData = Partial<AreaLayoutData> | null | undefined;
+
+/** Contornos guardados del layout interno (los layouts anteriores solo tienen `outline`) */
+export const storedOutlines = (data: LayoutData): number[][][] | null =>
+  data?.outlines?.length ? data.outlines : data?.outline?.length ? [data.outline] : null;
+
+/** Zonas del área en la planta, llevadas al lienzo del layout interno con su recorte */
+export const outlinesForCrop = (plantGeometry: AreaGeometry, crop: PlantCrop): number[][][] =>
+  zonesOf(plantGeometry).map((ring) => ring.map(([x, y]) => [(x - crop.x) * crop.scale, (y - crop.y) * crop.scale]));
+
 /**
- * Calcula el recorte cuadrado que encierra el contorno del área en la planta,
- * y el contorno transformado al lienzo del layout interno.
+ * Contornos a mostrar en un layout interno recortado de la planta: se calculan en vivo desde el
+ * dibujo actual del área en la planta, así una zona agregada o editada después se ve sin rehacer
+ * el recorte. Sin dibujo en la planta se usan los contornos guardados.
  */
-export const computePlantCrop = (plantGeometry: GeoJSONPolygon) => {
-  const ring = plantGeometry.coordinates[0];
-  const xs = ring.map((c) => c[0]);
-  const ys = ring.map((c) => c[1]);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+export const liveOutlines = (data: LayoutData, plantGeometry: AreaGeometry | null | undefined) =>
+  data?.source === 'plant_crop' && data.crop && plantGeometry ? outlinesForCrop(plantGeometry, data.crop) : storedOutlines(data);
+
+/** ¿Alguna zona queda (aunque sea en parte) fuera del lienzo del recorte? */
+export const cropMissesZones = (data: LayoutData, plantGeometry: AreaGeometry | null | undefined) => {
+  if (data?.source !== 'plant_crop' || !data.crop || !plantGeometry) return false;
+  const outside = (v: number) => v < -0.5 || v > LAYOUT_SIZE + 0.5;
+  return outlinesForCrop(plantGeometry, data.crop).some((ring) => ring.some(([x, y]) => outside(x) || outside(y)));
+};
+
+/**
+ * Calcula el recorte cuadrado que encierra todas las zonas del área en la planta,
+ * y sus contornos transformados al lienzo del layout interno.
+ */
+export const computePlantCrop = (plantGeometry: AreaGeometry) => {
+  const { minX, maxX, minY, maxY } = zonesBounds(zonesOf(plantGeometry));
 
   const size = Math.max(maxX - minX, maxY - minY, 1) * (1 + CROP_PADDING * 2);
   const crop: PlantCrop = {
@@ -46,9 +67,9 @@ export const computePlantCrop = (plantGeometry: GeoJSONPolygon) => {
     scale: LAYOUT_SIZE / size,
   };
 
-  const outline = ring.map(([x, y]) => [(x - crop.x) * crop.scale, (y - crop.y) * crop.scale]);
+  const outlines = outlinesForCrop(plantGeometry, crop);
 
-  return { crop, outline };
+  return { crop, outline: outlines[0], outlines };
 };
 
 /**

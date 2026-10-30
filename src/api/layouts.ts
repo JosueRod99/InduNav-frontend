@@ -86,6 +86,12 @@ export const getLayout = async (id: string): Promise<PlantLayout> => {
 };
 
 // Internal layout of an organizational area (null when the area has none yet)
+/** Internal layouts of an area, one per floor */
+export const getAreaLayouts = async (areaId: string): Promise<PlantLayout[]> => {
+  const { data } = await apiClient.get(`/layouts/area/${areaId}/floors`);
+  return data.layouts || [];
+};
+
 export const getAreaLayout = async (areaId: string): Promise<PlantLayout | null> => {
   try {
     const { data } = await apiClient.get(`/layouts/area/${areaId}`);
@@ -109,6 +115,12 @@ export const createLayout = async (payload: CreateLayoutRequest): Promise<PlantL
 export const updateLayout = async (id: string, payload: UpdateLayoutRequest): Promise<PlantLayout> => {
   const { data } = await apiClient.patch(`/layouts/${id}`, payload);
   return data.layout || data;
+};
+
+/** Area internal layout cut from the plant plan: new crop; its subareas and equipment keep their physical place */
+export const recropAreaLayout = async (id: string, crop: { x: number; y: number; scale: number }, outlines: number[][][]) => {
+  const { data } = await apiClient.post(`/layouts/${id}/recrop`, { crop, outlines });
+  return data as { moved: { areas: number; equipment: number } };
 };
 
 export const deleteLayout = async (id: string): Promise<void> => {

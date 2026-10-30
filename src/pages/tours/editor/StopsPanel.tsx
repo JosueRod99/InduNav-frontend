@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Map as MapIcon, Plus, Settings2, Trash2 } from 'lucide-react';
 import SortableList from '../../../components/ui/SortableList';
 import LayoutMap from '../../layouts/LayoutMap';
+import { mainZone } from '../../../utils/areaGeometry';
 import { getLayouts } from '../../../api/layouts';
 import { getAreasByLayout, type AreaPhysicalRepresentation } from '../../../api/areaRepresentations';
 import type { BuilderStop } from '../../../api/tourBuilder';
@@ -64,8 +65,9 @@ const StopsPanel = ({ plantId, stops, selectedStopId, onSelect, onAdd, onAddArea
     () =>
       stops
         .map((s) => representations.find((r) => r.organizational_area_id === s.organizational_area_id))
-        .filter((r): r is AreaPhysicalRepresentation => !!r?.geometry?.coordinates?.[0])
-        .map((r) => centroid(r.geometry.coordinates[0])),
+        .map((r) => mainZone(r?.geometry))
+        .filter((ring): ring is number[][] => !!ring)
+        .map((ring) => centroid(ring)),
     [stops, representations]
   );
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import {
   PenTool,
   Trash2,
@@ -9,6 +10,7 @@ import {
   LayoutGrid,
   ExternalLink,
   MapPin,
+  Plus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
@@ -19,13 +21,15 @@ import LinkAreaModal from '../../layouts/LinkAreaModal';
 import AreaLayoutBackgroundModal from '../modals/AreaLayoutBackgroundModal';
 import PlaceEquipmentModal from '../modals/PlaceEquipmentModal';
 import { useAuthStore } from '../../../store/authStore';
-import { getAreaLayout } from '../../../api/layouts';
+import { getAreaLayouts, recropAreaLayout } from '../../../api/layouts';
+import { floorLabel, sortFloors } from '../../../utils/floors';
 import {
   getAreasByLayout,
   getRepresentationsByArea,
   updateRepresentation,
   deleteRepresentation,
   leafletToGeoJSON,
+  type AreaGeometry,
   type AreaPhysicalRepresentation,
 } from '../../../api/areaRepresentations';
 import {
@@ -37,8 +41,9 @@ import {
   EQUIPMENT_STATUS_LABELS,
   type EquipmentFootprint,
 } from '../../../api/equipment';
-import { plantImageBoundsForCrop, type AreaLayoutData } from '../../../utils/areaLayout';
+import { computePlantCrop, cropMissesZones, liveOutlines, plantImageBoundsForCrop, type AreaLayoutData } from '../../../utils/areaLayout';
 import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
+import { addZone, removeZone, replaceZone, ringFromLeaflet, zoneAsPolygon, zonesOf } from '../../../utils/areaGeometry';
 
 interface AreaLayoutTabProps {
   areaId: string;
@@ -49,7 +54,7 @@ interface AreaLayoutTabProps {
 const EDITOR_ROLES = ['platform_admin', 'org_owner'];
 
 type Selection =
-  | { kind: 'area'; item: AreaPhysicalRepresentation }
+  | { kind: 'area'; item: AreaPhysicalRepresentation; zoneIndex: number }
   | { kind: 'equipment'; item: EquipmentFootprint }
   | null;
 
@@ -61,6 +66,7 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
 
   const [selection, setSelection] = useState<Selection>(null);
   const [drawMode, setDrawMode] = useState(false);
+  const [addingZone, setAddingZone] = useState(false); // drawing another zone of the selected subarea
   const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
   const [drawnKind, setDrawnKind] = useState<'choose' | 'area' | 'equipment' | null>(null);
@@ -84,18 +90,36 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
   });
 
   // ---------- Data ----------
-  const { data: layout, isLoading: isLoadingLayout } = useQuery({
+  // One internal layout per floor the area is on
+  const { data: areaLayouts = [], isLoading: isLoadingLayout } = useQuery({
     queryKey: ['area-layout', areaId],
-    queryFn: () => getAreaLayout(areaId),
+    queryFn: () => getAreaLayouts(areaId),
   });
 
-  // Where this area is drawn on the plant layout (source for the crop background)
+  // Where this area is drawn on the plant layouts (source for the crop background), by floor
   const { data: representations = [] } = useQuery({
     queryKey: ['area-representations', areaId],
     queryFn: () => getRepresentationsByArea(areaId),
   });
-  const plantRepresentation =
-    representations.find((r) => r.layout && !r.layout.organizational_area_id) || null;
+  const plantRepresentations = representations.filter((r) => r.layout && !r.layout.organizational_area_id);
+  const floors = sortFloors([...plantRepresentations.map((r) => r.floor_level), ...areaLayouts.map((l) => l.floor_level)]);
+  // ?floor=N (from the plant layout of that floor) opens that floor's internal layout
+  const [searchParams] = useSearchParams();
+  const [chosenFloor, setChosenFloor] = useState<number | null>(() => {
+    const fromUrl = searchParams.get('floor');
+    return fromUrl !== null && Number.isInteger(Number(fromUrl)) ? Number(fromUrl) : null;
+  });
+  const floor = chosenFloor !== null && floors.includes(chosenFloor) ? chosenFloor : floors[0] ?? 0;
+  const layout = areaLayouts.find((l) => l.floor_level === floor) || null;
+  const plantRepresentation = plantRepresentations.find((r) => r.floor_level === floor) || null;
+
+  const changeFloor = (level: number) => {
+    setSelection(null);
+    setDrawMode(false);
+    setEditMode(false);
+    setAddingZone(false);
+    setChosenFloor(level);
+  };
 
   const { data: subAreas = [] } = useQuery({
     queryKey: ['layout-areas', layout?.id],
@@ -151,9 +175,9 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
 
   const updateGeometryMutation = useMutation({
     mutationFn: async ({ sel, coordinates }: { sel: NonNullable<Selection>; coordinates: number[][] }) => {
-      const geometry = leafletToGeoJSON(coordinates);
-      if (sel.kind === 'area') await updateRepresentation(sel.item.id, { geometry });
-      else await updateFootprint(sel.item.id, { geometry });
+      // Subareas: only the edited zone changes; the other zones stay as they are
+      if (sel.kind === 'area') await updateRepresentation(sel.item.id, { geometry: replaceZone(sel.item.geometry, sel.zoneIndex, ringFromLeaflet(coordinates)) });
+      else await updateFootprint(sel.item.id, { geometry: leafletToGeoJSON(coordinates) });
     },
     onSuccess: () => {
       toast.success('Forma actualizada');
@@ -180,14 +204,60 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
     },
   });
 
+  // An area zone added on the plant plan can fall outside the stored crop
+  const recropMutation = useMutation({
+    mutationFn: () => {
+      const { crop, outlines } = computePlantCrop(plantRepresentation!.geometry);
+      return recropAreaLayout(layout!.id, crop, outlines);
+    },
+    onSuccess: () => {
+      toast.success('Recorte ajustado: se ven todas las zonas del área');
+      queryClient.invalidateQueries({ queryKey: ['area-layout', areaId] });
+      invalidateDrawings();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'No se pudo ajustar el recorte');
+    },
+  });
+
   // ---------- Handlers ----------
   const startDrawing = () => {
     setSelection(null);
     setEditMode(false);
+    setAddingZone(false);
     setDrawMode(true);
   };
 
+  const cancelDrawing = () => {
+    setDrawMode(false);
+    setAddingZone(false);
+  };
+
+  const zoneMutation = useMutation({
+    mutationFn: ({ id, geometry }: { id: string; geometry: AreaGeometry; message: string }) => updateRepresentation(id, { geometry }),
+    onSuccess: (_, { message }) => {
+      toast.success(message);
+      invalidateDrawings();
+      setSelection(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Error al guardar la zona');
+    },
+  });
+
+  const handleDeleteZone = () => {
+    if (selection?.kind !== 'area') return;
+    const name = selection.item.organizational_area?.name || 'la subárea';
+    if (!window.confirm(`¿Eliminar la zona ${selection.zoneIndex + 1} de ${name}? Las demás zonas se conservan.`)) return;
+    zoneMutation.mutate({ id: selection.item.id, geometry: removeZone(selection.item.geometry, selection.zoneIndex), message: 'Zona eliminada' });
+  };
+
   const handleDrawn = (coordinates: number[][]) => {
+    if (addingZone && selection?.kind === 'area') {
+      cancelDrawing();
+      zoneMutation.mutate({ id: selection.item.id, geometry: addZone(selection.item.geometry, ringFromLeaflet(coordinates)), message: 'Zona agregada' });
+      return;
+    }
     setDrawMode(false);
     setDrawnCoordinates(coordinates);
     setDrawnKind(unplacedEquipment.length > 0 ? 'choose' : 'area');
@@ -217,7 +287,8 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
       ? selection.kind === 'area'
         ? {
             id: selection.item.id,
-            geometry: selection.item.geometry,
+            geometry: zoneAsPolygon(selection.item.geometry, selection.zoneIndex),
+            zoneIndex: selection.zoneIndex,
             name: selection.item.organizational_area?.name,
             color: selection.item.display_color || selection.item.organizational_area?.color || undefined,
           }
@@ -245,34 +316,62 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
       area={area}
       layout={layout || null}
       plantRepresentation={plantRepresentation}
+      floorLevel={floor}
     />
+  );
+
+  // Areas on several floors: one internal layout per floor
+  const floorTabs = floors.length > 1 && (
+    <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Piso">
+      <span className="text-sm text-gray-600">Piso:</span>
+      {floors.map((level) => (
+        <button
+          key={level}
+          role="tab"
+          aria-selected={level === floor}
+          onClick={() => changeFloor(level)}
+          className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+            level === floor ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          {floorLabel(level)}
+        </button>
+      ))}
+    </div>
   );
 
   if (!layout) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
-        <LayoutGrid className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Esta área no tiene layout interno</h3>
-        <p className="text-gray-600 mb-6 max-w-md mx-auto">
-          Crea un layout para dibujar sus subáreas y el espacio que ocupa cada herramienta o máquina.
-        </p>
-        {canEdit ? (
-          <Button onClick={() => setIsBackgroundModalOpen(true)} className="gap-2">
-            <PenTool className="h-4 w-4" />
-            Crear Layout
-          </Button>
-        ) : (
-          <p className="text-sm text-gray-500">Pide a un administrador que lo cree.</p>
-        )}
-        {backgroundModal}
+      <div className="space-y-4">
+        {floorTabs}
+        <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+          <LayoutGrid className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {floors.length > 1 ? `Esta área no tiene layout interno en ${floorLabel(floor)}` : 'Esta área no tiene layout interno'}
+          </h3>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Crea un layout para dibujar sus subáreas y el espacio que ocupa cada herramienta o máquina.
+          </p>
+          {canEdit ? (
+            <Button onClick={() => setIsBackgroundModalOpen(true)} className="gap-2">
+              <PenTool className="h-4 w-4" />
+              Crear Layout
+            </Button>
+          ) : (
+            <p className="text-sm text-gray-500">Pide a un administrador que lo cree.</p>
+          )}
+          {backgroundModal}
+        </div>
       </div>
     );
   }
 
   const isBusy = drawMode || editMode;
+  const selectedZoneCount = selection?.kind === 'area' ? zonesOf(selection.item.geometry).length : 0;
 
   return (
     <div className="space-y-4">
+      {floorTabs}
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -334,6 +433,20 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
         </div>
       </div>
 
+      {cropMissesZones(layoutData, plantRepresentation?.geometry) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm text-amber-900">
+            Una zona de <strong>{area?.name}</strong> queda fuera del recorte de este plano (se dibujó después en la planta).
+            {canEdit && ' Al ajustarlo, las subáreas y los equipos ya colocados se conservan en su lugar.'}
+          </p>
+          {canEdit && (
+            <Button size="sm" onClick={() => recropMutation.mutate()} isLoading={recropMutation.isPending} disabled={isBusy}>
+              Ajustar recorte
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Map */}
         {/* Fixed height when stacked (flex-1 alone would collapse it to 0 in the column layout) */}
@@ -341,10 +454,11 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
           <LayoutMap
             imageUrl={background.imageUrl}
             imageBounds={background.imageBounds}
-            outline={layoutData.outline}
+            outlines={liveOutlines(layoutData, plantRepresentation?.geometry)}
             areas={subAreas}
-            onAreaClick={(item) => !isBusy && setSelection({ kind: 'area', item })}
+            onAreaClick={(item, zoneIndex) => !isBusy && setSelection({ kind: 'area', item, zoneIndex })}
             selectedAreaId={selection?.kind === 'area' ? selection.item.id : null}
+            selectedZoneIndex={selection?.kind === 'area' ? selection.zoneIndex : null}
             footprints={mapFootprints}
             onFootprintClick={(fp) => {
               const item = footprints.find((f) => f.id === fp.id);
@@ -357,12 +471,16 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
             highlightedId={isBusy ? null : hovered?.id ?? null}
             onShapeHover={(id) => !isBusy && setHovered(id ? { id, from: 'map' } : null)}
             drawMode={drawMode}
-            drawTitle="Dibujando subárea o equipo"
+            drawTitle={
+              addingZone && selection?.kind === 'area'
+                ? `Nueva zona de ${selection.item.organizational_area?.name || 'la subárea'}`
+                : 'Dibujando subárea o equipo'
+            }
             editMode={editMode}
             editingArea={editingShape}
             onAreaDrawn={handleDrawn}
             onAreaEdited={handleEdited}
-            onCancelDraw={() => setDrawMode(false)}
+            onCancelDraw={cancelDrawing}
             onCancelEdit={() => setEditMode(false)}
           />
         </div>
@@ -377,6 +495,11 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
                   ? selection.item.organizational_area?.name
                   : selection.item.equipment_name}
               </p>
+              {selection.kind === 'area' && selectedZoneCount > 1 && (
+                <p className="text-xs text-blue-900/80">
+                  Zona {selection.zoneIndex + 1} de {selectedZoneCount} (resaltada). Da clic en otra zona para elegirla.
+                </p>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -404,8 +527,35 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
                     }}
                   >
                     <PenTool className="h-4 w-4" />
-                    Editar puntos
+                    {selectedZoneCount > 1 ? `Editar puntos de la zona ${selection.kind === 'area' ? selection.zoneIndex + 1 : ''}` : 'Editar puntos'}
                   </Button>
+                  {selection.kind === 'area' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 justify-center"
+                      onClick={() => {
+                        setEditMode(false);
+                        setAddingZone(true);
+                        setDrawMode(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Agregar otra zona
+                    </Button>
+                  )}
+                  {selection.kind === 'area' && selectedZoneCount > 1 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 justify-center border-red-300 text-red-700 hover:bg-red-50"
+                      onClick={handleDeleteZone}
+                      disabled={zoneMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Eliminar zona {selection.zoneIndex + 1}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     className="w-full gap-2 justify-center bg-red-600 hover:bg-red-700"
@@ -434,7 +584,7 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
                   <button
                     key={rep.id}
                     {...rowHover(rep.id)}
-                    onClick={() => !isBusy && setSelection({ kind: 'area', item: rep })}
+                    onClick={() => !isBusy && setSelection({ kind: 'area', item: rep, zoneIndex: 0 })}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm transition-colors ${
                       selection?.kind === 'area' && selection.item.id === rep.id
                         ? 'bg-blue-50 text-blue-900'
@@ -450,6 +600,9 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
                       }}
                     />
                     <span className="truncate">{rep.display_name || rep.organizational_area?.name}</span>
+                    {zonesOf(rep.geometry).length > 1 && (
+                      <span className="ml-auto flex-shrink-0 text-xs text-gray-500">{zonesOf(rep.geometry).length} zonas</span>
+                    )}
                   </button>
                 ))}
               </div>

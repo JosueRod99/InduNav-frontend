@@ -5,14 +5,23 @@ export interface GeoJSONPolygon {
   coordinates: number[][][]; // [lng, lat] format
 }
 
+export interface GeoJSONMultiPolygon {
+  type: 'MultiPolygon';
+  coordinates: number[][][][];
+}
+
+// Shape of an area: one zone or several zones that are not next to each other (utils/areaGeometry)
+export type AreaGeometry = GeoJSONPolygon | GeoJSONMultiPolygon;
+
 export interface AreaPhysicalRepresentation {
   id: string;
   organizational_area_id: string;
   layout_id: string | null;
-  geometry: GeoJSONPolygon;
+  geometry: AreaGeometry;
   floor_level: number;
   display_name: string | null;
   display_color: string | null;
+  added_zone?: boolean; // create response: the area was already drawn there, the shape became another zone
   created_at: Date;
   updated_at: Date;
 
@@ -36,14 +45,14 @@ export interface AreaPhysicalRepresentation {
 export interface CreatePhysicalRepresentationRequest {
   organizational_area_id: string;
   layout_id: string | null;
-  geometry: GeoJSONPolygon;
+  geometry: AreaGeometry;
   floor_level?: number;
   display_name?: string;
   display_color?: string;
 }
 
 export interface UpdatePhysicalRepresentationRequest {
-  geometry?: GeoJSONPolygon;
+  geometry?: AreaGeometry;
   floor_level?: number;
   display_name?: string;
   display_color?: string;

@@ -37,13 +37,15 @@ const LiveSectionPreview = ({ sectionKey, stop, areaId }: LiveSectionPreviewProp
     if (!live) return <p className="text-xs text-gray-500">Cargando datos del área…</p>;
     switch (sectionKey) {
       case 'location': {
-        const interior = live.interior;
+        const interiors = live.interiors ?? (live.interior ? [live.interior] : []);
+        const subAreas = interiors.reduce((n, i) => n + i.sub_areas.length, 0);
+        const footprints = interiors.reduce((n, i) => n + i.footprints.length, 0);
         return (
           <ul className="space-y-1 text-xs text-gray-700">
             <li>{live.location_available ? '✓ El área está dibujada en el plano de la planta' : '✗ El área no está dibujada en el plano de la planta'}</li>
             <li>
-              {interior
-                ? `✓ Layout interno con ${interior.sub_areas.length} subáreas y ${interior.footprints.length} equipos dibujados`
+              {interiors.length
+                ? `✓ Layout interno${interiors.length > 1 ? ` en ${interiors.length} pisos` : ''} con ${subAreas} subáreas y ${footprints} equipos dibujados`
                 : '✗ Sin layout interno (el visitante solo verá la ubicación en la planta)'}
             </li>
           </ul>

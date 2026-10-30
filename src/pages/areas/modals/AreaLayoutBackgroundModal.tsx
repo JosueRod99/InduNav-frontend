@@ -8,7 +8,7 @@ import ImageUpload from '../../../components/shared/ImageUpload';
 import { ImageType } from '../../../api/upload';
 import { createLayout, updateLayout, type PlantLayout } from '../../../api/layouts';
 import type { AreaPhysicalRepresentation } from '../../../api/areaRepresentations';
-import { computePlantCrop, defaultOutline, type AreaLayoutData } from '../../../utils/areaLayout';
+import { computePlantCrop, defaultOutline, storedOutlines, type AreaLayoutData } from '../../../utils/areaLayout';
 
 type Source = AreaLayoutData['source'];
 
@@ -18,6 +18,7 @@ interface AreaLayoutBackgroundModalProps {
   area: { id: string; name: string; plant_id: string; organization_id: string };
   layout: PlantLayout | null; // null = create the area layout
   plantRepresentation: AreaPhysicalRepresentation | null; // area outline on the plant layout
+  floorLevel?: number; // floor of the internal layout to create (areas on several floors have one per floor)
 }
 
 const AreaLayoutBackgroundModal = ({
@@ -26,6 +27,7 @@ const AreaLayoutBackgroundModal = ({
   area,
   layout,
   plantRepresentation,
+  floorLevel = 0,
 }: AreaLayoutBackgroundModalProps) => {
   const queryClient = useQueryClient();
   const canCrop = !!plantRepresentation?.layout?.layout_image_url;
@@ -43,18 +45,20 @@ const AreaLayoutBackgroundModal = ({
 
   const buildLayoutData = (): AreaLayoutData => {
     if (source === 'plant_crop' && plantRepresentation?.layout) {
-      const { crop, outline } = computePlantCrop(plantRepresentation.geometry);
+      const { crop, outline, outlines } = computePlantCrop(plantRepresentation.geometry);
       return {
         source,
         plant_layout_id: plantRepresentation.layout.id,
         plant_image_url: plantRepresentation.layout.layout_image_url,
         crop,
         outline,
+        outlines,
       };
     }
     // With its own image or a blank canvas, keep the previous outline if there was one
-    const previousOutline = (layout?.layout_data as AreaLayoutData | undefined)?.outline;
-    return { source, outline: previousOutline || defaultOutline() };
+    const previous = layout?.layout_data as AreaLayoutData | undefined;
+    const outlines = storedOutlines(previous) || [defaultOutline()];
+    return { source, outline: outlines[0], outlines };
   };
 
   const saveMutation = useMutation({
@@ -70,7 +74,7 @@ const AreaLayoutBackgroundModal = ({
             plant_id: area.plant_id,
             organizational_area_id: area.id,
             layout_name: `Layout ${area.name}`,
-            floor_level: plantRepresentation?.floor_level ?? 0,
+            floor_level: plantRepresentation?.floor_level ?? floorLevel,
           });
     },
     onSuccess: () => {
