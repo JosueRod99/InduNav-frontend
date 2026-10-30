@@ -89,7 +89,7 @@ export const buildTemplate = async (plantName: string, areaNames: string[]): Pro
     ['Puesto / Departamento', 'Opcionales.'],
     ['Área', 'Nombre o código de un área de esta planta (lista desplegable).'],
     ['Jefe directo', 'Número de empleado, correo o nombre completo de su jefe. Puede ser alguien de este mismo archivo.'],
-    ['Correo / Teléfono', 'Opcionales. Si el correo ya existe en la empresa, se actualiza ese empleado.'],
+    ['Correo / Teléfono', 'Opcionales. Si el correo ya existe en la empresa, se actualiza ese empleado. El teléfono puede ir con o sin lada (656 412 8901, +1 915 555 0100); sin código de país se toma como de México.'],
     ['Fecha de ingreso', 'Opcional, en formato día/mes/año.'],
     ['', ''],
     ['Importante', 'Las celdas vacías no borran datos de empleados que ya existen. Máximo 1000 empleados por archivo.'],

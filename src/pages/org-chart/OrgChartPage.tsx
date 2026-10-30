@@ -6,6 +6,7 @@ import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import { getOrgChart, type OrgChartNode } from '../../api/employees';
 import Button from '../../components/ui/Button';
+import { avatarUrl } from '../../utils/avatarUrl';
 import type { PlantScopedProps } from '../plants/plantScope';
 
 // Card HTML is built as a string: escape every value that comes from the data
@@ -129,12 +130,17 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
             cursor: pointer;
           ">
             ${!isVirtual ? `
-              <!-- Header con nombre -->
+              <!-- Header con nombre (y foto) -->
               <div style="
                 background: rgba(0, 0, 0, 0.15);
                 padding: 12px 16px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                display: flex;
+                align-items: center;
+                gap: 10px;
               ">
+                ${node.avatar_url ? `<img src="${esc(avatarUrl(node.avatar_url, 40))}" alt="" style="width: 40px; height: 40px; border-radius: 9999px; object-fit: cover; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.6);" />` : ''}
+                <div style="min-width: 0;">
                 <div style="
                   font-size: 17px;
                   font-weight: 700;
@@ -155,6 +161,7 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   letter-spacing: 0.5px;
                 ">
                   ${esc(node.employee_number || '')}
+                </div>
                 </div>
               </div>
 

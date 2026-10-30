@@ -3,6 +3,7 @@ import { Shield, AlertTriangle, FileText, MapPin, Ban } from 'lucide-react';
 import { getSafetyInfoByArea } from '../../../api/areaSafetyInfo';
 import type { PPEItem, Hazard, EmergencyContact } from '../../../api/areaSafetyInfo';
 import Badge from '../../../components/ui/Badge';
+import { formatPhone, phoneHref } from '../../../utils/phone';
 
 interface SafetyTabProps {
   areaId: string;
@@ -248,10 +249,10 @@ const SafetyTab = ({ areaId }: SafetyTabProps) => {
                 <p className="text-sm font-medium text-gray-500 mb-1">{contact.role}</p>
                 <p className="font-semibold text-gray-900 mb-2">{contact.name}</p>
                 <a
-                  href={`tel:${contact.phone}`}
+                  href={phoneHref(contact.phone)}
                   className="text-sm text-blue-600 hover:text-blue-700"
                 >
-                  {contact.phone}
+                  {formatPhone(contact.phone)}
                   {contact.ext && ` ext. ${contact.ext}`}
                 </a>
               </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Building2, ChevronLeft, ChevronRight, Compass, Factory, Globe, Heart, Mail, MapPin, Phone, Target, X } from 'lucide-react';
 import type { TourLanguage } from '../../../api/tourBuilder';
 import { tr, type TourView } from '../../../api/tourView';
+import { formatPhone, phoneHref } from '../../../utils/phone';
 
 // Tour cover blocks about the company (profile from the organization's "Perfil" tab) and the
 // plant (description and photos from its "Configuración" tab). Blocks switched off or empty are not shown.
@@ -168,9 +169,9 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
           )}
           {contact.phone && (
             <li>
-              <a href={`tel:${contact.phone.replace(/[^\d+]/g, '')}`} className="inline-flex items-center gap-1.5 hover:text-blue-700">
+              <a href={phoneHref(contact.phone)} className="inline-flex items-center gap-1.5 hover:text-blue-700">
                 <Phone className="h-4 w-4" />
-                {contact.phone}
+                {formatPhone(contact.phone)}
               </a>
             </li>
           )}

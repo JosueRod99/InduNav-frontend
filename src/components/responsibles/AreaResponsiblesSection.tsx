@@ -19,6 +19,8 @@ import {
 import type { Employee } from '../../api/employees';
 import { personName } from '../../utils/personName';
 import { useAuthStore } from '../../store/authStore';
+import EmployeeAvatar from '../employees/EmployeeAvatar';
+import { formatPhone, phoneHref } from '../../utils/phone';
 
 // "Responsables" of an area (General tab): supervisors, quality and emergency contacts. Several
 // people per role, each with an optional shift; the first one is the main one (shown in tours).
@@ -114,10 +116,11 @@ const AreaResponsiblesSection = ({ area, onOpenEmployee }: Props) => {
                   {people.map((r, index) => (
                     <li key={r.id} className="space-y-1 px-4 py-3">
                       <div className="flex items-start justify-between gap-2">
+                        <EmployeeAvatar person={r} size={32} />
                         <button
                           type="button"
                           onClick={() => onOpenEmployee?.(r.employee_id)}
-                          className="min-w-0 text-left text-sm font-semibold text-gray-900 hover:text-blue-700 hover:underline"
+                          className="min-w-0 flex-1 text-left text-sm font-semibold text-gray-900 hover:text-blue-700 hover:underline"
                         >
                           {personName(r)}
                         </button>
@@ -183,9 +186,9 @@ const AreaResponsiblesSection = ({ area, onOpenEmployee }: Props) => {
                           </a>
                         )}
                         {r.phone && (
-                          <a href={`tel:${r.phone}`} className="inline-flex items-center gap-1 text-gray-600 hover:text-blue-700">
+                          <a href={phoneHref(r.phone)} className="inline-flex items-center gap-1 text-gray-600 hover:text-blue-700">
                             <Phone className="h-3 w-3" />
-                            {r.phone}
+                            {formatPhone(r.phone)}
                           </a>
                         )}
                       </div>

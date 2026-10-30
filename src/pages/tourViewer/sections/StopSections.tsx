@@ -16,6 +16,7 @@ import { EQUIPMENT_STATUS_COLORS, EQUIPMENT_STATUS_LABELS, EQUIPMENT_TYPE_LABELS
 import { getSectionBlocks, type TourLanguage, type TourSection } from '../../../api/tourBuilder';
 import SimpleChart from '../../../components/tours/SimpleChart';
 import { tr, type TourViewStop } from '../../../api/tourView';
+import { avatarUrl } from '../../../utils/avatarUrl';
 
 // Section renderers of the real tour viewer (independent from the demo tabs)
 
@@ -189,7 +190,7 @@ export const PersonnelSection = ({ stop, language }: { stop: TourViewStop; langu
       {stop.live.personnel.map((p) => (
         <div key={p.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
           {p.avatar_url ? (
-            <img src={p.avatar_url} alt={p.name} className="h-11 w-11 rounded-full object-cover" />
+            <img src={avatarUrl(p.avatar_url, 44)!} alt={p.name} className="h-11 w-11 rounded-full object-cover" />
           ) : (
             <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
               <User className="h-5 w-5 text-slate-400" />

@@ -51,6 +51,7 @@ import LocationSection from './sections/LocationSection';
 import { CompanySection, PlantSection } from './sections/CompanySections';
 import NarrationPlayer from './components/NarrationPlayer';
 import { useVisitTracking, type VisitSource } from './useVisitTracking';
+import { avatarUrl } from '../../utils/avatarUrl';
 
 // Viewer of REAL tours (separate from the demo at /tour/:slug, which is not touched).
 // Step 3: draft preview for the editor. Step 4 adds the public route reading the published version.
@@ -440,7 +441,7 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
                   {stop.responsible && (
                     <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                       {stop.responsible.avatar_url ? (
-                        <img src={stop.responsible.avatar_url} alt="" className="h-11 w-11 rounded-full object-cover" />
+                        <img src={avatarUrl(stop.responsible.avatar_url, 44)!} alt="" className="h-11 w-11 rounded-full object-cover" />
                       ) : (
                         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white">
                           <User className="h-5 w-5 text-slate-400" />

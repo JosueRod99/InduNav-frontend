@@ -10,6 +10,7 @@ import { PLANT_TIMEZONES } from './timezones';
 import { MANAGERS } from './plantTabs';
 import { useAuthStore } from '../../store/authStore';
 import PhotoGallery from '../../components/media/PhotoGallery';
+import PhoneInput from '../../components/ui/PhoneInput';
 
 // "Configuración" tab of the plant workspace: the plant's own details, edited in place.
 // Platform admins and organization owners edit; everyone else sees them read-only.
@@ -132,7 +133,12 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
             <input id="plant-contact-name" value={form.contact_name} onChange={set('contact_name')} maxLength={255} placeholder="Gerente de planta" className={inputClass} />
           </Field>
           <Field id="plant-contact-phone" label="Teléfono">
-            <input id="plant-contact-phone" type="tel" value={form.contact_phone} onChange={set('contact_phone')} maxLength={50} className={inputClass} />
+            <PhoneInput
+              id="plant-contact-phone"
+              value={form.contact_phone}
+              onChange={(contact_phone) => setForm((current) => ({ ...current, contact_phone }))}
+              disabled={!canEdit}
+            />
           </Field>
           <Field id="plant-contact-email" label="Correo">
             <input id="plant-contact-email" type="email" value={form.contact_email} onChange={set('contact_email')} maxLength={255} className={inputClass} />

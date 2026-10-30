@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, User, Mail, Phone, Briefcase, Building2, Calendar, MapPin, Award, Users } from 'lucide-react';
+import { X, Mail, Phone, Briefcase, Building2, Calendar, MapPin, Award, Users } from 'lucide-react';
 import { getEmployee } from '../../api/employees';
 import { getAssignmentsByEmployee } from '../../api/areaAssignments';
 import Badge from '../ui/Badge';
 import { personName } from '../../utils/personName';
 import EmployeeResponsibilities from '../responsibles/EmployeeResponsibilities';
 import EmployeeCertifications from '../responsibles/EmployeeCertifications';
+import EmployeeAvatar from './EmployeeAvatar';
+import { formatPhone, phoneHref } from '../../utils/phone';
 
 interface EmployeeDetailModalProps {
   isOpen: boolean;
@@ -40,9 +42,7 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-100 rounded-full p-3">
-              <User className="h-6 w-6 text-blue-600" />
-            </div>
+            <EmployeeAvatar person={employee} size={56} />
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
                 {isLoading ? 'Cargando...' : personName(employee)}
@@ -120,10 +120,10 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
                   <div className="flex items-center gap-3">
                     <Phone className="h-4 w-4 text-gray-500" />
                     <a
-                      href={`tel:${employee.phone}`}
+                      href={phoneHref(employee.phone)}
                       className="text-gray-700 hover:text-gray-900 transition-colors"
                     >
-                      {employee.phone}
+                      {formatPhone(employee.phone)}
                     </a>
                   </div>
                 )}

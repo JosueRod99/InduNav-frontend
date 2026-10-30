@@ -14,6 +14,7 @@ import {
   type TourDisplayBlock,
 } from '../../api/organizationProfile';
 import type { TourLanguage, Translations } from '../../api/tourBuilder';
+import PhoneInput from '../../components/ui/PhoneInput';
 
 // "Perfil" tab of the organization page: what the company is (tagline, about, mission, vision,
 // values, contact, photos). Every block has a switch that shows or hides it in all the tours.
@@ -364,7 +365,7 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
             </label>
             <label className="block text-sm font-medium text-gray-700">
               Teléfono
-              <input value={profile.phone} onChange={(e) => setProfile({ phone: e.target.value })} type="tel" maxLength={50} className={`mt-1 ${inputClass}`} />
+              <PhoneInput value={profile.phone} onChange={(phone) => setProfile({ phone })} ariaLabel="Teléfono" disabled={!canEdit} className="mt-1" />
             </label>
             <label className="block text-sm font-medium text-gray-700">
               Correo

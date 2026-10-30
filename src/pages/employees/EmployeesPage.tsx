@@ -12,6 +12,7 @@ import type { PlantScopedProps } from '../plants/plantScope';
 import { personName } from '../../utils/personName';
 import ImportEmployeesModal from './import/ImportEmployeesModal';
 import EmployeeDetailModal from '../../components/employees/EmployeeDetailModal';
+import EmployeeAvatar from '../../components/employees/EmployeeAvatar';
 
 const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
@@ -275,6 +276,8 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                 {employeesData.employees.map((employee) => (
                   <tr key={employee.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                      <EmployeeAvatar person={employee} size={36} />
                       <div>
                         <div className="text-sm font-medium text-gray-900">
                           <button
@@ -286,6 +289,7 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                           </button>
                         </div>
                         <div className="text-sm text-gray-500">{employee.email}</div>
+                      </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

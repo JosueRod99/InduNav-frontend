@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import Modal from '../../components/ui/Modal';
@@ -12,6 +12,10 @@ import { getPlants } from '../../api/plants';
 import { createAssignment } from '../../api/areaAssignments';
 import { DEPARTMENT_OPTIONS } from '../../constants/departments';
 import { NAME_PREFIXES, personName } from '../../utils/personName';
+import { Camera, Loader2 } from 'lucide-react';
+import EmployeeAvatar from '../../components/employees/EmployeeAvatar';
+import { uploadImage, ImageType } from '../../api/upload';
+import PhoneInput from '../../components/ui/PhoneInput';
 
 interface EmployeeModalProps {
   isOpen: boolean;
@@ -28,6 +32,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
     plant_id: '',
     area_id: '', // Keep for backward compatibility, but won't be used
     name_prefix: '',
+    avatar_url: null,
     first_name: '',
     last_name: '',
     email: '',
@@ -40,6 +45,25 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
   });
 
   const isEditing = !!employee;
+  const photoInput = useRef<HTMLInputElement>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const uploadPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('La foto pesa más de 10 MB');
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const result = await uploadImage(file, { imageType: ImageType.AVATAR, organizationId: formData.organization_id, plantId: formData.plant_id || undefined });
+      setFormData((prev) => ({ ...prev, avatar_url: result.url }));
+    } catch {
+      toast.error('No se pudo subir la foto');
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInput.current) photoInput.current.value = '';
+    }
+  };
 
   // Fetch organizations for selector
   const { data: organizationsData } = useQuery({
@@ -91,6 +115,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
         plant_id: employee.plant_id || '',
         area_id: employee.area_id || '',
         name_prefix: employee.name_prefix || '',
+        avatar_url: employee.avatar_url || null,
         first_name: employee.first_name,
         last_name: employee.last_name,
         email: employee.email || '',
@@ -154,7 +179,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
       ...formData,
       plant_id: formData.plant_id || undefined,
       area_id: formData.area_id || undefined,
-      phone: formData.phone || undefined,
+      phone: formData.phone || null,
       reports_to: formData.reports_to === '' ? null : formData.reports_to || null,
       // Optional fields: empty means "not captured"
       email: formData.email?.trim() || null,
@@ -162,6 +187,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
       position: formData.position?.trim() || null,
       department: formData.department || null,
       hire_date: formData.hire_date || undefined,
+      avatar_url: formData.avatar_url || null,
     } as unknown as CreateEmployeeRequest;
 
     if (isEditing && employee) {
@@ -196,6 +222,32 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Profile photo (cropped around the face when shown) */}
+        <div className="flex items-center gap-4">
+          <EmployeeAvatar person={formData} size={72} />
+          <div className="space-y-1.5">
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => uploadPhoto(e.target.files?.[0])}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" className="gap-1.5" disabled={uploadingPhoto || !formData.organization_id} onClick={() => photoInput.current?.click()}>
+                {uploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                {formData.avatar_url ? 'Cambiar foto' : 'Subir foto'}
+              </Button>
+              {formData.avatar_url && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setFormData((prev) => ({ ...prev, avatar_url: null }))}>
+                  Quitar
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">Opcional. JPG o PNG hasta 10 MB; se recorta centrado en la cara.</p>
+          </div>
+        </div>
+
         {/* Organization selector (disabled when editing) */}
         <div>
           <Select
@@ -287,14 +339,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
               Teléfono
             </label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="+52 999 123 4567"
-            />
+            <PhoneInput id="phone" value={formData.phone} onChange={(phone) => setFormData((prev) => ({ ...prev, phone }))} />
           </div>
         </div>
 

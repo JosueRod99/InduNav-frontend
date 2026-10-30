@@ -8,6 +8,7 @@ export interface Employee {
   name_prefix?: string | null; // title: Ing., Lic., C.P.…
   first_name: string;
   last_name: string;
+  avatar_url?: string | null; // profile photo
   email: string;
   phone: string | null;
   position: string;
@@ -60,6 +61,7 @@ export interface OrgChartNode {
   area?: string;
   plant?: string;
   responsibilities?: { role: 'supervisor' | 'quality' | 'emergency'; areas: string[] }[]; // areas in charge
+  avatar_url?: string | null;
   is_headcount?: boolean; // "Ayudantes generales (10)": unnamed staff of an area, not a person
   quantity?: number;
   shift?: string | null;
@@ -70,6 +72,7 @@ export interface CreateEmployeeRequest {
   plant_id?: string;
   area_id?: string;
   name_prefix?: string | null;
+  avatar_url?: string | null;
   first_name: string;
   last_name: string;
   email: string;
@@ -85,6 +88,7 @@ export interface UpdateEmployeeRequest {
   plant_id?: string;
   area_id?: string;
   name_prefix?: string | null;
+  avatar_url?: string | null;
   first_name?: string;
   last_name?: string;
   email?: string;

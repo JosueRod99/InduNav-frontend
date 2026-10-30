@@ -16,6 +16,8 @@ import ManageAssignmentsModal from '../modals/ManageAssignmentsModal';
 import { personName } from '../../../utils/personName';
 import { getResponsiblesByArea, roleLabel } from '../../../api/areaResponsibles';
 import AreaHeadcountSection from '../../../components/headcount/AreaHeadcountSection';
+import EmployeeAvatar from '../../../components/employees/EmployeeAvatar';
+import { formatPhone, phoneHref } from '../../../utils/phone';
 
 interface PersonalTabProps {
   areaId: string;
@@ -286,6 +288,8 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
                         className="px-6 py-4 whitespace-nowrap cursor-pointer"
                         onClick={() => setSelectedEmployeeId(employee.employee_id)}
                       >
+                        <div className="flex items-center gap-3">
+                        <EmployeeAvatar person={employee} size={36} />
                         <div className="flex flex-col">
                           <div className="text-sm font-medium text-gray-900">
                             {personName(employee)}
@@ -295,6 +299,7 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
                               {employee.employee_number}
                             </div>
                           )}
+                        </div>
                         </div>
                       </td>
                       <td
@@ -336,11 +341,11 @@ const PersonalTab = ({ areaId, area }: PersonalTabProps) => {
                             <div className="flex items-center gap-1">
                               <Phone className="h-3 w-3 text-gray-400" />
                               <a
-                                href={`tel:${employee.phone}`}
+                                href={phoneHref(employee.phone)}
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-xs text-gray-700"
                               >
-                                {employee.phone}
+                                {formatPhone(employee.phone)}
                               </a>
                             </div>
                           )}
@@ -533,6 +538,7 @@ const EmployeeCard = ({ employee, onClick }: EmployeeCardProps) => {
       className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-all hover:shadow-md cursor-pointer"
     >
       <div className="flex items-start justify-between mb-3">
+        <EmployeeAvatar person={employee} size={44} className="mr-3" />
         <div className="flex-1">
           <h4 className="font-semibold text-gray-900">
             {personName(employee)}
@@ -571,11 +577,11 @@ const EmployeeCard = ({ employee, onClick }: EmployeeCardProps) => {
         <div className="flex items-center gap-2 mb-2">
           <Phone className="h-4 w-4 text-gray-400" />
           <a
-            href={`tel:${employee.phone}`}
+            href={phoneHref(employee.phone)}
             onClick={(e) => e.stopPropagation()}
             className="text-sm text-gray-700"
           >
-            {employee.phone}
+            {formatPhone(employee.phone)}
           </a>
         </div>
       )}

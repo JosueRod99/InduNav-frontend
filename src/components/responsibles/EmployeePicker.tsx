@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2, Search } from 'lucide-react';
 import { getEmployees, type Employee } from '../../api/employees';
 import { personName } from '../../utils/personName';
+import EmployeeAvatar from '../employees/EmployeeAvatar';
 
 // Search box to pick an employee of the organization. People of `plantId` are listed first.
 
@@ -56,7 +57,8 @@ const EmployeePicker = ({ organizationId, plantId, excludeIds = [], onPick, auto
               onClick={() => onPick(e)}
               className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-blue-50"
             >
-              <span className="min-w-0">
+              <EmployeeAvatar person={e} size={32} />
+              <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium text-gray-900">{personName(e)}</span>
                 <span className="block truncate text-xs text-gray-500">
                   {[e.position, e.primary_area?.name].filter(Boolean).join(' · ') || 'Sin puesto'}
