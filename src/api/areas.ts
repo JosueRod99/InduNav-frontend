@@ -128,7 +128,7 @@ export interface UpdateAreaRequest {
 }
 
 export interface MoveAreaRequest {
-  new_parent_id: string | null;
+  parent_area_id: string | null; // null: becomes a root area
 }
 
 export interface AreasResponse {
@@ -240,4 +240,48 @@ export const getAreaEmployees = async (areaId: string, includeHistory?: boolean)
 export const getAreaAssignmentStats = async (areaId: string): Promise<any> => {
   const { data } = await apiClient.get(`/organizational-areas/${areaId}/assignment-stats`);
   return data.stats || data;
+};
+
+// "Áreas" tab: every area of a plant with its real figures (one request)
+export interface AreaOverview {
+  id: string;
+  name: string;
+  code: string | null;
+  color: string | null;
+  area_type: string;
+  description: string | null;
+  parent_area_id: string | null;
+  supervisor_id: string | null;
+  supervisor_name: string | null;
+  supervisor_position: string | null;
+  employees: number;
+  headcount: number;
+  children: number;
+  equipment: number;
+  equipment_stopped: number;
+  products: number;
+  process_steps: number;
+  documents: number;
+  certification_alerts: number;
+  people_certification_alerts: number;
+  drawn: { floor_level: number; inside_area_id: string | null; zones: number }[];
+  has_internal_layout: boolean;
+}
+
+export const getPlantAreasOverview = async (plantId: string): Promise<AreaOverview[]> => {
+  const { data } = await apiClient.get(`/plants/${plantId}/areas-overview`);
+  return data.areas || [];
+};
+
+/** What needs attention in an area (same signals as the plant summary) */
+export const areaPending = (a: AreaOverview) => ({
+  noSupervisor: !a.supervisor_id,
+  notDrawn: a.drawn.length === 0,
+  stoppedEquipment: a.equipment_stopped,
+  certifications: a.certification_alerts + a.people_certification_alerts,
+});
+
+export const hasPending = (a: AreaOverview) => {
+  const p = areaPending(a);
+  return p.noSupervisor || p.notDrawn || p.stoppedEquipment > 0 || p.certifications > 0;
 };

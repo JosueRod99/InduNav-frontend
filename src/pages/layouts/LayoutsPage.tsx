@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { MapPin, Upload, PenTool, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -34,13 +35,18 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const [selectedPlantId, setSelectedPlantId] = useState<string>(plantId ?? '');
-  const [chosenFloor, setChosenFloor] = useState<number | null>(null);
+  // ?floor=N&area=<id>[&draw=1] (from the "Áreas" tab): open that floor with the area selected, or drawing it
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [chosenFloor, setChosenFloor] = useState<number | null>(() => {
+    const floor = searchParams.get('floor');
+    return floor !== null && Number.isInteger(Number(floor)) ? Number(floor) : null;
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null); // selected area drawing
   const [selectedZone, setSelectedZone] = useState(0); // zone of the selected area (areas can have several)
   const [isLinkAreaModalOpen, setIsLinkAreaModalOpen] = useState(false);
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
-  const [addingZone, setAddingZone] = useState(false); // drawing another zone of the selected area
+  const [addingZone, setAddingZone] = useState<AreaPhysicalRepresentation | null>(null); // drawing another zone of this area
   const [drawingFor, setDrawingFor] = useState<AreaCoverage | null>(null); // drawing an area picked from "Sin dibujar"
   const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
@@ -110,7 +116,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   const resetModes = () => {
     setDrawMode(false);
     setEditMode(false);
-    setAddingZone(false);
+    setAddingZone(null);
     setDrawingFor(null);
   };
 
@@ -155,7 +161,43 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
     onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo guardar el dibujo'),
   });
 
+  // Area asked in the URL: once its floor and drawings are loaded, select it (or start drawing it)
+  const askedArea = searchParams.get('area');
+  useEffect(() => {
+    if (!askedArea || !coverage.length) return;
+    const area = coverage.find((a) => a.id === askedArea);
+    const clear = () =>
+      setSearchParams(
+        (params) => {
+          ['area', 'floor', 'draw'].forEach((key) => params.delete(key));
+          return params;
+        },
+        { replace: true }
+      );
+    if (!area) return clear();
+    if (searchParams.get('draw') === '1') {
+      if (!currentLayout) return; // wait for the floor plan
+      handleDrawFor(area);
+      return clear();
+    }
+    const floors = area.drawn.filter((d) => !d.inside_area_id).map((d) => d.floor_level);
+    if (!floors.length) return clear(); // not on any floor plan
+    if (!floors.includes(selectedFloor)) {
+      setChosenFloor(sortFloors(floors)[0]);
+      return; // runs again with that floor's drawings
+    }
+    const rep = areaRepresentations.find((r) => r.organizational_area_id === askedArea);
+    if (rep) {
+      setSelectedId(rep.id);
+      setSelectedZone(0);
+      clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askedArea, coverage, areaRepresentations, currentLayout, selectedFloor]);
+
   const handleAreaClick = (area: AreaPhysicalRepresentation, zoneIndex: number) => {
+    // While drawing or editing, a click on another area is a point of the drawing, not a new selection
+    if (drawMode || editMode) return;
     setSelectedId(area.id);
     setSelectedZone(zoneIndex);
   };
@@ -185,7 +227,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   const handleStartAddingZone = () => {
     if (!selectedArea) return;
     resetModes();
-    setAddingZone(true);
+    setAddingZone(selectedArea); // the zone goes to this area, whatever happens to the selection meanwhile
     setDrawMode(true);
   };
 
@@ -196,13 +238,15 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   };
 
   const handleAreaDrawn = (coordinates: number[][]) => {
-    if (addingZone && selectedArea) {
+    if (addingZone) {
+      const target = areaRepresentations.find((r) => r.id === addingZone.id) || addingZone;
       resetModes();
+      setSelectedId(target.id);
       updateMutation.mutate({
-        id: selectedArea.id,
-        geometry: addZone(selectedArea.geometry, ringFromLeaflet(coordinates)),
+        id: target.id,
+        geometry: addZone(target.geometry, ringFromLeaflet(coordinates)),
         message: 'Zona agregada',
-        zone: selectedZoneCount, // the new zone is the last one
+        zone: zonesOf(target.geometry).length, // the new zone is the last one
       });
       return;
     }
@@ -231,7 +275,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   };
 
   const drawTitle = addingZone
-    ? `Nueva zona de ${selectedAreaName}`
+    ? `Nueva zona de ${addingZone.display_name || addingZone.organizational_area?.name || 'el área'}`
     : drawingFor
       ? `Dibujando: ${drawingFor.name}`
       : undefined;
