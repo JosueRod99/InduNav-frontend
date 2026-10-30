@@ -15,6 +15,7 @@ import {
 } from '../../api/organizationProfile';
 import type { TourLanguage, Translations } from '../../api/tourBuilder';
 import PhoneInput from '../../components/ui/PhoneInput';
+import AddressInput from '../../components/ui/AddressInput';
 
 // "Perfil" tab of the organization page: what the company is (tagline, about, mission, vision,
 // values, contact, photos). Every block has a switch that shows or hides it in all the tours.
@@ -31,6 +32,7 @@ const EMPTY: OrganizationProfileData = {
   phone: '',
   email: '',
   address: '',
+  address_details: null,
 };
 
 interface FormState {
@@ -372,10 +374,19 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
               <input value={profile.email} onChange={(e) => setProfile({ email: e.target.value })} type="email" maxLength={255} className={`mt-1 ${inputClass}`} />
             </label>
           </div>
-          <label className="block text-sm font-medium text-gray-700">
-            Domicilio
-            <input value={profile.address} onChange={(e) => setProfile({ address: e.target.value })} maxLength={500} className={`mt-1 ${inputClass}`} />
-          </label>
+          <div>
+            <label htmlFor="org-address" className="block text-sm font-medium text-gray-700">
+              Domicilio
+            </label>
+            <AddressInput
+              id="org-address"
+              value={profile.address}
+              details={profile.address_details}
+              onChange={(address, address_details) => setProfile({ address, address_details })}
+              disabled={!canEdit}
+              className="mt-1"
+            />
+          </div>
         </Section>
 
         <Section

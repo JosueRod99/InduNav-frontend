@@ -206,18 +206,7 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
 
   return (
     <div className="space-y-4">
-      {plant.description ? (
-        <p className="max-w-3xl whitespace-pre-line text-sm text-gray-700">{plant.description}</p>
-      ) : (
-        MANAGERS.includes(role) && (
-          <p className="text-sm text-gray-500">
-            Esta planta no tiene descripción.{' '}
-            <Link to={`/plants/${plant.id}/configuracion`} className="font-medium text-blue-600 hover:underline">
-              Agregar una
-            </Link>
-          </p>
-        )
-      )}
+
 
       {/* Key numbers: each one opens its tab */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -270,9 +259,8 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
                           <span className="ml-1.5 font-mono text-xs text-gray-500">{eq.code}</span>
                         </span>
                         <span
-                          className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                            eq.status === 'out_of_service' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
-                          }`}
+                          className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${eq.status === 'out_of_service' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                            }`}
                         >
                           {eq.status === 'out_of_service' ? 'Fuera de servicio' : 'En mantenimiento'}
                         </span>
@@ -345,13 +333,12 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
                             <span className="ml-1.5 text-xs text-gray-500">· {cert.area_name}</span>
                           </span>
                           <span
-                            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                              cert.kind === 'expired'
-                                ? 'bg-red-100 text-red-800'
-                                : cert.kind === 'expiring'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-blue-100 text-blue-800'
-                            }`}
+                            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${cert.kind === 'expired'
+                              ? 'bg-red-100 text-red-800'
+                              : cert.kind === 'expiring'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-blue-100 text-blue-800'
+                              }`}
                           >
                             {text}
                           </span>

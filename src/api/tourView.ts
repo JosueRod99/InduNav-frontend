@@ -1,5 +1,6 @@
 import apiClient from './client';
 import type { AreaGeometry, GeoJSONPolygon } from './areaRepresentations';
+import type { AddressDetails } from '../utils/googlePlaces';
 import type { EquipmentStatus, EquipmentType } from './equipment';
 import type { StopContent, TourLanguage, TourSection, Translations } from './tourBuilder';
 
@@ -138,11 +139,17 @@ export interface TourCompanyProfile {
   vision: Translations | null;
   values: { title: Translations; description: Translations }[];
   industry: string | null;
-  contact: { website: string | null; phone: string | null; email: string | null; address: string | null } | null;
+  contact: {
+    website: string | null;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    address_details?: AddressDetails | null;
+  } | null;
   photos: TourPhoto[];
   documents?: TourGeneralDocument[]; // whole company (start of the tour)
   plant_documents?: TourGeneralDocument[]; // whole plant
-  plant: { description: string | null; photos: TourPhoto[] } | null;
+  plant: { description: string | null; photos: TourPhoto[]; address?: string | null; address_details?: AddressDetails | null } | null;
   plant_cover_url: string | null;
 }
 

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Building2, ChevronLeft, ChevronRight, Compass, ExternalLink, Factory, FileText, Globe, Heart, Mail, MapPin, Phone, Target, X } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, Compass, ExternalLink, Factory, FileText, Globe, Heart, Mail, MapPin, Navigation, Phone, Target, X } from 'lucide-react';
 import type { TourLanguage } from '../../../api/tourBuilder';
 import { tr, type TourGeneralDocument, type TourView } from '../../../api/tourView';
 import { formatPhone, phoneHref } from '../../../utils/phone';
+import { directionsUrl, type AddressDetails } from '../../../utils/googlePlaces';
 
 // Tour cover blocks about the company (profile from the organization's "Perfil" tab) and the
 // plant (description and photos from its "Configuración" tab). Blocks switched off or empty are not shown.
@@ -84,6 +85,25 @@ const PhotoStrip = ({ photos, language }: { photos: Photo[]; language: TourLangu
     </>
   );
 };
+
+/** Address with a "Cómo llegar" link to Google Maps directions (a plain link: no API, no cost) */
+const AddressLine = ({ address, details, language }: { address: string; details?: AddressDetails | null; language: TourLanguage }) => (
+  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+    <span className="inline-flex items-center gap-1.5">
+      <MapPin className="h-4 w-4 flex-shrink-0" />
+      {address}
+    </span>
+    <a
+      href={directionsUrl(address, details)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+    >
+      <Navigation className="h-3.5 w-3.5" />
+      {language === 'es' ? 'Cómo llegar' : 'Directions'}
+    </a>
+  </span>
+);
 
 const websiteLabel = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
@@ -211,9 +231,8 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
             </li>
           )}
           {contact.address && (
-            <li className="inline-flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 flex-shrink-0" />
-              {contact.address}
+            <li>
+              <AddressLine address={contact.address} details={contact.address_details} language={language} />
             </li>
           )}
         </ul>
@@ -225,7 +244,7 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
 export const PlantSection = ({ view, language }: { view: TourView; language: TourLanguage }) => {
   const plant = view.tour.organization.profile?.plant;
   const documents = view.tour.organization.profile?.plant_documents || [];
-  if ((!plant || (!plant.description && !plant.photos.length)) && !documents.length) return null;
+  if ((!plant || (!plant.description && !plant.photos.length && !plant.address)) && !documents.length) return null;
   const lang = (es: string, en: string) => (language === 'es' ? es : en);
   return (
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
@@ -236,6 +255,11 @@ export const PlantSection = ({ view, language }: { view: TourView; language: Tou
           {view.tour.plant_name}
         </h2>
       </div>
+      {plant?.address && (
+        <p className="text-sm text-slate-700">
+          <AddressLine address={plant.address} details={plant.address_details} language={language} />
+        </p>
+      )}
       {plant?.description && <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 sm:text-base">{plant.description}</p>}
       {plant && <PhotoStrip photos={plant.photos} language={language} />}
       <GeneralDocuments documents={documents} title={lang('Documentos de la planta', 'Plant documents')} />

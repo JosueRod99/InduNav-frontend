@@ -1,5 +1,6 @@
 import apiClient from './client';
 import type { Translations } from './tourBuilder';
+import type { AddressDetails } from '../utils/googlePlaces';
 
 // Company profile and company/plant photo galleries (PLAN_LAB_KRAFT.md points 1-2)
 
@@ -19,6 +20,7 @@ export interface OrganizationProfileData {
   phone: string;
   email: string;
   address: string;
+  address_details?: AddressDetails | null; // picked from Google Places suggestions
 }
 
 export const TOUR_DISPLAY_BLOCKS = ['about', 'mission', 'vision', 'values', 'contact', 'gallery', 'plant', 'documents'] as const;

@@ -171,7 +171,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
             aria-label="A quién aplica"
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Del área y generales</option>
+            <option value="">Aplica: todos</option>
             <option value="area">Solo de esta área</option>
             <option value="general">Generales y de varias áreas</option>
           </select>
@@ -182,7 +182,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Todas las Categorías</option>
+            <option value="">Categoría: todas</option>
             <option value="SOP">SOP</option>
             <option value="WORK_INSTRUCTION">Instrucción de Trabajo</option>
             <option value="MANUAL">Manual de Equipo</option>
@@ -203,7 +203,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Todos los Estados</option>
+            <option value="">Estado: todos</option>
             <option value="draft">Borrador</option>
             <option value="active">Activo</option>
             <option value="under_review">En Revisión</option>

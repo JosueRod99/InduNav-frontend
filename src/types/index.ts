@@ -1,3 +1,5 @@
+import type { AddressDetails } from '../utils/googlePlaces';
+
 // User & Auth Types
 export interface User {
   id: string;
@@ -72,6 +74,8 @@ export interface Plant {
   contact_name?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
+  address?: string | null;
+  address_details?: AddressDetails | null; // picked from Google Places suggestions
   organization_name?: string;
   created_at: Date;
   updated_at: Date;

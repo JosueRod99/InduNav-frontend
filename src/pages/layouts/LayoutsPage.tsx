@@ -320,12 +320,12 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
               editingArea={
                 editMode && selectedArea
                   ? {
-                      id: selectedArea.id,
-                      geometry: zoneAsPolygon(selectedArea.geometry, selectedZone),
-                      zoneIndex: selectedZone,
-                      name: selectedArea.display_name || selectedArea.organizational_area?.name,
-                      color: selectedArea.display_color || selectedArea.organizational_area?.color || undefined,
-                    }
+                    id: selectedArea.id,
+                    geometry: zoneAsPolygon(selectedArea.geometry, selectedZone),
+                    zoneIndex: selectedZone,
+                    name: selectedArea.display_name || selectedArea.organizational_area?.name,
+                    color: selectedArea.display_color || selectedArea.organizational_area?.color || undefined,
+                  }
                   : null
               }
               onAreaDrawn={handleAreaDrawn}
@@ -367,13 +367,12 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                       onClick={() => handleAreaClick(areaRep, 0)}
                       onMouseEnter={() => setHovered({ id: areaRep.id, from: 'list' })}
                       onMouseLeave={() => setHovered(null)}
-                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        selectedArea?.id === areaRep.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : hovered?.id === areaRep.id
+                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedArea?.id === areaRep.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : hovered?.id === areaRep.id
                           ? 'border-blue-300 bg-gray-50'
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <div

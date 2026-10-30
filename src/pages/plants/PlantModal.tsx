@@ -7,7 +7,9 @@ import Input from '../../components/ui/Input';
 import { createPlant, updatePlant, type CreatePlantRequest } from '../../api/plants';
 import { getOrganizations } from '../../api/organizations';
 import type { Plant } from '../../types';
-import { PLANT_TIMEZONES } from './timezones';
+import { PLANT_TIMEZONES, timezoneLabel } from './timezones';
+import AddressInput from '../../components/ui/AddressInput';
+import { plantAddressDefaults, type AddressDetails } from '../../utils/googlePlaces';
 
 interface PlantModalProps {
   isOpen: boolean;
@@ -24,7 +26,10 @@ const PlantModal = ({ isOpen, onClose, plant, defaultOrganizationId }: PlantModa
     slug: '',
     location: '',
     timezone: 'America/Mexico_City',
+    address: '',
+    address_details: null,
   });
+  const [autoNote, setAutoNote] = useState<string | null>(null); // what picking the address filled in
 
   const isEditing = !!plant;
 
@@ -42,6 +47,8 @@ const PlantModal = ({ isOpen, onClose, plant, defaultOrganizationId }: PlantModa
         slug: plant.slug,
         location: plant.location || '',
         timezone: plant.timezone,
+        address: plant.address || '',
+        address_details: plant.address_details || null,
       });
     } else {
       setFormData({
@@ -50,9 +57,21 @@ const PlantModal = ({ isOpen, onClose, plant, defaultOrganizationId }: PlantModa
         slug: '',
         location: '',
         timezone: 'America/Mexico_City',
+        address: '',
+        address_details: null,
       });
     }
+    setAutoNote(null);
   }, [plant]);
+
+  // A picked address fills "Ubicación" (City, State) and the time zone
+  const changeAddress = async (address: string, details: AddressDetails | null) => {
+    setFormData((prev) => ({ ...prev, address, address_details: details }));
+    if (!details) return;
+    const { location, timezone } = await plantAddressDefaults(details);
+    setFormData((prev) => ({ ...prev, location: location || prev.location, timezone: timezone || prev.timezone }));
+    setAutoNote([location && `Ubicación: ${location}`, timezone && `zona horaria: ${timezoneLabel(timezone)}`].filter(Boolean).join(' · ') || null);
+  };
 
   const createMutation = useMutation({
     mutationFn: createPlant,
@@ -176,6 +195,14 @@ const PlantModal = ({ isOpen, onClose, plant, defaultOrganizationId }: PlantModa
         </div>
 
         <div>
+          <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+            Dirección
+          </label>
+          <AddressInput id="address" value={formData.address || ''} details={formData.address_details} onChange={changeAddress} />
+          {autoNote && <p className="mt-1 text-xs text-blue-700">Se ajustó con la dirección → {autoNote}</p>}
+        </div>
+
+        <div>
           <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
             Ubicación
           </label>
@@ -184,7 +211,7 @@ const PlantModal = ({ isOpen, onClose, plant, defaultOrganizationId }: PlantModa
             name="location"
             value={formData.location}
             onChange={handleChange}
-            placeholder="Ciudad, País"
+            placeholder="Ciudad, Estado"
           />
         </div>
 
@@ -200,6 +227,7 @@ const PlantModal = ({ isOpen, onClose, plant, defaultOrganizationId }: PlantModa
             required
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           >
+            {!PLANT_TIMEZONES.some((tz) => tz.value === formData.timezone) && <option value={formData.timezone}>{formData.timezone}</option>}
             {PLANT_TIMEZONES.map((tz) => (
               <option key={tz.value} value={tz.value}>
                 {tz.label}

@@ -6,16 +6,19 @@ import { Loader2, Save } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import { updatePlant, type UpdatePlantRequest } from '../../api/plants';
 import type { Plant } from '../../types';
-import { PLANT_TIMEZONES } from './timezones';
+import { PLANT_TIMEZONES, timezoneLabel } from './timezones';
 import { MANAGERS } from './plantTabs';
 import { useAuthStore } from '../../store/authStore';
 import PhotoGallery from '../../components/media/PhotoGallery';
 import PhoneInput from '../../components/ui/PhoneInput';
+import AddressInput from '../../components/ui/AddressInput';
+import { plantAddressDefaults, type AddressDetails } from '../../utils/googlePlaces';
 
 // "Configuración" tab of the plant workspace: the plant's own details, edited in place.
 // Platform admins and organization owners edit; everyone else sees them read-only.
 
 type Form = Required<Pick<UpdatePlantRequest, 'name' | 'location' | 'timezone'>> & {
+  address: string;
   description: string;
   contact_name: string;
   contact_phone: string;
@@ -26,6 +29,7 @@ const toForm = (plant: Plant): Form => ({
   name: plant.name,
   description: plant.description || '',
   location: plant.location || '',
+  address: plant.address || '',
   timezone: plant.timezone || 'America/Mexico_City',
   contact_name: plant.contact_name || '',
   contact_phone: plant.contact_phone || '',
@@ -50,12 +54,32 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
   const role = useAuthStore((state) => state.user?.role?.name) || '';
   const canEdit = MANAGERS.includes(role);
   const [form, setForm] = useState<Form>(() => toForm(plant));
+  const [addressDetails, setAddressDetails] = useState<AddressDetails | null>(plant.address_details || null);
+  const [autoNote, setAutoNote] = useState<string | null>(null); // what picking the address filled in
 
   // Saved elsewhere (or after our own save): start from the stored values
-  useEffect(() => setForm(toForm(plant)), [plant]);
+  useEffect(() => {
+    setForm(toForm(plant));
+    setAddressDetails(plant.address_details || null);
+    setAutoNote(null);
+  }, [plant]);
 
   const initial = toForm(plant);
-  const isDirty = (Object.keys(initial) as (keyof Form)[]).some((key) => form[key].trim() !== initial[key].trim());
+  const isDirty =
+    (Object.keys(initial) as (keyof Form)[]).some((key) => form[key].trim() !== initial[key].trim()) ||
+    JSON.stringify(addressDetails) !== JSON.stringify(plant.address_details || null);
+
+  // A picked address fills "Ubicación" (City, State) and the time zone
+  const changeAddress = async (address: string, details: AddressDetails | null) => {
+    setForm((current) => ({ ...current, address }));
+    setAddressDetails(details);
+    if (!details) return;
+    const { location, timezone } = await plantAddressDefaults(details);
+    setForm((current) => ({ ...current, location: location || current.location, timezone: timezone || current.timezone }));
+    setAutoNote(
+      [location && `Ubicación: ${location}`, timezone && `zona horaria: ${timezoneLabel(timezone)}`].filter(Boolean).join(' · ') || null
+    );
+  };
   const nameError = form.name.trim().length < 2 ? 'El nombre debe tener al menos 2 caracteres' : null;
 
   const save = useMutation({
@@ -64,9 +88,12 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
         name: form.name.trim(),
         description: form.description.trim() || null,
         location: form.location.trim(),
+        address: form.address.trim() || null,
+        address_details: form.address.trim() ? addressDetails : null,
         timezone: form.timezone,
         contact_name: form.contact_name.trim() || null,
-        contact_phone: form.contact_phone.trim() || null,
+        // Only when changed: an old phone that is not valid must not block saving the rest
+        ...(form.contact_phone.trim() !== initial.contact_phone.trim() && { contact_phone: form.contact_phone.trim() || null }),
         contact_email: form.contact_email.trim() || null,
       }),
     onSuccess: () => {
@@ -110,7 +137,17 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
               />
             </Field>
           </div>
-          <Field id="plant-location" label="Ubicación">
+          <div className="sm:col-span-2">
+            <Field
+              id="plant-address"
+              label="Dirección"
+              hint="Elige la dirección de la lista para llenar la ubicación y la zona horaria. También puedes escribirla a mano."
+            >
+              <AddressInput id="plant-address" value={form.address} details={addressDetails} onChange={changeAddress} disabled={!canEdit} />
+              {autoNote && <p className="mt-1 text-xs text-blue-700">Se ajustó con la dirección → {autoNote}</p>}
+            </Field>
+          </div>
+          <Field id="plant-location" label="Ubicación" hint="Se muestra bajo el nombre de la planta.">
             <input id="plant-location" value={form.location} onChange={set('location')} maxLength={500} placeholder="Ciudad, Estado" className={inputClass} />
           </Field>
           <Field id="plant-timezone" label="Zona horaria">

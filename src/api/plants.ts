@@ -1,5 +1,6 @@
 import apiClient from './client';
 import type { Plant } from '../types';
+import type { AddressDetails } from '../utils/googlePlaces';
 
 export interface CreatePlantRequest {
   organization_id: string;
@@ -7,6 +8,8 @@ export interface CreatePlantRequest {
   slug?: string;
   location?: string;
   timezone?: string;
+  address?: string | null;
+  address_details?: AddressDetails | null;
   settings?: Record<string, any>;
 }
 
@@ -21,6 +24,8 @@ export interface UpdatePlantRequest {
   contact_name?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
+  address?: string | null;
+  address_details?: AddressDetails | null;
 }
 
 // Plant "Resumen" tab. Fields the user's role cannot see come back null/empty.
