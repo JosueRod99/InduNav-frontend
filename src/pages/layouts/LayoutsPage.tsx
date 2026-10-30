@@ -1,283 +1,348 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Trash2, Square, Upload, PenTool, LayoutGrid, Plus } from 'lucide-react';
+import { MapPin, Upload, PenTool, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
 import LayoutMap from './LayoutMap';
 import LabelModeToggle, { useLabelMode } from './LabelModeToggle';
 import LinkAreaModal from './LinkAreaModal';
 import LayoutModal from './LayoutModal';
+import LayoutAreaList from './LayoutAreaList';
+import SelectedAreaPanel from './SelectedAreaPanel';
 import { getPlants } from '../../api/plants';
-import { getLayouts } from '../../api/layouts';
-import { getAreasByLayout, getRepresentationsByArea } from '../../api/areaRepresentations';
+import { getLayouts, getPlantCoverage, type AreaCoverage } from '../../api/layouts';
+import {
+  createRepresentation,
+  deleteRepresentation,
+  getAreasByLayout,
+  leafletToGeoJSON,
+  updateRepresentation,
+  type AreaGeometry,
+  type AreaPhysicalRepresentation,
+} from '../../api/areaRepresentations';
 import { floorLabel, sortFloors } from '../../utils/floors';
-import { deleteRepresentation, updateRepresentation, type AreaGeometry, type AreaPhysicalRepresentation } from '../../api/areaRepresentations';
 import { useAuthStore } from '../../store/authStore';
 import type { PlantScopedProps } from '../plants/plantScope';
-import { useNavigateWithBack } from '../../hooks/useBackNavigation';
+import { useBackState, useNavigateWithBack } from '../../hooks/useBackNavigation';
 import { addZone, removeZone, replaceZone, ringFromLeaflet, zoneAsPolygon, zonesOf } from '../../utils/areaGeometry';
 import SectionHeader from '../../components/ui/SectionHeader';
+
+// Floors offered by "+ Piso" (those without a plan yet)
+const FLOOR_CHOICES = [-2, -1, 0, 1, 2, 3, 4, 5];
 
 const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const [selectedPlantId, setSelectedPlantId] = useState<string>(plantId ?? '');
-  const [selectedFloor, setSelectedFloor] = useState<number>(0);
-  const [selectedArea, setSelectedArea] = useState<AreaPhysicalRepresentation | null>(null);
+  const [chosenFloor, setChosenFloor] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null); // selected area drawing
   const [selectedZone, setSelectedZone] = useState(0); // zone of the selected area (areas can have several)
   const [isLinkAreaModalOpen, setIsLinkAreaModalOpen] = useState(false);
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [drawMode, setDrawMode] = useState(false);
   const [addingZone, setAddingZone] = useState(false); // drawing another zone of the selected area
+  const [drawingFor, setDrawingFor] = useState<AreaCoverage | null>(null); // drawing an area picked from "Sin dibujar"
   const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
+  const [addingFloor, setAddingFloor] = useState(false);
   // Names on the map (always / on hover) and the area under the mouse, shared by map and list
   const [labelMode, setLabelMode] = useLabelMode();
   const [hovered, setHovered] = useState<{ id: string; from: 'map' | 'list' } | null>(null);
-  const listRows = useRef(new Map<string, HTMLDivElement>());
+  const listRows = useRef(new Map<string, HTMLElement>());
   useEffect(() => {
     if (hovered?.from === 'map') listRows.current.get(hovered.id)?.scrollIntoView({ block: 'nearest' });
   }, [hovered]);
   const queryClient = useQueryClient();
   const navigate = useNavigateWithBack(); // detail pages opened from here return here
+  const backState = useBackState();
   const { user } = useAuthStore();
 
-  // Fetch plants
   const { data: plantsData } = useQuery({
     queryKey: ['plants'],
     queryFn: () => getPlants({ limit: 100 }),
   });
 
-  // Fetch layouts for selected plant
-  const { data: layouts } = useQuery({
-    queryKey: ['layouts', selectedPlantId, selectedFloor],
-    queryFn: () => getLayouts({ plant_id: selectedPlantId || undefined, floor_level: selectedFloor }),
+  // Plans of every floor of the plant: the floor tabs
+  const { data: plantLayouts = [] } = useQuery({
+    queryKey: ['layouts', selectedPlantId, 'all-floors'],
+    queryFn: () => getLayouts({ plant_id: selectedPlantId }),
     enabled: !!selectedPlantId,
   });
+  const floorsWithPlan = sortFloors(plantLayouts.map((l) => l.floor_level));
+  const selectedFloor = chosenFloor ?? (floorsWithPlan.includes(0) ? 0 : floorsWithPlan[0] ?? 0);
+  const floorTabs = sortFloors([...floorsWithPlan, selectedFloor]);
+  const currentLayout = plantLayouts.find((l) => l.floor_level === selectedFloor);
 
-  const currentLayout = layouts?.[0];
-
-  // Get selected plant's organization_id
-  const selectedPlant = plantsData?.plants.find(p => p.id === selectedPlantId);
+  const selectedPlant = plantsData?.plants.find((p) => p.id === selectedPlantId);
   const organizationId = selectedPlant?.organization_id || user?.organization_id || '';
 
-  // Fetch area representations for current layout
   const { data: areaRepresentations = [] } = useQuery({
     queryKey: ['layout-areas', currentLayout?.id, selectedFloor],
     queryFn: () => getAreasByLayout(currentLayout!.id, selectedFloor),
     enabled: !!currentLayout?.id,
   });
 
-  // Other floors where the selected area is drawn (same area, not a duplicate)
-  const { data: selectedAreaDrawings = [] } = useQuery({
-    queryKey: ['area-representations', selectedArea?.organizational_area_id],
-    queryFn: () => getRepresentationsByArea(selectedArea!.organizational_area_id),
-    enabled: !!selectedArea,
+  // Where every area of the plant is drawn (counter, "En otros pisos", "Sin dibujar")
+  const { data: coverage = [] } = useQuery({
+    queryKey: ['layout-coverage', selectedPlantId],
+    queryFn: () => getPlantCoverage(selectedPlantId),
+    enabled: !!selectedPlantId,
   });
-  const otherFloors = sortFloors(
-    selectedAreaDrawings
-      .filter((r) => r.layout && !r.layout.organizational_area_id && r.floor_level !== selectedFloor)
-      .map((r) => r.floor_level)
-  );
 
-  const goToFloor = (level: number) => {
-    setSelectedArea(null);
+  const selectedArea = areaRepresentations.find((r) => r.id === selectedId) || null;
+  const selectedAreaName = selectedArea?.display_name || selectedArea?.organizational_area?.name || 'el área';
+  const selectedZoneCount = selectedArea ? zonesOf(selectedArea.geometry).length : 0;
+  const zone = Math.min(selectedZone, Math.max(0, selectedZoneCount - 1));
+  const otherFloors = selectedArea
+    ? sortFloors(
+        (coverage.find((a) => a.id === selectedArea.organizational_area_id)?.drawn || [])
+          .filter((d) => !d.inside_area_id && d.floor_level !== selectedFloor)
+          .map((d) => d.floor_level)
+      )
+    : [];
+
+  const refreshDrawings = () => {
+    queryClient.invalidateQueries({ queryKey: ['layout-areas'] });
+    queryClient.invalidateQueries({ queryKey: ['area-representations'] });
+    queryClient.invalidateQueries({ queryKey: ['layout-coverage'] });
+  };
+
+  const resetModes = () => {
     setDrawMode(false);
     setEditMode(false);
     setAddingZone(false);
-    setSelectedFloor(level);
+    setDrawingFor(null);
   };
 
-  // Delete representation mutation
+  const goToFloor = (level: number) => {
+    setSelectedId(null);
+    resetModes();
+    setChosenFloor(level);
+  };
+
   const deleteMutation = useMutation({
     mutationFn: deleteRepresentation,
     onSuccess: () => {
-      toast.success('Representación de área eliminada exitosamente');
-      queryClient.invalidateQueries({ queryKey: ['layout-areas'] });
-      queryClient.invalidateQueries({ queryKey: ['area-representations'] });
-      setSelectedArea(null);
+      toast.success('Área quitada del plano');
+      refreshDrawings();
+      setSelectedId(null);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al eliminar representación');
-    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Error al quitar el área'),
   });
 
-  // Update representation geometry mutation (edit, add or remove a zone)
+  // Edit, add or remove a zone (the selection stays, with the fresh shape)
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; geometry: AreaGeometry; message: string }) =>
+    mutationFn: (data: { id: string; geometry: AreaGeometry; message: string; zone?: number }) =>
       updateRepresentation(data.id, { geometry: data.geometry }),
     onSuccess: (_, data) => {
       toast.success(data.message);
-      queryClient.invalidateQueries({ queryKey: ['layout-areas'] });
-      queryClient.invalidateQueries({ queryKey: ['area-representations'] });
-      setSelectedArea(null);
+      refreshDrawings();
+      if (data.zone !== undefined) setSelectedZone(data.zone);
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al actualizar geometría');
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Error al actualizar la forma'),
+  });
+
+  // An area picked from "Sin dibujar": the drawing is linked to it right away
+  const drawForMutation = useMutation({
+    mutationFn: ({ area, coordinates }: { area: AreaCoverage; coordinates: number[][] }) =>
+      createRepresentation(area.id, { layout_id: currentLayout!.id, geometry: leafletToGeoJSON(coordinates), floor_level: selectedFloor }),
+    onSuccess: (rep, { area }) => {
+      toast.success(`${area.name} dibujada en el plano`);
+      refreshDrawings();
+      setSelectedId(rep.id);
+      setSelectedZone(0);
     },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo guardar el dibujo'),
   });
 
   const handleAreaClick = (area: AreaPhysicalRepresentation, zoneIndex: number) => {
-    setSelectedArea(area);
+    setSelectedId(area.id);
     setSelectedZone(zoneIndex);
   };
 
   const handleDeleteArea = () => {
-    const zones = selectedArea ? zonesOf(selectedArea.geometry).length : 0;
+    if (!selectedArea) return;
     const message =
-      zones > 1
-        ? `¿Quitar ${selectedArea!.display_name || selectedArea!.organizational_area?.name} del plano? Se borran sus ${zones} zonas; el área sigue existiendo.`
-        : '¿Estás seguro de eliminar esta representación física del área?';
-    if (selectedArea && window.confirm(message)) {
-      deleteMutation.mutate(selectedArea.id);
-    }
+      selectedZoneCount > 1
+        ? `¿Quitar ${selectedAreaName} del plano? Se borran sus ${selectedZoneCount} zonas; el área sigue existiendo.`
+        : `¿Quitar ${selectedAreaName} del plano? El área sigue existiendo, solo se borra su dibujo.`;
+    if (window.confirm(message)) deleteMutation.mutate(selectedArea.id);
   };
 
   const handleStartDrawing = () => {
+    resetModes();
+    setSelectedId(null);
     setDrawMode(true);
-    setEditMode(false);
-    setAddingZone(false);
-    setSelectedArea(null);
+  };
+
+  const handleDrawFor = (area: AreaCoverage) => {
+    resetModes();
+    setSelectedId(null);
+    setDrawingFor(area);
+    setDrawMode(true);
   };
 
   const handleStartAddingZone = () => {
     if (!selectedArea) return;
+    resetModes();
     setAddingZone(true);
     setDrawMode(true);
-    setEditMode(false);
-  };
-
-  const cancelDrawing = () => {
-    setDrawMode(false);
-    setAddingZone(false);
   };
 
   const handleDeleteZone = () => {
     if (!selectedArea) return;
-    if (!window.confirm(`¿Eliminar la zona ${selectedZone + 1} de ${selectedAreaName}? Las demás zonas del área se conservan.`)) return;
-    updateMutation.mutate({ id: selectedArea.id, geometry: removeZone(selectedArea.geometry, selectedZone), message: 'Zona eliminada' });
-  };
-
-  const handleStartEditing = () => {
-    if (selectedArea) {
-      setEditMode(true);
-      setDrawMode(false);
-    }
+    if (!window.confirm(`¿Eliminar la zona ${zone + 1} de ${selectedAreaName}? Las demás zonas del área se conservan.`)) return;
+    updateMutation.mutate({ id: selectedArea.id, geometry: removeZone(selectedArea.geometry, zone), message: 'Zona eliminada', zone: 0 });
   };
 
   const handleAreaDrawn = (coordinates: number[][]) => {
     if (addingZone && selectedArea) {
-      cancelDrawing();
-      updateMutation.mutate({ id: selectedArea.id, geometry: addZone(selectedArea.geometry, ringFromLeaflet(coordinates)), message: 'Zona agregada' });
+      resetModes();
+      updateMutation.mutate({
+        id: selectedArea.id,
+        geometry: addZone(selectedArea.geometry, ringFromLeaflet(coordinates)),
+        message: 'Zona agregada',
+        zone: selectedZoneCount, // the new zone is the last one
+      });
+      return;
+    }
+    if (drawingFor) {
+      const area = drawingFor;
+      resetModes();
+      drawForMutation.mutate({ area, coordinates });
       return;
     }
     setDrawnCoordinates(coordinates);
-    setDrawMode(false);
-    setEditMode(false);
+    resetModes();
     setIsLinkAreaModalOpen(true);
   };
 
-  const handleAreaEdited = async (coordinates: number[][]) => {
+  const handleAreaEdited = (coordinates: number[][]) => {
     if (!selectedArea) return;
     // Only the edited zone changes; the other zones of the area stay as they are
-    updateMutation.mutate({
-      id: selectedArea.id,
-      geometry: replaceZone(selectedArea.geometry, selectedZone, ringFromLeaflet(coordinates)),
-      message: 'Forma actualizada',
-    });
+    updateMutation.mutate({ id: selectedArea.id, geometry: replaceZone(selectedArea.geometry, zone, ringFromLeaflet(coordinates)), message: 'Forma actualizada' });
     setEditMode(false);
   };
-
-  const selectedAreaName = selectedArea?.display_name || selectedArea?.organizational_area?.name || 'el área';
-  const selectedZoneCount = selectedArea ? zonesOf(selectedArea.geometry).length : 0;
 
   const handleCloseModal = () => {
     setIsLinkAreaModalOpen(false);
     setDrawnCoordinates(null);
-    setSelectedArea(null);
+    queryClient.invalidateQueries({ queryKey: ['layout-coverage'] });
   };
+
+  const drawTitle = addingZone
+    ? `Nueva zona de ${selectedAreaName}`
+    : drawingFor
+      ? `Dibujando: ${drawingFor.name}`
+      : undefined;
 
   return (
     <div className={`flex flex-col ${embedded ? 'lg:h-[calc(100vh-17rem)] lg:min-h-[32rem]' : 'lg:h-[calc(100vh-8rem)]'}`}>
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4">
         <SectionHeader
           title={embedded ? 'Layout' : 'Layout 2D'}
           description={embedded ? 'Plano de cada piso con las áreas dibujadas encima.' : 'Diseña y gestiona distribuciones de planta en 2D'}
           actions={
-            selectedPlantId && (
-              !drawMode && !editMode ? (
-                <>
-                  {areaRepresentations.length > 0 && <LabelModeToggle value={labelMode} onChange={setLabelMode} />}
-                  <Button
-                    onClick={() => setIsLayoutModalOpen(true)}
-                    className="gap-2"
-                    variant={currentLayout ? "outline" : "primary"}
-                  >
-                    <Upload className="h-4 w-4" />
-                    {currentLayout ? 'Editar Layout' : 'Subir Layout'}
+            selectedPlantId &&
+            (!drawMode && !editMode ? (
+              <>
+                {areaRepresentations.length > 0 && <LabelModeToggle value={labelMode} onChange={setLabelMode} />}
+                <Button onClick={() => setIsLayoutModalOpen(true)} className="gap-2" variant={currentLayout ? 'outline' : 'primary'}>
+                  <Upload className="h-4 w-4" />
+                  {currentLayout ? 'Cambiar plano' : 'Subir plano'}
+                </Button>
+                {currentLayout && (
+                  <Button onClick={handleStartDrawing} className="gap-2">
+                    <PenTool className="h-4 w-4" />
+                    Dibujar Área
                   </Button>
-                  {currentLayout && (
-                    <Button onClick={handleStartDrawing} className="gap-2">
-                      <PenTool className="h-4 w-4" />
-                      Dibujar Área
-                    </Button>
-                  )}
-                </>
-              ) : drawMode ? (
-                <Button onClick={cancelDrawing} variant="outline">
-                  Cancelar Dibujo
-                </Button>
-              ) : (
-                <Button onClick={() => setEditMode(false)} variant="outline">
-                  Cancelar Edición
-                </Button>
-              )
-            )
+                )}
+              </>
+            ) : drawMode ? (
+              <Button onClick={resetModes} variant="outline">
+                Cancelar Dibujo
+              </Button>
+            ) : (
+              <Button onClick={() => setEditMode(false)} variant="outline">
+                Cancelar Edición
+              </Button>
+            ))
           }
         />
 
-        {/* Filters */}
-        <div className="mt-4 flex flex-wrap gap-4">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           {!embedded && (
-            <div className="w-full sm:w-64">
-              <label htmlFor="plant-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Seleccionar Planta
-              </label>
-              <select
-                id="plant-select"
-                value={selectedPlantId}
-                onChange={(e) => setSelectedPlantId(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              >
-                <option value="">Seleccionar planta</option>
-                {plantsData?.plants.map((plant) => (
-                  <option key={plant.id} value={plant.id}>
-                    {plant.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              id="plant-select"
+              aria-label="Planta"
+              value={selectedPlantId}
+              onChange={(e) => {
+                setSelectedPlantId(e.target.value);
+                goToFloor(0);
+                setChosenFloor(null);
+              }}
+              className="w-full sm:w-64"
+            >
+              <option value="">Seleccionar planta</option>
+              {plantsData?.plants.map((plant) => (
+                <option key={plant.id} value={plant.id}>
+                  {plant.name}
+                </option>
+              ))}
+            </select>
           )}
 
+          {/* Floors: only those with a plan, plus "+ Piso" */}
           {selectedPlantId && (
-            <div className="w-full sm:w-48">
-              <label htmlFor="floor-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Piso
-              </label>
-              <select
-                id="floor-select"
-                value={selectedFloor}
-                onChange={(e) => setSelectedFloor(parseInt(e.target.value))}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              >
-                <option value={0}>Planta Baja</option>
-                <option value={1}>Piso 1</option>
-                <option value={2}>Piso 2</option>
-                <option value={3}>Piso 3</option>
-                <option value={-1}>Sótano</option>
-              </select>
+            <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Piso">
+              {floorTabs.map((level) => {
+                const hasPlan = floorsWithPlan.includes(level);
+                return (
+                  <button
+                    key={level}
+                    role="tab"
+                    aria-selected={level === selectedFloor}
+                    onClick={() => goToFloor(level)}
+                    className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                      level === selectedFloor ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {floorLabel(level)}
+                    {!hasPlan && <span className="ml-1 text-xs opacity-80">(sin plano)</span>}
+                  </button>
+                );
+              })}
+              {addingFloor ? (
+                <select
+                  autoFocus
+                  aria-label="Piso a agregar"
+                  defaultValue=""
+                  onChange={(e) => {
+                    setAddingFloor(false);
+                    if (e.target.value === '') return;
+                    goToFloor(Number(e.target.value));
+                    setIsLayoutModalOpen(true);
+                  }}
+                  onBlur={() => setAddingFloor(false)}
+                  className="w-40 text-sm"
+                >
+                  <option value="">Elige el piso…</option>
+                  {FLOOR_CHOICES.filter((level) => !floorsWithPlan.includes(level)).map((level) => (
+                    <option key={level} value={level}>
+                      {floorLabel(level)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <button
+                  onClick={() => setAddingFloor(true)}
+                  disabled={drawMode || editMode}
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-400 px-3 py-1 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700 disabled:opacity-50"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Piso
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -289,202 +354,91 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
           <div>
             <MapPin className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Selecciona una planta</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Elige una planta para ver y editar su layout
-            </p>
+            <p className="mt-1 text-sm text-gray-500">Elige una planta para ver y editar su layout</p>
           </div>
         </div>
       ) : (
         <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row">
           {/* Map (fixed height when stacked on small screens; fills the page from lg up) */}
-          <div className="h-[420px] min-w-0 bg-white rounded-lg shadow overflow-hidden sm:h-[520px] lg:h-auto lg:flex-1">
+          <div className="relative h-[420px] min-w-0 bg-white rounded-lg shadow overflow-hidden sm:h-[520px] lg:h-auto lg:flex-1">
             <LayoutMap
               imageUrl={currentLayout?.layout_image_url || null}
               areas={areaRepresentations}
               onAreaClick={handleAreaClick}
               selectedAreaId={selectedArea?.id}
-              selectedZoneIndex={selectedZone}
+              selectedZoneIndex={zone}
               showAreaLabels
+              numberZones
+              mapControls
               labelMode={labelMode}
               highlightedId={drawMode || editMode ? null : hovered?.id ?? null}
               onShapeHover={(id) => !drawMode && !editMode && setHovered(id ? { id, from: 'map' } : null)}
               drawMode={drawMode}
-              drawTitle={addingZone ? `Nueva zona de ${selectedAreaName}` : undefined}
+              drawTitle={drawTitle}
               editMode={editMode}
               editingArea={
                 editMode && selectedArea
                   ? {
-                    id: selectedArea.id,
-                    geometry: zoneAsPolygon(selectedArea.geometry, selectedZone),
-                    zoneIndex: selectedZone,
-                    name: selectedArea.display_name || selectedArea.organizational_area?.name,
-                    color: selectedArea.display_color || selectedArea.organizational_area?.color || undefined,
-                  }
+                      id: selectedArea.id,
+                      geometry: zoneAsPolygon(selectedArea.geometry, zone),
+                      zoneIndex: zone,
+                      name: selectedZoneCount > 1 ? `${selectedAreaName} · zona ${zone + 1}` : selectedAreaName,
+                      color: selectedArea.display_color || selectedArea.organizational_area?.color || undefined,
+                    }
                   : null
               }
               onAreaDrawn={handleAreaDrawn}
               onAreaEdited={handleAreaEdited}
-              onCancelDraw={cancelDrawing}
+              onCancelDraw={resetModes}
               onCancelEdit={() => setEditMode(false)}
             />
-          </div>
-
-          {/* Sidebar */}
-          <div className="w-full bg-white rounded-lg shadow p-4 lg:w-80 lg:overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Áreas ({areaRepresentations.length})
-            </h3>
-
-            {areaRepresentations.length === 0 ? (
-              <div className="text-center py-8">
-                <Square className="mx-auto h-8 w-8 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-500">No hay áreas</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Dibuja un área para vincularla
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {areaRepresentations.map((areaRep) => {
-                  const area = areaRep.organizational_area;
-                  const displayName = areaRep.display_name || area?.name || 'Sin nombre';
-                  const displayColor = areaRep.display_color || area?.color || '#3B82F6';
-                  const zoneCount = zonesOf(areaRep.geometry).length;
-
-                  return (
-                    <div
-                      key={areaRep.id}
-                      ref={(el) => {
-                        if (el) listRows.current.set(areaRep.id, el);
-                        else listRows.current.delete(areaRep.id);
-                      }}
-                      onClick={() => handleAreaClick(areaRep, 0)}
-                      onMouseEnter={() => setHovered({ id: areaRep.id, from: 'list' })}
-                      onMouseLeave={() => setHovered(null)}
-                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedArea?.id === areaRep.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : hovered?.id === areaRep.id
-                          ? 'border-blue-300 bg-gray-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div
-                          className="w-4 h-4 rounded"
-                          style={{ backgroundColor: displayColor }}
-                        />
-                        <span className="font-medium text-sm text-gray-900">
-                          {displayName}
-                        </span>
-                        {zoneCount > 1 && (
-                          <span className="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{zoneCount} zonas</span>
-                        )}
-                      </div>
-
-                      {area?.code && (
-                        <p className="text-xs text-gray-600 mb-1">Código: {area.code}</p>
-                      )}
-
-                      {area && (
-                        <div className="flex items-center gap-2">
-                          <Badge variant="default" className="text-xs">
-                            {area.area_type}
-                          </Badge>
-                          {(area as any).full_path_name && (
-                            <span className="text-xs text-gray-500 truncate">
-                              {(area as any).full_path_name}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {selectedArea && !drawMode && !editMode && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  Representación Seleccionada
-                </h4>
-
-                {/* Show organizational area info */}
-                {selectedArea.organizational_area && (
-                  <div className="mb-3 p-2 bg-gray-50 rounded text-xs">
-                    <p className="font-medium text-gray-700">
-                      {selectedArea.organizational_area.name}
-                    </p>
-                    {(selectedArea.organizational_area as any).full_path_name && (
-                      <p className="text-gray-500 mt-1">
-                        {(selectedArea.organizational_area as any).full_path_name}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {otherFloors.length > 0 && (
-                  <p className="mb-3 flex flex-wrap items-center gap-1 text-xs text-gray-600">
-                    También en:
-                    {otherFloors.map((level) => (
-                      <button
-                        key={level}
-                        onClick={() => goToFloor(level)}
-                        className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700 hover:bg-blue-100"
-                      >
-                        {floorLabel(level)}
-                      </button>
-                    ))}
-                  </p>
-                )}
-
-                {selectedZoneCount > 1 && (
-                  <p className="mb-3 text-xs text-gray-600">
-                    Zona <strong>{selectedZone + 1}</strong> de {selectedZoneCount} seleccionada (resaltada en el plano). Da clic en otra zona
-                    del área para elegirla.
-                  </p>
-                )}
-
-                <div className="space-y-2">
-                  <Button
-                    onClick={() => navigate(`/areas/${selectedArea.organizational_area_id}?tab=layout&floor=${selectedFloor}`)}
-                    className="w-full gap-2 justify-center"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                    Abrir layout interno
-                  </Button>
-                  <Button
-                    onClick={handleStartEditing}
-                    className="w-full gap-2 justify-center"
-                    variant="outline"
-                  >
-                    <PenTool className="h-4 w-4" />
-                    {selectedZoneCount > 1 ? `Editar zona ${selectedZone + 1}` : 'Editar Geometría'}
-                  </Button>
-                  <Button onClick={handleStartAddingZone} className="w-full gap-2 justify-center" variant="outline">
-                    <Plus className="h-4 w-4" />
-                    Agregar otra zona
-                  </Button>
-                  {selectedZoneCount > 1 && (
-                    <Button
-                      onClick={handleDeleteZone}
-                      className="w-full gap-2 justify-center border-red-300 text-red-700 hover:bg-red-50"
-                      variant="outline"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Eliminar zona {selectedZone + 1}
-                    </Button>
-                  )}
-                  <Button
-                    onClick={handleDeleteArea}
-                    className="w-full gap-2 justify-center bg-red-600 hover:bg-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {selectedZoneCount > 1 ? 'Quitar el área del plano' : 'Eliminar Representación'}
+            {!currentLayout && (
+              <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-white/80">
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-900">{floorLabel(selectedFloor)} no tiene plano todavía</p>
+                  <Button onClick={() => setIsLayoutModalOpen(true)} className="mt-3 gap-2">
+                    <Upload className="h-4 w-4" /> Subir plano
                   </Button>
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Sidebar: the selected area first, then the list */}
+          <div className="w-full space-y-4 bg-white rounded-lg shadow p-4 lg:w-80 lg:overflow-y-auto">
+            {selectedArea && !drawMode && !editMode && (
+              <SelectedAreaPanel
+                rep={selectedArea}
+                zoneIndex={zone}
+                zoneCount={selectedZoneCount}
+                otherFloors={otherFloors}
+                canEdit
+                backState={backState}
+                onSelectZone={setSelectedZone}
+                onGoToFloor={goToFloor}
+                onOpenInternal={() => navigate(`/areas/${selectedArea.organizational_area_id}?tab=layout&floor=${selectedFloor}`)}
+                onEditZone={() => {
+                  resetModes();
+                  setEditMode(true);
+                }}
+                onAddZone={handleStartAddingZone}
+                onDeleteZone={handleDeleteZone}
+                onRemove={handleDeleteArea}
+                onClose={() => setSelectedId(null)}
+              />
+            )}
+            <LayoutAreaList
+              drawn={areaRepresentations}
+              coverage={coverage}
+              floor={selectedFloor}
+              selectedId={selectedArea?.id ?? null}
+              hoveredId={hovered?.id ?? null}
+              onSelect={(rep) => handleAreaClick(rep, 0)}
+              onHover={(id) => setHovered(id ? { id, from: 'list' } : null)}
+              onDraw={currentLayout && !drawMode && !editMode ? handleDrawFor : undefined}
+              onGoToFloor={goToFloor}
+              rowRef={(id, el) => (el ? listRows.current.set(id, el) : listRows.current.delete(id))}
+            />
           </div>
         </div>
       )}
@@ -502,10 +456,13 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
         />
       )}
 
-      {/* Layout Modal */}
+      {/* Plan of the floor */}
       <LayoutModal
         isOpen={isLayoutModalOpen}
-        onClose={() => setIsLayoutModalOpen(false)}
+        onClose={() => {
+          setIsLayoutModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['layouts', selectedPlantId] });
+        }}
         layout={currentLayout}
         plantId={selectedPlantId}
         floorLevel={selectedFloor}

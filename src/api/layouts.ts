@@ -86,6 +86,23 @@ export const getLayout = async (id: string): Promise<PlantLayout> => {
 };
 
 // Internal layout of an organizational area (null when the area has none yet)
+/** Where each area of the plant is drawn: a plant floor (inside_area_id null) or another area's internal layout */
+export interface AreaCoverage {
+  id: string;
+  name: string;
+  code: string | null;
+  color: string | null;
+  area_type: string;
+  parent_area_id: string | null;
+  parent_name: string | null;
+  drawn: { layout_id: string; floor_level: number; inside_area_id: string | null }[];
+}
+
+export const getPlantCoverage = async (plantId: string): Promise<AreaCoverage[]> => {
+  const { data } = await apiClient.get(`/layouts/plant/${plantId}/coverage`);
+  return data.areas || [];
+};
+
 /** Internal layouts of an area, one per floor */
 export const getAreaLayouts = async (areaId: string): Promise<PlantLayout[]> => {
   const { data } = await apiClient.get(`/layouts/area/${areaId}/floors`);

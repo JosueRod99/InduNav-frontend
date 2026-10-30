@@ -289,7 +289,10 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
             id: selection.item.id,
             geometry: zoneAsPolygon(selection.item.geometry, selection.zoneIndex),
             zoneIndex: selection.zoneIndex,
-            name: selection.item.organizational_area?.name,
+            name:
+              zonesOf(selection.item.geometry).length > 1
+                ? `${selection.item.organizational_area?.name} · zona ${selection.zoneIndex + 1}`
+                : selection.item.organizational_area?.name,
             color: selection.item.display_color || selection.item.organizational_area?.color || undefined,
           }
         : {
@@ -459,6 +462,8 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
             onAreaClick={(item, zoneIndex) => !isBusy && setSelection({ kind: 'area', item, zoneIndex })}
             selectedAreaId={selection?.kind === 'area' ? selection.item.id : null}
             selectedZoneIndex={selection?.kind === 'area' ? selection.zoneIndex : null}
+            numberZones
+            mapControls
             footprints={mapFootprints}
             onFootprintClick={(fp) => {
               const item = footprints.find((f) => f.id === fp.id);

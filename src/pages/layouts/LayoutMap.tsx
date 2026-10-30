@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { MapContainer, ImageOverlay, Polygon, Polyline, Rectangle, Tooltip, useMap } from 'react-leaflet';
-import { Check, RotateCcw, X } from 'lucide-react';
+import { Check, Crosshair, Maximize, Minimize, RotateCcw, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import type { AreaPhysicalRepresentation, GeoJSONPolygon } from '../../api/areaRepresentations';
 import Button from '../../components/ui/Button';
@@ -51,6 +51,8 @@ interface LayoutMapProps {
   colorByStatus?: boolean; // fill footprints by equipment status instead of their own color
   statusLabels?: Record<EquipmentStatus, string>; // legend texts (defaults to Spanish labels)
   showAreaLabels?: boolean; // name label on each area
+  numberZones?: boolean; // areas with several zones: "Logística · zona 2" on each zone (editors)
+  mapControls?: boolean; // "fit view" and full screen buttons
   // 'permanent': labels always visible. 'hover': only on hover, or when the shape is
   // highlighted/selected (touch screens have no hover)
   labelMode?: 'permanent' | 'hover';
@@ -87,6 +89,73 @@ function MapBoundsHandler() {
   }, [map]);
 
   return null;
+}
+
+// Enter / Escape / Backspace while drawing or editing points (not while typing in a field)
+const useDrawingKeys = (active: boolean, keys: { finish: () => void; cancel: () => void; undo: () => void }) => {
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (e.key === 'Enter') keys.finish();
+      else if (e.key === 'Escape') keys.cancel();
+      else if (e.key === 'Backspace') {
+        e.preventDefault();
+        keys.undo();
+      } else return;
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+};
+
+const KeysHint = () => (
+  <p className="text-[11px] text-gray-500">
+    Teclas: <kbd className="rounded border border-gray-300 px-1">Enter</kbd> terminar · <kbd className="rounded border border-gray-300 px-1">Esc</kbd> cancelar ·{' '}
+    <kbd className="rounded border border-gray-300 px-1">⌫</kbd> deshacer
+  </p>
+);
+
+// "Fit view" and full screen, top right of the map
+function MapControls({ container, bounds }: { container: React.RefObject<HTMLDivElement>; bounds: L.LatLngBoundsExpression }) {
+  const map = useMap();
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => {
+      setFullscreen(document.fullscreenElement === container.current);
+      setTimeout(() => map.invalidateSize(), 50);
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, [map, container]);
+
+  const buttonClass =
+    'flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-50';
+  return (
+    <div className="absolute right-3 top-3 z-[1000] flex flex-col gap-1.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className={buttonClass}
+        title="Ajustar vista"
+        aria-label="Ajustar vista"
+        onClick={() => map.fitBounds(L.latLngBounds(bounds as L.LatLngBoundsLiteral), { padding: [8, 8] })}
+      >
+        <Crosshair className="h-4 w-4" />
+      </button>
+      {document.fullscreenEnabled && (
+        <button
+          type="button"
+          className={buttonClass}
+          title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          onClick={() => (fullscreen ? document.exitFullscreen() : container.current?.requestFullscreen())}
+        >
+          {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+        </button>
+      )}
+    </div>
+  );
 }
 
 // Component to handle drawing mode with editable points
@@ -265,6 +334,8 @@ function DrawingHandler({
     onCancel?.();
   };
 
+  useDrawingKeys(drawMode, { finish: handleFinish, cancel: handleCancel, undo: handleUndo });
+
   // Render control panel
   if (!drawMode) return null;
 
@@ -292,6 +363,7 @@ function DrawingHandler({
           <p>• <strong>Click</strong> en el mapa para agregar puntos</p>
           <p>• <strong>Arrastra</strong> los puntos para ajustar</p>
           <p>• Mínimo <strong>3 puntos</strong> para crear el área</p>
+          <KeysHint />
         </div>
 
         <div className="flex items-center justify-between py-2 px-3 bg-blue-50 rounded-lg">
@@ -558,6 +630,8 @@ function EditingHandler({
     onCancel?.();
   };
 
+  useDrawingKeys(editMode, { finish: handleFinish, cancel: handleCancel, undo: handleUndo });
+
   // Render control panel
   if (!editMode) return null;
 
@@ -586,6 +660,7 @@ function EditingHandler({
           <p>• <strong>Arrastra</strong> los puntos para ajustar</p>
           <p>• <strong>Click en ×</strong> para eliminar un punto</p>
           <p>• Mínimo <strong>3 puntos</strong> requeridos</p>
+          <KeysHint />
         </div>
 
         <div className="flex items-center justify-between py-2 px-3 bg-blue-50 rounded-lg">
@@ -659,6 +734,8 @@ const LayoutMap = ({
   colorByStatus = false,
   statusLabels = EQUIPMENT_STATUS_LABELS,
   showAreaLabels = false,
+  numberZones = false,
+  mapControls = false,
   labelMode = 'permanent',
   highlightedId = null,
   onShapeHover,
@@ -686,8 +763,10 @@ const LayoutMap = ({
     return acc;
   }, {});
 
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
   return (
-    <div className="relative w-full h-full">
+    <div ref={wrapperRef} className="relative w-full h-full bg-white">
       <MapContainer
         center={[500, 500]}
         zoom={0}
@@ -703,6 +782,7 @@ const LayoutMap = ({
         scrollWheelZoom={scrollWheelZoom}
       >
         <MapBoundsHandler />
+        {mapControls && <MapControls container={wrapperRef} bounds={CANVAS_BOUNDS} />}
         <DrawingHandler
           drawMode={drawMode || false}
           title={drawTitle}
@@ -765,8 +845,9 @@ const LayoutMap = ({
         ))}
 
         {/* Every zone of an area is drawn with the area's color and its own name label */}
-        {areas.flatMap((area) =>
-          zonesOf(area.geometry).map((ring, zoneIndex) => {
+        {areas.flatMap((area) => {
+          const zones = zonesOf(area.geometry);
+          return zones.map((ring, zoneIndex) => {
             // Don't render the zone being edited (EditingHandler handles it)
             if (isEditing(area.id, zoneIndex)) return null;
 
@@ -801,12 +882,13 @@ const LayoutMap = ({
                     className="area-name-label"
                   >
                     {area.display_name || area.organizational_area?.name}
+                    {numberZones && zones.length > 1 && <span className="font-normal opacity-75"> · zona {zoneIndex + 1}</span>}
                   </Tooltip>
                 )}
               </Polygon>
             );
-          })
-        )}
+          });
+        })}
 
         {/* Route through the areas (tour order) */}
         {route && route.length >= 2 && (
