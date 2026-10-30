@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import { CheckCircle, Copy, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Modal from './ui/Modal';
+import PhoneInput from './ui/PhoneInput';
+import { isValidPhone } from '../utils/phone';
 import {
   CONTACT_EMAIL,
   DEFAULT_CONTACT_SUBJECT,
@@ -43,6 +45,10 @@ const ContactModal = ({ isOpen, onClose, subject = DEFAULT_CONTACT_SUBJECT }: Co
     e.preventDefault();
     // Campo trampa: solo los bots lo llenan
     if (honeypot) return;
+    if (form.phone && !isValidPhone(form.phone)) {
+      toast.error('Revisa el teléfono: el número no es válido');
+      return;
+    }
 
     setIsSending(true);
     try {
@@ -118,7 +124,7 @@ const ContactModal = ({ isOpen, onClose, subject = DEFAULT_CONTACT_SUBJECT }: Co
           </div>
           <div>
             <label className={labelClass}>Teléfono</label>
-            <input type="tel" className={inputClass} value={form.phone} onChange={update('phone')} />
+            <PhoneInput value={form.phone} onChange={(phone) => setForm((prev) => ({ ...prev, phone }))} ariaLabel="Teléfono" />
           </div>
         </div>
         <div>

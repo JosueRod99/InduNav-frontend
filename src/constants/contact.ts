@@ -1,3 +1,4 @@
+import { formatPhoneInternational } from '../utils/phone';
 export const CONTACT_EMAIL = 'erickaguirre@inau.mx';
 
 export const DEFAULT_CONTACT_SUBJECT = 'Contacto desde INAU';
@@ -24,7 +25,7 @@ export const sendContactForm = async (data: ContactFormData, subject: string) =>
     body: JSON.stringify({
       Nombre: data.name,
       email: data.email, // FormSubmit lo usa como Reply-To
-      Teléfono: data.phone || '—',
+      Teléfono: data.phone ? formatPhoneInternational(data.phone) : '—',
       Empresa: data.company || '—',
       Mensaje: data.message,
       _subject: `${subject} - ${data.name}`,

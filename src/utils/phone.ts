@@ -19,3 +19,8 @@ export const phoneHref = (value: string | null | undefined) => {
   const phone = parsePhoneNumberFromString(value, DEFAULT_COUNTRY);
   return `tel:${phone ? phone.number : value.replace(/[^\d+]/g, '')}`;
 };
+
+export const isValidPhone = (value: string) => !!parsePhoneNumberFromString(value, DEFAULT_COUNTRY)?.isValid();
+
+/** "+52 656 412 8901": readable and with the country code, for emails */
+export const formatPhoneInternational = (value: string) => parsePhoneNumberFromString(value, DEFAULT_COUNTRY)?.formatInternational() || value;
