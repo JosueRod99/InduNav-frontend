@@ -388,6 +388,19 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
             {form.tour_display.plant ? 'Cada tour muestra la información de su planta.' : 'Los tours no muestran la información de la planta.'}
           </p>
         </Section>
+
+        <Section
+          title="Documentos generales en los tours"
+          hint="Los documentos de toda la empresa o de toda la planta (se administran en la pestaña Documentos de cada planta)."
+          block="documents"
+          {...sectionProps}
+        >
+          <p className="text-sm text-gray-600">
+            {form.tour_display.documents
+              ? 'Aparecen una sola vez al inicio del tour (no en cada parada). Los privados y los que no tienen archivo no se muestran.'
+              : 'Los tours no muestran los documentos generales.'}
+          </p>
+        </Section>
       </fieldset>
 
       {/* Photos save on their own (outside the form's save button) */}

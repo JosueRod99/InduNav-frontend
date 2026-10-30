@@ -21,7 +21,7 @@ export interface OrganizationProfileData {
   address: string;
 }
 
-export const TOUR_DISPLAY_BLOCKS = ['about', 'mission', 'vision', 'values', 'contact', 'gallery', 'plant'] as const;
+export const TOUR_DISPLAY_BLOCKS = ['about', 'mission', 'vision', 'values', 'contact', 'gallery', 'plant', 'documents'] as const;
 export type TourDisplayBlock = (typeof TOUR_DISPLAY_BLOCKS)[number];
 export type TourDisplay = Record<TourDisplayBlock, boolean>;
 

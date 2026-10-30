@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Upload, FileText, Link, Check } from 'lucide-react';
-import { createDocumentVersion, getFileIcon, type AreaDocument } from '../../../api/areaDocuments';
+import { createDocumentVersion, getFileIcon, invalidateDocumentLists, type AreaDocument } from '../../../api/areaDocuments';
 import apiClient from '../../../api/client';
 import Button from '../../../components/ui/Button';
 
@@ -30,8 +30,7 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
     mutationFn: (data: any) => createDocumentVersion(document!.id, data),
     onSuccess: () => {
       // Invalidar ambos queries (active y archived)
-      queryClient.invalidateQueries({ queryKey: ['area-documents-active', document!.organizational_area_id] });
-      queryClient.invalidateQueries({ queryKey: ['area-documents-archived', document!.organizational_area_id] });
+      invalidateDocumentLists(queryClient); // a general document shows in many lists
       queryClient.invalidateQueries({ queryKey: ['document-versions', document!.id] });
       handleClose();
       // Llamar callback si existe (para cerrar modal padre si viene desde EditDocumentModal)
@@ -147,7 +146,7 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
         formData.append('file', selectedFile!);
         formData.append('organization_id', organizationId);
         formData.append('plant_id', plantId);
-        formData.append('area_id', document.organizational_area_id);
+        if (document.organizational_area_id) formData.append('area_id', document.organizational_area_id);
 
         const uploadResponse = await apiClient.post('/upload/document', formData, {
           headers: {

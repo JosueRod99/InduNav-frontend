@@ -23,6 +23,7 @@ const loaders = {
   organigrama: () => import('../org-chart/OrgChartPage'),
   procesos: () => import('../processes/ProcessesTab'),
   certificaciones: () => import('../certifications/PlantCertificationsTab'),
+  documentos: () => import('../documents/PlantDocumentsTab'),
 };
 
 const LayoutsPage = lazy(loaders.layout);
@@ -33,6 +34,7 @@ const EmployeesPage = lazy(loaders.personal);
 const OrgChartPage = lazy(loaders.organigrama);
 const ProcessesTab = lazy(loaders.procesos);
 const PlantCertificationsTab = lazy(loaders.certificaciones);
+const PlantDocumentsTab = lazy(loaders.documentos);
 
 
 
@@ -189,6 +191,7 @@ const PlantWorkspacePage = () => {
           {activeTab === 'productos' && <ProductsPage {...scope} />}
           {activeTab === 'procesos' && <ProcessesTab plantId={plant.id} organizationId={plant.organization_id} />}
           {activeTab === 'certificaciones' && <PlantCertificationsTab plant={plant} />}
+          {activeTab === 'documentos' && <PlantDocumentsTab plant={plant} />}
           {activeTab === 'personal' && (
             <div className="space-y-4">
               <div className={`flex rounded-lg border border-gray-300 bg-white p-0.5 text-sm font-medium w-fit ${canSeeEmployeeList ? '' : 'hidden'}`} role="group" aria-label="Vista del personal">

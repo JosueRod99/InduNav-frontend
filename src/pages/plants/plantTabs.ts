@@ -1,4 +1,4 @@
-import { Award, GitBranch, LayoutDashboard, LayoutGrid, Layers, Map, Package, Settings, Users, Wrench } from 'lucide-react';
+import { Award, FileText, GitBranch, LayoutDashboard, LayoutGrid, Layers, Map, Package, Settings, Users, Wrench } from 'lucide-react';
 
 // Tabs of the plant workspace (/plants/:plantId/:tab)
 
@@ -12,6 +12,7 @@ export const PLANT_TABS = [
   { id: 'productos', label: 'Productos', Icon: Package, roles: MANAGERS },
   { id: 'procesos', label: 'Procesos', Icon: GitBranch, roles: [...MANAGERS, 'plant_manager'] }, // across areas
   { id: 'certificaciones', label: 'Certificaciones', Icon: Award, roles: [...MANAGERS, 'plant_manager'] },
+  { id: 'documentos', label: 'Documentos', Icon: FileText, roles: [...MANAGERS, 'plant_manager'] }, // areas, plant and company
   { id: 'personal', label: 'Personal', Icon: Users, roles: undefined }, // the employee list: managers only
   { id: 'tours', label: 'Tours', Icon: Map, roles: undefined },
   { id: 'configuracion', label: 'Configuración', Icon: Settings, roles: undefined }, // read-only for non-managers

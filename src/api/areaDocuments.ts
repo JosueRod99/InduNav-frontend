@@ -1,8 +1,18 @@
+import type { QueryClient } from '@tanstack/react-query';
 import apiClient from './client';
+
+// Who a document applies to: one area · several areas · the whole plant · the whole organization.
+export type DocumentScope = 'area' | 'areas' | 'plant' | 'organization';
 
 export interface AreaDocument {
   id: string;
-  organizational_area_id: string;
+  organizational_area_id: string | null; // the area of an "area" scope document
+  organization_id: string;
+  plant_id: string | null; // null for "organization" scope
+  scope: DocumentScope;
+  area_name?: string | null;
+  plant_name?: string | null;
+  shared_areas?: { id: string; name: string }[];
   title: string;
   description?: string | null;
   document_code?: string | null;
@@ -34,7 +44,11 @@ export interface AreaDocument {
 }
 
 export interface CreateDocumentRequest {
-  organizational_area_id: string;
+  organizational_area_id?: string | null;
+  plant_id?: string | null;
+  organization_id?: string | null;
+  scope?: DocumentScope;
+  shared_area_ids?: string[];
   title: string;
   description?: string;
   document_code?: string;
@@ -57,6 +71,10 @@ export interface CreateDocumentRequest {
 }
 
 export interface UpdateDocumentRequest {
+  scope?: DocumentScope;
+  organizational_area_id?: string | null;
+  plant_id?: string | null;
+  shared_area_ids?: string[];
   title?: string;
   description?: string;
   document_code?: string;
@@ -146,14 +164,76 @@ export const createDocument = async (
   return response.data.data;
 };
 
+/** New document; where it applies: { scope, organizational_area_id | plant_id | organization_id, shared_area_ids } */
+export const createGeneralDocument = async (data: CreateDocumentRequest): Promise<AreaDocument> => {
+  const response = await apiClient.post('/documents', data);
+  return response.data.data;
+};
+
+/** Fields that say where a document applies, for create and update */
+export const scopeFields = (value: { scope: DocumentScope; areaId: string | null; sharedAreaIds: string[] }, plantId: string, organizationId: string) => ({
+  scope: value.scope,
+  organizational_area_id: value.scope === 'area' ? value.areaId : null,
+  plant_id: value.scope === 'organization' ? null : plantId,
+  organization_id: organizationId,
+  shared_area_ids: value.scope === 'areas' ? value.sharedAreaIds : [],
+});
+
+/** Documents that apply to an area besides its own: several areas including it, the plant, the organization */
+export const getApplicableDocuments = async (areaId: string): Promise<AreaDocument[]> => {
+  const response = await apiClient.get(`/organizational-areas/${areaId}/documents/applicable`);
+  return response.data.data;
+};
+
+/** Library of a plant: documents of its areas, of the plant and of the organization */
+export const getPlantDocuments = async (plantId: string, options: { includeArchived?: boolean } = {}): Promise<AreaDocument[]> => {
+  const response = await apiClient.get(`/plants/${plantId}/documents`, { params: options.includeArchived ? { includeArchived: 'true' } : {} });
+  return response.data.data;
+};
+
+/**
+ * Code the next document of this type and key would get, e.g. PROC-RH-003.
+ * Numbers are per organization, so any area or plant of it gives the same answer.
+ */
+export const getNextDocumentCode = async (codeSource: { areaId?: string; plantId?: string }, prefix: string, key: string): Promise<string> => {
+  const url = codeSource.areaId ? `/organizational-areas/${codeSource.areaId}/documents/next-code` : `/plants/${codeSource.plantId}/documents/next-code`;
+  const response = await apiClient.get(url, { params: { prefix, key } });
+  return response.data.data.code;
+};
+
+/** Every document list changes together (a general document shows in many places) */
+export const invalidateDocumentLists = (queryClient: QueryClient) => {
+  for (const key of ['area-documents-active', 'area-documents-archived', 'area-documents-applicable', 'plant-documents']) {
+    queryClient.invalidateQueries({ queryKey: [key] });
+  }
+};
+
+export const SCOPE_OPTIONS: { value: DocumentScope; label: string; hint: string }[] = [
+  { value: 'area', label: 'Un área', hint: 'Solo el área que elijas' },
+  { value: 'areas', label: 'Varias áreas', hint: 'Las áreas que elijas' },
+  { value: 'plant', label: 'Toda la planta', hint: 'Todas las áreas de la planta' },
+  { value: 'organization', label: 'Toda la empresa', hint: 'Todas las áreas de todas las plantas' },
+];
+
+/** Who it applies to: "Calidad", "Línea 1, Línea 2", "5 áreas", "Toda la planta", "Toda la empresa" */
+export const scopeLabel = (doc: Pick<AreaDocument, 'scope' | 'shared_areas' | 'area_name'>) => {
+  if (doc.scope === 'organization') return 'Toda la empresa';
+  if (doc.scope === 'plant') return 'Toda la planta';
+  if (doc.scope === 'area') return doc.area_name || 'Un área';
+  const names = (doc.shared_areas || []).map((a) => a.name);
+  return names.length <= 2 ? names.join(', ') : `${names.length} áreas`;
+};
+
+/** Does the document apply to this area? */
+export const appliesToArea = (doc: Pick<AreaDocument, 'scope' | 'organizational_area_id' | 'shared_areas'>, areaId: string) =>
+  doc.scope === 'organization' ||
+  doc.scope === 'plant' ||
+  (doc.scope === 'area' && doc.organizational_area_id === areaId) ||
+  (doc.scope === 'areas' && !!doc.shared_areas?.some((a) => a.id === areaId));
+
 /**
  * Update document metadata (not file)
  */
-/** Code the next document of this type and key would get, e.g. PROC-RH-003 */
-export const getNextDocumentCode = async (areaId: string, prefix: string, key: string): Promise<string> => {
-  const response = await apiClient.get(`/organizational-areas/${areaId}/documents/next-code`, { params: { prefix, key } });
-  return response.data.data.code;
-};
 
 // Quality-system document types used in codes (TYPE-KEY-NNN)
 export const DOCUMENT_CODE_TYPES = [

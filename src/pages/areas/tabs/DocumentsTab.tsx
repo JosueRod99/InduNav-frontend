@@ -1,8 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Upload, Trash2, Eye, ExternalLink, GitBranch } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { FileText, Upload, Trash2, Eye, ExternalLink, GitBranch, Globe2 } from 'lucide-react';
 import {
+  getApplicableDocuments,
   getDocumentsByArea,
+  invalidateDocumentLists,
+  scopeLabel,
   deleteDocument,
   getFileIcon,
   formatFileSize,
@@ -34,6 +38,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showPrivate, setShowPrivate] = useState<boolean>(false);
+  const [appliesFilter, setAppliesFilter] = useState<'' | 'area' | 'general'>(''); // only this area's / general ones
 
   // Debounce search query (500ms)
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -58,13 +63,19 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
     enabled: statusFilter === 'archived', // Solo ejecutar cuando filtran por archived
   });
 
-  // Combinar documentos activos y archivados según el filtro
+  // Documents that also apply here: several areas including this one, the whole plant, the whole company
+  const { data: generalDocuments = [] } = useQuery({
+    queryKey: ['area-documents-applicable', areaId],
+    queryFn: () => getApplicableDocuments(areaId),
+  });
+
+  // One list: this area's documents and the general ones (archived: only this area's)
   const allDocuments = useMemo(() => {
     if (statusFilter === 'archived') {
       return archivedDocuments || [];
     }
-    return activeDocuments || [];
-  }, [activeDocuments, archivedDocuments, statusFilter]);
+    return [...(activeDocuments || []), ...generalDocuments.filter((d) => showPrivate || !d.is_private)];
+  }, [activeDocuments, archivedDocuments, generalDocuments, statusFilter, showPrivate]);
 
   const isLoading = statusFilter === 'archived' ? isLoadingArchived : isLoadingActive;
 
@@ -75,6 +86,8 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
     return allDocuments.filter((doc) => {
       // Filter by category
       if (categoryFilter && doc.category !== categoryFilter) return false;
+      if (appliesFilter === 'area' && doc.scope !== 'area') return false;
+      if (appliesFilter === 'general' && doc.scope === 'area') return false;
 
       // Status ya está filtrado por el query correcto (activeDocuments vs archivedDocuments)
       // No necesitamos filtrar por status aquí
@@ -91,15 +104,11 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
 
       return true;
     });
-  }, [allDocuments, categoryFilter, debouncedSearchQuery]);
+  }, [allDocuments, categoryFilter, appliesFilter, debouncedSearchQuery]);
 
   const deleteDocumentMutation = useMutation({
     mutationFn: deleteDocument,
-    onSuccess: () => {
-      // Invalidar ambos queries (active y archived)
-      queryClient.invalidateQueries({ queryKey: ['area-documents-active', areaId] });
-      queryClient.invalidateQueries({ queryKey: ['area-documents-archived', areaId] });
-    },
+    onSuccess: () => invalidateDocumentLists(queryClient), // a general document shows in many lists
   });
 
   const handleDocumentClick = (document: AreaDocument) => {
@@ -120,7 +129,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
     return <div className="flex items-center justify-center py-12 text-gray-600">Cargando documentos...</div>;
   }
 
-  const hasActiveFilters = categoryFilter || statusFilter || searchQuery || showPrivate;
+  const hasActiveFilters = categoryFilter || statusFilter || searchQuery || showPrivate || appliesFilter;
   const noResults = !documents || documents.length === 0;
 
   return (
@@ -133,7 +142,15 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
               Documentos ({documents?.length || 0})
             </h3>
             <p className="text-sm text-gray-600 mt-1">
-              Documentos del área con versionado automático
+              Los de esta área y los generales que le aplican (de varias áreas, la planta o la empresa).
+              {area?.plant_id && (
+                <>
+                  {' '}
+                  <Link to={`/plants/${area.plant_id}/documentos`} className="font-medium text-blue-700 hover:underline">
+                    Ver todos en Documentos de la planta
+                  </Link>
+                </>
+              )}
             </p>
           </div>
           <button
@@ -146,7 +163,19 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {/* This area's / general */}
+          <select
+            value={appliesFilter}
+            onChange={(e) => setAppliesFilter(e.target.value as typeof appliesFilter)}
+            aria-label="A quién aplica"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Del área y generales</option>
+            <option value="area">Solo de esta área</option>
+            <option value="general">Generales y de varias áreas</option>
+          </select>
+
           {/* Category Filter */}
           <select
             value={categoryFilter}
@@ -235,6 +264,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
                 setStatusFilter('');
                 setSearchQuery('');
                 setShowPrivate(false);
+                setAppliesFilter('');
               }}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
             >
@@ -298,6 +328,14 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
                           <Badge variant="warning" size="sm" className="mt-1">
                             Privado
                           </Badge>
+                        )}
+                        {doc.scope && doc.scope !== 'area' && (
+                          <span
+                            className="mt-1 ml-1 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800"
+                            title={doc.scope === 'areas' ? `Aplica a: ${(doc.shared_areas || []).map((a) => a.name).join(', ')}` : undefined}
+                          >
+                            <Globe2 className="h-3 w-3" /> Aplica a: {scopeLabel(doc)}
+                          </span>
                         )}
                       </div>
                     </div>

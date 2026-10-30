@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Building2, ChevronLeft, ChevronRight, Compass, Factory, Globe, Heart, Mail, MapPin, Phone, Target, X } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, Compass, ExternalLink, Factory, FileText, Globe, Heart, Mail, MapPin, Phone, Target, X } from 'lucide-react';
 import type { TourLanguage } from '../../../api/tourBuilder';
-import { tr, type TourView } from '../../../api/tourView';
+import { tr, type TourGeneralDocument, type TourView } from '../../../api/tourView';
 import { formatPhone, phoneHref } from '../../../utils/phone';
 
 // Tour cover blocks about the company (profile from the organization's "Perfil" tab) and the
@@ -87,6 +87,30 @@ const PhotoStrip = ({ photos, language }: { photos: Photo[]; language: TourLangu
 
 const websiteLabel = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
+/** General documents (whole company / whole plant), shown once here instead of in every stop */
+const GeneralDocuments = ({ documents, title }: { documents: TourGeneralDocument[]; title: string }) =>
+  documents.length ? (
+    <div>
+      <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+        <FileText className="h-4 w-4 text-blue-600" />
+        {title}
+      </h3>
+      <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200">
+        {documents.map((d) => (
+          <li key={d.id}>
+            <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50">
+              <span className="min-w-0 flex-1">
+                {d.document_code && <span className="block font-mono text-xs font-semibold text-blue-700">{d.document_code}</span>}
+                <span className="block truncate text-sm font-medium text-slate-900">{d.title}</span>
+              </span>
+              <ExternalLink className="h-4 w-4 flex-shrink-0 text-slate-400" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ) : null;
+
 export const CompanySection = ({ view, language }: { view: TourView; language: TourLanguage }) => {
   const company = view.tour.organization.profile;
   if (!company) return null;
@@ -96,7 +120,8 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
   const vision = tr(company.vision, language);
   const values = company.values.filter((v) => tr(v.title, language));
   const contact = company.contact && Object.values(company.contact).some(Boolean) ? company.contact : null;
-  if (!about && !mission && !vision && !values.length && !contact && !company.photos.length) return null;
+  const documents = company.documents || [];
+  if (!about && !mission && !vision && !values.length && !contact && !company.photos.length && !documents.length) return null;
 
   return (
     <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-6" aria-labelledby="company-heading">
@@ -157,6 +182,8 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
 
       <PhotoStrip photos={company.photos} language={language} />
 
+      <GeneralDocuments documents={documents} title={lang('Documentos de la empresa', 'Company documents')} />
+
       {contact && (
         <ul className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-700">
           {contact.website && (
@@ -197,7 +224,8 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
 
 export const PlantSection = ({ view, language }: { view: TourView; language: TourLanguage }) => {
   const plant = view.tour.organization.profile?.plant;
-  if (!plant || (!plant.description && !plant.photos.length)) return null;
+  const documents = view.tour.organization.profile?.plant_documents || [];
+  if ((!plant || (!plant.description && !plant.photos.length)) && !documents.length) return null;
   const lang = (es: string, en: string) => (language === 'es' ? es : en);
   return (
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
@@ -208,8 +236,9 @@ export const PlantSection = ({ view, language }: { view: TourView; language: Tou
           {view.tour.plant_name}
         </h2>
       </div>
-      {plant.description && <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 sm:text-base">{plant.description}</p>}
-      <PhotoStrip photos={plant.photos} language={language} />
+      {plant?.description && <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 sm:text-base">{plant.description}</p>}
+      {plant && <PhotoStrip photos={plant.photos} language={language} />}
+      <GeneralDocuments documents={documents} title={lang('Documentos de la planta', 'Plant documents')} />
     </section>
   );
 };

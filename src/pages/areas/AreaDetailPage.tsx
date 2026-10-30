@@ -89,7 +89,7 @@ const AreaDetailPage = () => {
       case 'certifications':
         return <CertificationsTab areaId={areaId!} plantId={area.plant_id} />;
       case 'documents':
-        return <DocumentsTab areaId={areaId!} />;
+        return <DocumentsTab areaId={areaId!} area={area} />;
       case 'gallery':
         return <GalleryTab areaId={areaId!} area={area} />;
       default:

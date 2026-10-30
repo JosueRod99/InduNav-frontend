@@ -8,7 +8,7 @@ import { createProcess, updateProcess, type Process } from '../../api/processes'
 import { getAreas } from '../../api/areas';
 import { getEmployees } from '../../api/employees';
 import { getEquipment } from '../../api/equipment';
-import { getDocumentsByArea } from '../../api/areaDocuments';
+import { getApplicableDocuments, getDocumentsByArea, scopeLabel } from '../../api/areaDocuments';
 import { personName } from '../../utils/personName';
 
 // Create / edit a process with all its steps; saved at once.
@@ -38,11 +38,14 @@ const emptyStep = (): StepDraft => ({
 
 const inputClass = 'block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30';
 
-/** Documents of the step's area (to link), current versions only */
+/** Documents of the step's area and the general ones that apply to it (to link), current versions only */
 const StepDocuments = ({ areaId, selected, onChange }: { areaId: string; selected: string[]; onChange: (ids: string[]) => void }) => {
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['area-documents-for-process', areaId],
-    queryFn: () => getDocumentsByArea(areaId, { includePrivate: true }),
+    queryFn: async () => {
+      const [own, general] = await Promise.all([getDocumentsByArea(areaId, { includePrivate: true }), getApplicableDocuments(areaId)]);
+      return [...own, ...general];
+    },
     enabled: !!areaId,
   });
   if (!areaId) return <p className="text-xs text-gray-500">Elige el área para ver sus documentos.</p>;
@@ -61,6 +64,7 @@ const StepDocuments = ({ areaId, selected, onChange }: { areaId: string; selecte
           {doc.document_code && <span className="font-mono font-semibold text-blue-700">{doc.document_code}</span>}
           <span className="truncate">{doc.title}</span>
           {doc.document_type === 'pending' && <span className="text-amber-700">(sin archivo)</span>}
+          {doc.scope !== 'area' && <span className="flex-shrink-0 text-gray-500">· aplica a: {scopeLabel(doc).toLowerCase()}</span>}
         </label>
       ))}
     </div>

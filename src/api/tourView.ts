@@ -121,6 +121,16 @@ interface TourPhoto {
 }
 
 /** Company profile as tours show it: blocks switched off in the profile come back empty */
+export interface TourGeneralDocument {
+  id: string;
+  document_code: string | null;
+  title: string;
+  description: string | null;
+  file_url: string;
+  file_type: string | null;
+  version: string | null;
+}
+
 export interface TourCompanyProfile {
   tagline: Translations | null;
   about: Translations | null;
@@ -130,6 +140,8 @@ export interface TourCompanyProfile {
   industry: string | null;
   contact: { website: string | null; phone: string | null; email: string | null; address: string | null } | null;
   photos: TourPhoto[];
+  documents?: TourGeneralDocument[]; // whole company (start of the tour)
+  plant_documents?: TourGeneralDocument[]; // whole plant
   plant: { description: string | null; photos: TourPhoto[] } | null;
   plant_cover_url: string | null;
 }

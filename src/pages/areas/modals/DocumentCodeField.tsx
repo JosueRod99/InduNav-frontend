@@ -11,7 +11,7 @@ export type DocumentCodeValue =
   | { mode: 'none' };
 
 interface Props {
-  areaId: string;
+  codeSource: { areaId?: string; plantId?: string }; // where the next number is asked (same organization)
   value: DocumentCodeValue;
   onChange: (value: DocumentCodeValue) => void;
   disabled?: boolean;
@@ -20,7 +20,7 @@ interface Props {
 const inputClass =
   'w-full rounded-md border border-gray-300 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50';
 
-const DocumentCodeField = ({ areaId, value, onChange, disabled }: Props) => {
+const DocumentCodeField = ({ codeSource, value, onChange, disabled }: Props) => {
   const isCustomPrefix = value.mode === 'auto' && !DOCUMENT_CODE_TYPES.some((t) => t.prefix === value.prefix);
   const [debouncedKey, setDebouncedKey] = useState(value.mode === 'auto' ? value.key : '');
   useEffect(() => {
@@ -32,8 +32,8 @@ const DocumentCodeField = ({ areaId, value, onChange, disabled }: Props) => {
   const validPrefix = /^[A-Z]{2,6}$/.test(prefix);
   const validKey = /^[A-Z0-9]+(-[A-Z0-9]+)*$/.test(debouncedKey);
   const { data: next, isFetching, isError } = useQuery({
-    queryKey: ['next-document-code', areaId, prefix, debouncedKey],
-    queryFn: () => getNextDocumentCode(areaId, prefix, debouncedKey),
+    queryKey: ['next-document-code', codeSource.areaId || codeSource.plantId, prefix, debouncedKey],
+    queryFn: () => getNextDocumentCode(codeSource, prefix, debouncedKey),
     enabled: value.mode === 'auto' && validPrefix && validKey,
     staleTime: 0, // numbers move as documents are saved
   });
@@ -90,7 +90,7 @@ const DocumentCodeField = ({ areaId, value, onChange, disabled }: Props) => {
               <option value="OTRO">Otro…</option>
             </select>
             <input
-              aria-label="Clave del área"
+              aria-label="Clave"
               value={value.key}
               disabled={disabled}
               maxLength={20}
@@ -112,7 +112,7 @@ const DocumentCodeField = ({ areaId, value, onChange, disabled }: Props) => {
           )}
           <p className="flex items-center gap-1.5 text-xs text-gray-600">
             {!validKey ? (
-              'Escribe la clave del área (letras, números y guiones).'
+              'Escribe la clave (letras, números y guiones; GEN para documentos generales).'
             ) : !validPrefix ? (
               'El tipo debe tener de 2 a 6 letras.'
             ) : isFetching ? (

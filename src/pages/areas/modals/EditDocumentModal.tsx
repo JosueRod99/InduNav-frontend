@@ -8,8 +8,12 @@ import {
   getFileIcon,
   formatFileSize,
   getCategoryLabel,
+  invalidateDocumentLists,
+  scopeFields,
+  scopeLabel,
   type AreaDocument,
 } from '../../../api/areaDocuments';
+import DocumentScopeField, { type DocumentScopeValue } from './DocumentScopeField';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
 import NewDocumentVersionModal from './NewDocumentVersionModal';
@@ -33,6 +37,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
   const [status, setStatus] = useState('active');
   const [isPrivate, setIsPrivate] = useState(false);
   const [effectiveDate, setEffectiveDate] = useState('');
+  const [scope, setScope] = useState<DocumentScopeValue>({ scope: 'area', areaId: null, sharedAreaIds: [] });
   const [showVersions, setShowVersions] = useState(false);
   const [isNewVersionModalOpen, setIsNewVersionModalOpen] = useState(false);
 
@@ -54,6 +59,11 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
       setStatus(document.status);
       setIsPrivate(document.is_private);
       setEffectiveDate(document.effective_date ? document.effective_date.split('T')[0] : '');
+      setScope({
+        scope: document.scope || 'area',
+        areaId: document.organizational_area_id,
+        sharedAreaIds: (document.shared_areas || []).map((a) => a.id),
+      });
     } else if (!isOpen) {
       // Reset when modal closes
       setTitle('');
@@ -71,9 +81,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
   const updateDocumentMutation = useMutation({
     mutationFn: (data: any) => updateDocument(document!.id, data),
     onSuccess: () => {
-      // Invalidar ambos queries (active y archived)
-      queryClient.invalidateQueries({ queryKey: ['area-documents-active', document!.organizational_area_id] });
-      queryClient.invalidateQueries({ queryKey: ['area-documents-archived', document!.organizational_area_id] });
+      invalidateDocumentLists(queryClient); // a general document shows in many lists
       onClose();
     },
     onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo guardar el documento'),
@@ -83,6 +91,14 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
     if (!document) return;
 
     const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    if (scope.scope === 'area' && !scope.areaId) {
+      toast.error('Elige el área a la que aplica');
+      return;
+    }
+    if (scope.scope === 'areas' && scope.sharedAreaIds.length === 0) {
+      toast.error('Elige al menos un área a la que aplica');
+      return;
+    }
 
     updateDocumentMutation.mutate({
       title: title.trim(),
@@ -93,6 +109,8 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
       status,
       is_private: isPrivate,
       effective_date: effectiveDate || undefined,
+      // Who it applies to (every version of the document)
+      ...scopeFields(scope, document.plant_id || plantId, organizationId),
     });
   };
 
@@ -116,6 +134,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant="primary" size="sm">v{document.version}</Badge>
                 <span className="text-sm text-gray-500">{getCategoryLabel(document.category)}</span>
+                <span className="text-sm text-gray-500">· Aplica a: {scopeLabel(document)}</span>
               </div>
             </div>
           </div>
@@ -193,8 +212,6 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Historial de Versiones</h3>
               <div className="flex flex-col gap-2">
                 {versions.map((ver) => {
-                  console.log(ver);
-
                   return (
                     <div
                       key={ver.id}
@@ -278,6 +295,9 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
                 className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+
+            {/* Who it applies to (shared by every version) */}
+            <DocumentScopeField plantId={document.plant_id || plantId} value={scope} onChange={setScope} />
 
             {/* Title */}
             <div>

@@ -2,16 +2,23 @@ import { useState, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Upload, Check, Link, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { codeTypeForCategory, createDocument, getFileIcon } from '../../../api/areaDocuments';
+import {
+  codeTypeForCategory,
+  createGeneralDocument,
+  getFileIcon,
+  invalidateDocumentLists,
+  scopeFields,
+} from '../../../api/areaDocuments';
 import { getArea } from '../../../api/areas';
 import DocumentCodeField, { type DocumentCodeValue } from './DocumentCodeField';
+import DocumentScopeField, { type DocumentScopeValue } from './DocumentScopeField';
 import apiClient from '../../../api/client';
 import Button from '../../../components/ui/Button';
 
 interface UploadDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  areaId: string;
+  areaId?: string; // opened from an area: it applies to that area unless changed
   organizationId: string;
   plantId: string;
 }
@@ -33,17 +40,20 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
   const [status, setStatus] = useState(''); // Empty for placeholder
   const [effectiveDate, setEffectiveDate] = useState('');
   const [uploading, setUploading] = useState(false);
-  // Area code is the default key of automatic document codes (PROC-<key>-001)
-  const { data: area } = useQuery({ queryKey: ['organizational-area', areaId], queryFn: () => getArea(areaId), enabled: isOpen });
+  // Who it applies to: from an area, that area; from the plant library, the whole plant
+  const [scope, setScope] = useState<DocumentScopeValue | null>(null);
+  const scopeValue: DocumentScopeValue = scope || (areaId ? { scope: 'area', areaId, sharedAreaIds: [] } : { scope: 'plant', areaId: null, sharedAreaIds: [] });
+  // Default key of automatic codes (PROC-<key>-001): the area's code for one area, GEN otherwise
+  const keyAreaId = scopeValue.scope === 'area' ? scopeValue.areaId : null;
+  const { data: keyArea } = useQuery({ queryKey: ['organizational-area', keyAreaId], queryFn: () => getArea(keyAreaId!), enabled: isOpen && !!keyAreaId });
   const [code, setCode] = useState<DocumentCodeValue | null>(null);
-  const codeValue: DocumentCodeValue = code || { mode: 'auto', prefix: codeTypeForCategory(category) || 'PROC', key: (area?.code || '').toUpperCase() };
+  const defaultKey = keyAreaId ? (keyArea?.code || '').toUpperCase() : 'GEN';
+  const codeValue: DocumentCodeValue = code || { mode: 'auto', prefix: codeTypeForCategory(category) || 'PROC', key: defaultKey };
 
   const createDocumentMutation = useMutation({
-    mutationFn: (data: any) => createDocument(areaId, data),
+    mutationFn: (data: any) => createGeneralDocument(data),
     onSuccess: () => {
-      // Invalidar ambos queries (active y archived)
-      queryClient.invalidateQueries({ queryKey: ['area-documents-active', areaId] });
-      queryClient.invalidateQueries({ queryKey: ['area-documents-archived', areaId] });
+      invalidateDocumentLists(queryClient); // a general document shows in many lists
       queryClient.removeQueries({ queryKey: ['next-document-code'] }); // the next free number changed
       handleClose();
     },
@@ -62,6 +72,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
     setEffectiveDate('');
     setUploading(false);
     setCode(null);
+    setScope(null);
     onClose();
   };
 
@@ -175,6 +186,16 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
       return;
     }
 
+    if (scopeValue.scope === 'area' && !scopeValue.areaId) {
+      alert('Elige el área a la que aplica.');
+      return;
+    }
+
+    if (scopeValue.scope === 'areas' && scopeValue.sharedAreaIds.length === 0) {
+      alert('Elige al menos un área a la que aplica.');
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -185,10 +206,11 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
           : codeValue.mode === 'manual'
           ? { document_code: codeValue.code.trim() }
           : {};
+      const where = scopeFields(scopeValue, plantId, organizationId);
 
       if (documentSource === 'pending') {
         await createDocumentMutation.mutateAsync({
-          organizational_area_id: areaId,
+          ...where,
           title: title.trim(),
           description: description.trim() || undefined,
           category,
@@ -209,7 +231,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
         formData.append('file', selectedFile!);
         formData.append('organization_id', organizationId);
         formData.append('plant_id', plantId);
-        formData.append('area_id', areaId);
+        if (where.organizational_area_id) formData.append('area_id', where.organizational_area_id);
 
         const uploadResponse = await apiClient.post('/upload/document', formData, {
           headers: {
@@ -219,7 +241,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
 
         // Step 2: Create document record
         await createDocumentMutation.mutateAsync({
-          organizational_area_id: areaId,
+          ...where,
           title: title.trim(),
           description: description.trim() || undefined,
           category,
@@ -241,7 +263,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
         const mimeType = getMimeTypeFromUrl(cleanUrl);
 
         await createDocumentMutation.mutateAsync({
-          organizational_area_id: areaId,
+          ...where,
           title: title.trim(),
           description: description.trim() || undefined,
           category,
@@ -470,7 +492,10 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
               </div>
 
               {/* Code: automatic TYPE-KEY-NNN, typed, or none */}
-              <DocumentCodeField areaId={areaId} value={codeValue} onChange={setCode} disabled={uploading} />
+              {/* Who it applies to */}
+              <DocumentScopeField plantId={plantId} value={scopeValue} onChange={setScope} disabled={uploading} />
+
+              <DocumentCodeField codeSource={{ plantId }} value={codeValue} onChange={setCode} disabled={uploading} />
 
               {/* Title */}
               <div>
