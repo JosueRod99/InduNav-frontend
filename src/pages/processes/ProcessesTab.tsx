@@ -8,6 +8,7 @@ import { deleteProcess, getProcess, getProcesses } from '../../api/processes';
 import ProcessStepsList from './ProcessStepsList';
 import ProcessEditorModal from './ProcessEditorModal';
 import { useAuthStore } from '../../store/authStore';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 // "Procesos" tab of a plant (PLAN_LAB_KRAFT.md point 5): processes that go across areas
 // ("Del pedido a la entrega"). The list and one process (?proceso=<id>) live in the same tab.
@@ -124,14 +125,17 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
   // All processes of the plant
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gray-600">Procesos que recorren varias áreas de la planta, paso a paso.</p>
-        {canEdit && (
-          <Button onClick={() => setEditor('new')} className="gap-1.5">
-            <Plus className="h-4 w-4" /> Nuevo proceso
-          </Button>
-        )}
-      </div>
+      <SectionHeader
+        title="Procesos"
+        description="Procesos que recorren varias áreas de la planta, paso a paso."
+        actions={
+          canEdit && (
+            <Button onClick={() => setEditor('new')} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Nuevo proceso
+            </Button>
+          )
+        }
+      />
       {isLoading ? (
         <p className="flex items-center gap-2 text-gray-600">
           <Loader2 className="h-4 w-4 animate-spin" /> Cargando procesos…

@@ -19,12 +19,12 @@ import {
 } from 'lucide-react';
 import type { Plant } from '../../types';
 import { getPlantSummary, type PlantSummary } from '../../api/plants';
-import { MANAGERS, PLANT_TABS, type PlantTab } from './plantTabs';
+import { PLANT_TABS, type PlantTab } from './plantTabs';
 import { useAuthStore } from '../../store/authStore';
 import { useBackState } from '../../hooks/useBackNavigation';
 
-// "Resumen" tab of the plant workspace: key numbers (each one opens its tab), what needs
-// attention, tour visits and recent changes. One request; sections the role cannot open are hidden.
+// "Resumen" tab of the plant workspace: key numbers (each one opens its tab, tour visits included),
+// what needs attention and recent changes. One request; sections the role cannot open are hidden.
 
 type Activity = NonNullable<PlantSummary['activity']>[number];
 
@@ -154,7 +154,9 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
   const equipmentTotal = equipment
     ? Object.entries(equipment).reduce((sum, [status, n]) => sum + (status === 'retired' ? 0 : n || 0), 0)
     : 0;
-  const stats = [
+  const trend = tours.visits_prev_30d > 0 ? Math.round(((tours.visits_30d - tours.visits_prev_30d) / tours.visits_prev_30d) * 100) : null;
+
+  const stats: { key: string; tab: PlantTab; Icon: typeof Eye; label: string; value: number; detail: React.ReactNode }[] = [
     {
       tab: 'areas' as const,
       Icon: Layers,
@@ -190,7 +192,27 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
       value: counts.tours,
       detail: counts.tours > 0 ? `${counts.tours_published} publicado${counts.tours_published === 1 ? '' : 's'}` : null,
     },
-  ].filter((s) => allowed(s.tab));
+    {
+      tab: 'tours' as const,
+      Icon: Eye,
+      label: 'Visitas a tours',
+      value: tours.visits_30d,
+      detail: (
+        <>
+          últimos 30 días
+          {trend !== null && trend !== 0 && (
+            <span className={`ml-1 inline-flex items-center gap-0.5 font-medium ${trend > 0 ? 'text-green-700' : 'text-red-700'}`}>
+              {trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {trend > 0 ? '+' : ''}
+              {trend}%
+            </span>
+          )}
+        </>
+      ),
+    },
+  ]
+    .map((stat) => ({ ...stat, key: stat.label }))
+    .filter((s) => allowed(s.tab));
 
   const showEquipmentAlerts = allowed('equipos');
   const showCertificationAlerts = allowed('areas');
@@ -202,17 +224,13 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
   const peopleCerts = alerts.certified_people || [];
   const alertCount = outOfService + inMaintenance + alerts.certifications.length + withoutSupervisor.total + peopleCerts.length;
 
-  const trend = tours.visits_prev_30d > 0 ? Math.round(((tours.visits_30d - tours.visits_prev_30d) / tours.visits_prev_30d) * 100) : null;
-
   return (
     <div className="space-y-4">
-
-
       {/* Key numbers: each one opens its tab */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {stats.map(({ tab, Icon, label, value, detail }) => (
+      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${stats.length >= 6 ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
+        {stats.map(({ key, tab, Icon, label, value, detail }) => (
           <Link
-            key={tab}
+            key={key}
             to={`/plants/${plant.id}/${tab}`}
             className="group rounded-lg border border-gray-200 bg-white p-3 transition-colors hover:border-blue-300 hover:bg-blue-50/40 sm:p-4"
           >
@@ -221,214 +239,169 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
               {label}
             </span>
             <span className="mt-1 block text-2xl font-bold text-gray-900">{value}</span>
-            <span className="block h-4 text-xs text-gray-500">{detail}</span>
+            <span className="flex h-4 items-center whitespace-nowrap text-xs text-gray-500">{detail}</span>
           </Link>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          {showAlerts && (
-            <Card
-              title="Requiere atención"
-              Icon={AlertTriangle}
-              action={
-                alertCount > 0 && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{alertCount}</span>
-                )
-              }
-            >
-              {alerts.equipment.length === 0 && alerts.certifications.length === 0 && withoutSupervisor.total === 0 && peopleCerts.length === 0 ? (
-                <p className="flex items-center gap-2 px-4 py-4 text-sm text-gray-600">
-                  <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-600" />
-                  Todo en orden: {showEquipmentAlerts ? 'ningún equipo detenido, ' : ''}todas las áreas con supervisor y ninguna certificación
-                  vencida o por vencer en los próximos {data.alert_days} días.
-                </p>
-              ) : (
-                <ul className="divide-y divide-gray-100">
-                  {alerts.equipment.map((eq) => (
-                    <li key={eq.id}>
-                      <Link
-                        to={`/equipment/${eq.id}`}
-                        state={backState}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50"
-                      >
-                        <Wrench className={`h-4 w-4 flex-shrink-0 ${eq.status === 'out_of_service' ? 'text-red-600' : 'text-amber-600'}`} />
-                        <span className="min-w-0 flex-1 truncate">
-                          <span className="font-medium text-gray-900">{eq.name}</span>
-                          <span className="ml-1.5 font-mono text-xs text-gray-500">{eq.code}</span>
-                        </span>
-                        <span
-                          className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${eq.status === 'out_of_service' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
-                            }`}
-                        >
-                          {eq.status === 'out_of_service' ? 'Fuera de servicio' : 'En mantenimiento'}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                  {hiddenEquipment > 0 && (
-                    <li>
-                      <Link
-                        to={`/plants/${plant.id}/equipos`}
-                        className="block px-4 py-2 text-xs font-medium text-blue-600 hover:bg-gray-50"
-                      >
-                        Y {hiddenEquipment} equipo
-                        {hiddenEquipment === 1 ? '' : 's'} más detenido
-                        {hiddenEquipment === 1 ? '' : 's'} · Ver Equipos
-                      </Link>
-                    </li>
-                  )}
-                  {withoutSupervisor.areas.map((area) => (
-                    <li key={area.id}>
-                      <Link to={`/areas/${area.id}`} state={backState} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
-                        <UserX className="h-4 w-4 flex-shrink-0 text-amber-600" />
-                        <span className="min-w-0 flex-1 truncate font-medium text-gray-900">{area.name}</span>
-                        <span className="flex-shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Sin supervisor</span>
-                      </Link>
-                    </li>
-                  ))}
-                  {withoutSupervisor.total > withoutSupervisor.areas.length && (
-                    <li>
-                      <Link to={`/plants/${plant.id}/areas`} className="block px-4 py-2 text-xs font-medium text-blue-600 hover:bg-gray-50">
-                        Y {withoutSupervisor.total - withoutSupervisor.areas.length} más sin supervisor · Ver Áreas
-                      </Link>
-                    </li>
-                  )}
-                  {peopleCerts.map((p) => (
-                    <li key={p.type_id}>
-                      <Link to={`/plants/${plant.id}/certificaciones`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
-                        <BadgeCheck className={`h-4 w-4 flex-shrink-0 ${p.expired ? 'text-red-600' : 'text-amber-600'}`} />
-                        <span className="min-w-0 flex-1 truncate font-medium text-gray-900">{p.name}</span>
-                        <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${p.expired ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
-                          {[p.expired && `${p.expired} vencida${p.expired === 1 ? '' : 's'}`, p.expiring && `${p.expiring} por vencer`].filter(Boolean).join(' · ')}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                  {alerts.certifications.map((cert) => {
-                    const date = cert.kind === 'audit' ? cert.next_audit_date : cert.expiry_date;
-                    const text =
-                      cert.kind === 'expired'
-                        ? `Venció el ${shortDate(date!)}`
-                        : cert.kind === 'expiring'
-                          ? `Vence el ${shortDate(date!)}`
-                          : `Auditoría el ${shortDate(date!)}`;
-                    return (
-                      <li key={cert.id}>
-                        <Link
-                          to={cert.area_id ? `/areas/${cert.area_id}?tab=certifications` : `/plants/${plant.id}/certificaciones`}
-                          state={backState}
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50"
-                        >
-                          {cert.kind === 'audit' ? (
-                            <CalendarClock className="h-4 w-4 flex-shrink-0 text-blue-600" />
-                          ) : (
-                            <BadgeCheck
-                              className={`h-4 w-4 flex-shrink-0 ${cert.kind === 'expired' ? 'text-red-600' : 'text-amber-600'}`}
-                            />
-                          )}
-                          <span className="min-w-0 flex-1 truncate">
-                            <span className="font-medium text-gray-900">{cert.certification_name}</span>
-                            <span className="ml-1.5 text-xs text-gray-500">· {cert.area_name}</span>
-                          </span>
-                          <span
-                            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${cert.kind === 'expired'
-                              ? 'bg-red-100 text-red-800'
-                              : cert.kind === 'expiring'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-blue-100 text-blue-800'
-                              }`}
-                          >
-                            {text}
-                          </span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
-          )}
-
-          {activity && (
-            <Card title="Cambios recientes" Icon={History}>
-              {activity.length === 0 ? (
-                <p className="px-4 py-4 text-sm text-gray-500">Sin cambios en los últimos 30 días.</p>
-              ) : (
-                <ul className="divide-y divide-gray-100">
-                  {activity.map((item) => {
-                    const to = activityLink(item, plant.id);
-                    const name = item.entity_name || KIND_LABELS[item.kind];
-                    return (
-                      <li key={item.id} className="flex items-start gap-3 px-4 py-2.5 text-sm">
-                        <span className="mt-0.5 flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600">
-                          {KIND_LABELS[item.kind]}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          {to ? (
-                            <Link to={to} state={backState} className="font-medium text-gray-900 hover:text-blue-700 hover:underline">
-                              {name}
-                            </Link>
-                          ) : (
-                            <span className="font-medium text-gray-900">{name}</span>
-                          )}
-                          <span className="block text-xs text-gray-500">
-                            {item.user_name || 'Alguien'} {describeAction(item)} · {relativeTime(item.created_at)}
-                          </span>
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
-          )}
-        </div>
-
-        {/* Tour visits (its own height, not stretched to the left column) */}
-        <div className="self-start">
+      {/* What needs attention and recent changes, full width */}
+      <div className="space-y-4">
+        {showAlerts && (
           <Card
-            title="Visitas a tours"
-            Icon={Eye}
+            title="Requiere atención"
+            Icon={AlertTriangle}
             action={
-              <Link to={`/plants/${plant.id}/tours`} className="text-xs font-medium text-blue-600 hover:underline">
-                Ver tours
-              </Link>
+              alertCount > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{alertCount}</span>
+              )
             }
           >
-            <div className="px-4 py-3">
-              <p className="text-3xl font-bold text-gray-900">{tours.visits_30d}</p>
-              <p className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
-                últimos 30 días
-                {trend !== null && trend !== 0 && (
-                  <span className={`inline-flex items-center gap-0.5 font-medium ${trend > 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    {trend > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                    {trend > 0 ? '+' : ''}
-                    {trend}% vs. 30 días previos
-                  </span>
-                )}
+            {alerts.equipment.length === 0 && alerts.certifications.length === 0 && withoutSupervisor.total === 0 && peopleCerts.length === 0 ? (
+              <p className="flex items-center gap-2 px-4 py-4 text-sm text-gray-600">
+                <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-600" />
+                Todo en orden: {showEquipmentAlerts ? 'ningún equipo detenido, ' : ''}todas las áreas con supervisor y ninguna certificación
+                vencida o por vencer en los próximos {data.alert_days} días.
               </p>
-            </div>
-            {tours.top.length > 0 ? (
-              <ul className="divide-y divide-gray-100 border-t border-gray-100">
-                {tours.top.map((tour, index) => (
-                  <li key={tour.id}>
-                    <Link to={`/tours/${tour.id}/stats`} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50">
-                      <span className="w-4 text-xs font-semibold text-gray-400">{index + 1}</span>
-                      <span className="min-w-0 flex-1 truncate text-gray-900">{tour.title}</span>
-                      <span className="flex-shrink-0 text-xs font-medium text-gray-600">{tour.visits_30d}</span>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {alerts.equipment.map((eq) => (
+                  <li key={eq.id}>
+                    <Link
+                      to={`/equipment/${eq.id}`}
+                      state={backState}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50"
+                    >
+                      <Wrench className={`h-4 w-4 flex-shrink-0 ${eq.status === 'out_of_service' ? 'text-red-600' : 'text-amber-600'}`} />
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="font-medium text-gray-900">{eq.name}</span>
+                        <span className="ml-1.5 font-mono text-xs text-gray-500">{eq.code}</span>
+                      </span>
+                      <span
+                        className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${eq.status === 'out_of_service' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                          }`}
+                      >
+                        {eq.status === 'out_of_service' ? 'Fuera de servicio' : 'En mantenimiento'}
+                      </span>
                     </Link>
                   </li>
                 ))}
+                {hiddenEquipment > 0 && (
+                  <li>
+                    <Link
+                      to={`/plants/${plant.id}/equipos`}
+                      className="block px-4 py-2 text-xs font-medium text-blue-600 hover:bg-gray-50"
+                    >
+                      Y {hiddenEquipment} equipo
+                      {hiddenEquipment === 1 ? '' : 's'} más detenido
+                      {hiddenEquipment === 1 ? '' : 's'} · Ver Equipos
+                    </Link>
+                  </li>
+                )}
+                {withoutSupervisor.areas.map((area) => (
+                  <li key={area.id}>
+                    <Link to={`/areas/${area.id}`} state={backState} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
+                      <UserX className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                      <span className="min-w-0 flex-1 truncate font-medium text-gray-900">{area.name}</span>
+                      <span className="flex-shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Sin supervisor</span>
+                    </Link>
+                  </li>
+                ))}
+                {withoutSupervisor.total > withoutSupervisor.areas.length && (
+                  <li>
+                    <Link to={`/plants/${plant.id}/areas`} className="block px-4 py-2 text-xs font-medium text-blue-600 hover:bg-gray-50">
+                      Y {withoutSupervisor.total - withoutSupervisor.areas.length} más sin supervisor · Ver Áreas
+                    </Link>
+                  </li>
+                )}
+                {peopleCerts.map((p) => (
+                  <li key={p.type_id}>
+                    <Link to={`/plants/${plant.id}/certificaciones`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
+                      <BadgeCheck className={`h-4 w-4 flex-shrink-0 ${p.expired ? 'text-red-600' : 'text-amber-600'}`} />
+                      <span className="min-w-0 flex-1 truncate font-medium text-gray-900">{p.name}</span>
+                      <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${p.expired ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {[p.expired && `${p.expired} vencida${p.expired === 1 ? '' : 's'}`, p.expiring && `${p.expiring} por vencer`].filter(Boolean).join(' · ')}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+                {alerts.certifications.map((cert) => {
+                  const date = cert.kind === 'audit' ? cert.next_audit_date : cert.expiry_date;
+                  const text =
+                    cert.kind === 'expired'
+                      ? `Venció el ${shortDate(date!)}`
+                      : cert.kind === 'expiring'
+                        ? `Vence el ${shortDate(date!)}`
+                        : `Auditoría el ${shortDate(date!)}`;
+                  return (
+                    <li key={cert.id}>
+                      <Link
+                        to={cert.area_id ? `/areas/${cert.area_id}?tab=certifications` : `/plants/${plant.id}/certificaciones`}
+                        state={backState}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50"
+                      >
+                        {cert.kind === 'audit' ? (
+                          <CalendarClock className="h-4 w-4 flex-shrink-0 text-blue-600" />
+                        ) : (
+                          <BadgeCheck
+                            className={`h-4 w-4 flex-shrink-0 ${cert.kind === 'expired' ? 'text-red-600' : 'text-amber-600'}`}
+                          />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="font-medium text-gray-900">{cert.certification_name}</span>
+                          <span className="ml-1.5 text-xs text-gray-500">· {cert.area_name}</span>
+                        </span>
+                        <span
+                          className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${cert.kind === 'expired'
+                            ? 'bg-red-100 text-red-800'
+                            : cert.kind === 'expiring'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-blue-100 text-blue-800'
+                            }`}
+                        >
+                          {text}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
-            ) : (
-              <p className="border-t border-gray-100 px-4 py-3 text-xs text-gray-500">
-                {counts.tours_published > 0 ? 'Aún no hay visitas este mes.' : 'Publica un tour para empezar a recibir visitas.'}
-              </p>
             )}
           </Card>
-        </div>
+        )}
+
+        {activity && (
+          <Card title="Cambios recientes" Icon={History}>
+            {activity.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-gray-500">Sin cambios en los últimos 30 días.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {activity.map((item) => {
+                  const to = activityLink(item, plant.id);
+                  const name = item.entity_name || KIND_LABELS[item.kind];
+                  return (
+                    <li key={item.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                      <span className="min-w-0 flex-1">
+                        {to ? (
+                          <Link to={to} state={backState} className="font-medium text-gray-900 hover:text-blue-700 hover:underline">
+                            {name}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-gray-900">{name}</span>
+                        )}
+                        <span className="block text-xs text-gray-500">
+                          {item.user_name || 'Alguien'} {describeAction(item)} · {relativeTime(item.created_at)}
+                        </span>
+                      </span>
+                      <span className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600">
+                        {KIND_LABELS[item.kind]}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        )}
       </div>
     </div>
   );

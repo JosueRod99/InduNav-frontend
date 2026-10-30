@@ -17,6 +17,7 @@ import { useAuthStore } from '../../store/authStore';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 import { addZone, removeZone, replaceZone, ringFromLeaflet, zoneAsPolygon, zonesOf } from '../../utils/areaGeometry';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
@@ -201,19 +202,12 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
     <div className={`flex flex-col ${embedded ? 'lg:h-[calc(100vh-17rem)] lg:min-h-[32rem]' : 'lg:h-[calc(100vh-8rem)]'}`}>
       {/* Header */}
       <div className="mb-6">
-        <div className={`flex flex-wrap items-center gap-3 ${embedded ? 'justify-end' : 'justify-between'}`}>
-          {!embedded && (
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Layout 2D</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Diseña y gestiona distribuciones de planta en 2D
-              </p>
-            </div>
-          )}
-
-          {selectedPlantId && (
-            <div className="flex flex-wrap items-center gap-2">
-              {!drawMode && !editMode ? (
+        <SectionHeader
+          title={embedded ? 'Layout' : 'Layout 2D'}
+          description={embedded ? 'Plano de cada piso con las áreas dibujadas encima.' : 'Diseña y gestiona distribuciones de planta en 2D'}
+          actions={
+            selectedPlantId && (
+              !drawMode && !editMode ? (
                 <>
                   {areaRepresentations.length > 0 && <LabelModeToggle value={labelMode} onChange={setLabelMode} />}
                   <Button
@@ -239,10 +233,10 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                 <Button onClick={() => setEditMode(false)} variant="outline">
                   Cancelar Edición
                 </Button>
-              )}
-            </div>
-          )}
-        </div>
+              )
+            )
+          }
+        />
 
         {/* Filters */}
         <div className="mt-4 flex flex-wrap gap-4">

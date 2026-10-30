@@ -20,6 +20,7 @@ import {
 import SystemCertificationModal from './SystemCertificationModal';
 import HoldersModal from './HoldersModal';
 import { useAuthStore } from '../../store/authStore';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 // "Certificaciones" tab of a plant (PLAN_LAB_KRAFT.md point 9): system certifications that cover the
 // plant (company-wide, plant or area) and people certifications with their holders (checkboxes).
@@ -124,6 +125,8 @@ const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_i
 
   return (
     <div className="space-y-6">
+      <SectionHeader title="Certificaciones" description="Normas y sistemas de la empresa y la planta, y las certificaciones de cada persona." />
+
       {/* System */}
       <section className="rounded-lg border border-gray-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">

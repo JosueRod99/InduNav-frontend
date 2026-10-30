@@ -8,6 +8,7 @@ import { getOrgChart, type OrgChartNode } from '../../api/employees';
 import Button from '../../components/ui/Button';
 import { avatarUrl } from '../../utils/avatarUrl';
 import type { PlantScopedProps } from '../plants/plantScope';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 // Card HTML is built as a string: escape every value that comes from the data
 const esc = (value: unknown) =>
@@ -18,7 +19,7 @@ const ROLE_SHORT = { supervisor: 'Supervisor', quality: 'Calidad', emergency: 'E
 const responsibilityText = (node: OrgChartNode) =>
   (node.responsibilities || []).map((r) => `${ROLE_SHORT[r.role]}: ${r.areas.join(', ')}`).join(' · ');
 
-const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
+const OrgChartPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
@@ -297,33 +298,33 @@ const OrgChartPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="mb-6">
-        <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
-          {!embedded && (
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Organigrama</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Visualiza la estructura jerárquica de la organización
-              </p>
-            </div>
-          )}
-
-          {selectedOrg && chartData && chartData.length > 0 && (
-            <div className="flex gap-2">
-              <Button onClick={handleZoomIn} variant="outline" className="gap-2">
-                <ZoomIn className="h-4 w-4" />
-                Acercar
-              </Button>
-              <Button onClick={handleZoomOut} variant="outline" className="gap-2">
-                <ZoomOut className="h-4 w-4" />
-                Alejar
-              </Button>
-              <Button onClick={handleFit} variant="outline" className="gap-2">
-                <Maximize2 className="h-4 w-4" />
-                Ajustar
-              </Button>
-            </div>
-          )}
-        </div>
+        <SectionHeader
+          title={embedded ? 'Personal' : 'Organigrama'}
+          description={
+            embedded ? 'Organigrama de la planta: quién reporta a quién, responsables de área y puestos.' : 'Visualiza la estructura jerárquica de la organización'
+          }
+          actions={
+            selectedOrg &&
+            chartData &&
+            chartData.length > 0 && (
+              <>
+                <Button onClick={handleZoomIn} variant="outline" className="gap-2">
+                  <ZoomIn className="h-4 w-4" />
+                  Acercar
+                </Button>
+                <Button onClick={handleZoomOut} variant="outline" className="gap-2">
+                  <ZoomOut className="h-4 w-4" />
+                  Alejar
+                </Button>
+                <Button onClick={handleFit} variant="outline" className="gap-2">
+                  <Maximize2 className="h-4 w-4" />
+                  Ajustar
+                </Button>
+              </>
+            )
+          }
+        />
+        {viewSwitch && <div className="mt-4">{viewSwitch}</div>}
 
         {/* Filters */}
         <div className="mt-4 flex gap-4">

@@ -23,6 +23,7 @@ import { getPlants } from '../../api/plants';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 import { areaTypeLabel } from '../../constants/areaTypes';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
@@ -142,24 +143,19 @@ const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
-        {!embedded && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Áreas Organizacionales</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Gestiona la estructura de áreas de tu organización
-            </p>
-          </div>
-        )}
-
-        {selectedOrg && selectedPlant && (
-          <Button onClick={handleCreateRoot} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nueva Área Raíz
-          </Button>
-        )}
-      </div>
+      <SectionHeader
+        title={embedded ? 'Áreas' : 'Áreas Organizacionales'}
+        description={embedded ? 'Estructura de áreas de la planta: cada área con sus subáreas.' : 'Gestiona la estructura de áreas de tu organización'}
+        actions={
+          selectedOrg &&
+          selectedPlant && (
+            <Button onClick={handleCreateRoot} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nueva Área Raíz
+            </Button>
+          )
+        }
+      />
 
       {/* Filters (only organization and plant: nothing to show inside the plant workspace) */}
       <div className={`bg-white rounded-lg shadow p-4 ${embedded ? 'hidden' : ''}`}>

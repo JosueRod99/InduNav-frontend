@@ -21,6 +21,7 @@ import Button from '../../components/ui/Button';
 import UploadDocumentModal from '../areas/modals/UploadDocumentModal';
 import EditDocumentModal from '../areas/modals/EditDocumentModal';
 import NewDocumentVersionModal from '../areas/modals/NewDocumentVersionModal';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 // Plant document library: everything that applies to its areas, to the whole plant or to the
 // whole company, with who each document applies to.
@@ -90,15 +91,15 @@ const PlantDocumentsTab = ({ plant }: Props) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Documentos</h2>
-          <p className="text-sm text-gray-600">Todos los documentos de la planta y de la empresa, y a quién aplica cada uno.</p>
-        </div>
-        <Button onClick={() => setCreating(true)} className="gap-2">
-          <Plus className="h-4 w-4" /> Nuevo documento
-        </Button>
-      </div>
+      <SectionHeader
+        title="Documentos"
+        description="Todos los documentos de la planta y de la empresa, y a quién aplica cada uno."
+        actions={
+          <Button onClick={() => setCreating(true)} className="gap-2">
+            <Plus className="h-4 w-4" /> Nuevo documento
+          </Button>
+        }
+      />
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

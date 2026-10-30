@@ -13,8 +13,9 @@ import { personName } from '../../utils/personName';
 import ImportEmployeesModal from './import/ImportEmployeesModal';
 import EmployeeDetailModal from '../../components/employees/EmployeeDetailModal';
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar';
+import SectionHeader from '../../components/ui/SectionHeader';
 
-const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
+const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
@@ -97,33 +98,28 @@ const EmployeesPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
-        {!embedded && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Empleados</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Gestiona empleados y su estructura organizacional
-            </p>
-          </div>
-        )}
-
-        {selectedOrg && (
-          <div className="flex flex-wrap gap-2">
-            {/* Import works on one plant: available inside the plant workspace */}
-            {embedded && (
-              <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
-                <FileSpreadsheet className="h-4 w-4" />
-                Importar Excel
+      <SectionHeader
+        title={embedded ? 'Personal' : 'Empleados'}
+        description={embedded ? 'Empleados de la planta, su puesto, área y a quién reportan.' : 'Gestiona empleados y su estructura organizacional'}
+        actions={
+          selectedOrg && (
+            <>
+              {/* Import works on one plant: available inside the plant workspace */}
+              {embedded && (
+                <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Importar Excel
+                </Button>
+              )}
+              <Button onClick={handleCreate} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Nuevo Empleado
               </Button>
-            )}
-            <Button onClick={handleCreate} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nuevo Empleado
-            </Button>
-          </div>
-        )}
-      </div>
+            </>
+          )
+        }
+      />
+      {viewSwitch}
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow p-4">

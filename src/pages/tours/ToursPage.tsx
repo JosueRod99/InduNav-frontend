@@ -11,6 +11,7 @@ import { getPlants } from '../../api/plants';
 import type { Tour } from '../../types';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { rememberToursList } from './toursReturn';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 // Catalog of the organization's tours (cards). Each card opens the editor or the preview.
 
@@ -138,19 +139,17 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
 
   return (
     <div>
-      {/* Page Header */}
-      <div className={`mb-6 flex flex-wrap items-center gap-4 ${embedded ? 'justify-end' : 'justify-between'}`}>
-        {!embedded && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Tours</h2>
-            <p className="mt-1 text-sm text-gray-600">Recorridos virtuales de tus plantas</p>
-          </div>
-        )}
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo Tour
-        </Button>
-      </div>
+      <SectionHeader
+        className="mb-6"
+        title="Tours"
+        description={embedded ? 'Recorridos virtuales de la planta: borradores y publicados.' : 'Recorridos virtuales de tus plantas'}
+        actions={
+          <Button onClick={handleCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Tour
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap items-end gap-4">

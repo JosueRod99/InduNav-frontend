@@ -13,6 +13,7 @@ import PhotoGallery from '../../components/media/PhotoGallery';
 import PhoneInput from '../../components/ui/PhoneInput';
 import AddressInput from '../../components/ui/AddressInput';
 import { plantAddressDefaults, type AddressDetails } from '../../utils/googlePlaces';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 // "Configuración" tab of the plant workspace: the plant's own details, edited in place.
 // Platform admins and organization owners edit; everyone else sees them read-only.
@@ -115,6 +116,10 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
         if (canEdit && isDirty && !nameError) save.mutate();
       }}
     >
+      <SectionHeader
+        title="Configuración"
+        description={canEdit ? 'Datos, dirección, contacto y fotos de la planta.' : 'Datos, dirección, contacto y fotos de la planta (solo lectura).'}
+      />
       <section className="rounded-lg border border-gray-200 bg-white">
         <h3 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900">Datos de la planta</h3>
         <fieldset disabled={!canEdit} className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">

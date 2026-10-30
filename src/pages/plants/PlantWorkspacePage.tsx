@@ -188,28 +188,34 @@ const PlantWorkspacePage = () => {
           {activeTab === 'procesos' && <ProcessesTab plantId={plant.id} organizationId={plant.organization_id} />}
           {activeTab === 'certificaciones' && <PlantCertificationsTab plant={plant} />}
           {activeTab === 'documentos' && <PlantDocumentsTab plant={plant} />}
-          {activeTab === 'personal' && (
-            <div className="space-y-4">
-              <div className={`flex rounded-lg border border-gray-300 bg-white p-0.5 text-sm font-medium w-fit ${canSeeEmployeeList ? '' : 'hidden'}`} role="group" aria-label="Vista del personal">
-                {(
-                  [
-                    ['lista', 'Lista'],
-                    ['organigrama', 'Organigrama'],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    onClick={() => setSearchParams(value === 'lista' ? {} : { vista: value }, { replace: true })}
-                    aria-pressed={personalView === value}
-                    className={`rounded-md px-3 py-1.5 ${personalView === value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {personalView === 'lista' ? <EmployeesPage {...scope} /> : <OrgChartPage {...scope} />}
-            </div>
-          )}
+          {activeTab === 'personal' &&
+            (() => {
+              // Lista / Organigrama: under the section header of each view (managers only see both)
+              const viewSwitch = canSeeEmployeeList && (
+                <div className="flex w-fit rounded-lg border border-gray-300 bg-white p-0.5 text-sm font-medium" role="group" aria-label="Vista del personal">
+                  {(
+                    [
+                      ['lista', 'Lista'],
+                      ['organigrama', 'Organigrama'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      onClick={() => setSearchParams(value === 'lista' ? {} : { vista: value }, { replace: true })}
+                      aria-pressed={personalView === value}
+                      className={`rounded-md px-3 py-1.5 ${personalView === value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              );
+              return personalView === 'lista' ? (
+                <EmployeesPage {...scope} viewSwitch={viewSwitch} />
+              ) : (
+                <OrgChartPage {...scope} viewSwitch={viewSwitch} />
+              );
+            })()}
           {activeTab === 'tours' && <ToursPage {...scope} />}
           {activeTab === 'configuracion' && <PlantSettingsTab plant={plant} />}
         </div>

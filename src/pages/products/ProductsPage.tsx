@@ -18,6 +18,7 @@ import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
@@ -104,24 +105,18 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
-        {!embedded && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Productos</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Catálogo de productos manufacturados en la planta
-            </p>
-          </div>
-        )}
-
-        {selectedOrg && (
-          <Button onClick={handleCreateNew} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Producto
-          </Button>
-        )}
-      </div>
+      <SectionHeader
+        title="Productos"
+        description="Catálogo de productos que se fabrican en la planta y sus pasos de proceso."
+        actions={
+          selectedOrg && (
+            <Button onClick={handleCreateNew} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo Producto
+            </Button>
+          )
+        }
+      />
 
       {/* Filters */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">

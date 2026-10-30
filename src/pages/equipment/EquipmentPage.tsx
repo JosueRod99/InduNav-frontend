@@ -18,6 +18,7 @@ import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
@@ -103,24 +104,18 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
-        {!embedded && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Herramientas y Maquinaria</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Gestión de equipos, herramientas y maquinaria de la planta
-            </p>
-          </div>
-        )}
-
-        {selectedOrg && (
-          <Button onClick={handleCreateNew} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Equipo
-          </Button>
-        )}
-      </div>
+      <SectionHeader
+        title={embedded ? 'Equipos' : 'Herramientas y Maquinaria'}
+        description="Herramientas y maquinaria de la planta, con su estado y el área donde están."
+        actions={
+          selectedOrg && (
+            <Button onClick={handleCreateNew} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo Equipo
+            </Button>
+          )
+        }
+      />
 
       {/* Filters */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
