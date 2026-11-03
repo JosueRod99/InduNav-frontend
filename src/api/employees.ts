@@ -59,7 +59,9 @@ export interface OrgChartNode {
   email: string;
   employee_number: string;
   parentId: string | null;
-  area?: string;
+  area?: string | null;
+  area_id?: string | null;
+  area_color?: string | null; // card stripe
   plant?: string;
   responsibilities?: { role: 'supervisor' | 'quality' | 'emergency'; areas: string[] }[]; // areas in charge
   avatar_url?: string | null;

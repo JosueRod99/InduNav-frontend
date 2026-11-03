@@ -79,6 +79,7 @@ export interface Plant {
   organization_name?: string;
   created_at: Date;
   updated_at: Date;
+  cover_url?: string | null; // gallery cover: icon in lists and header
 }
 
 // Tour & Stop Types

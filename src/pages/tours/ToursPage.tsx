@@ -102,11 +102,19 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
     queryFn: () => getTours({ limit: 100, plant_id: selectedPlantFilter || undefined, is_active: true }),
   });
 
+  const all = useMemo(() => (data?.tours || []) as TourCard[], [data]);
+  const counts = {
+    all: all.length,
+    draft: all.filter((t) => t.status !== 'published').length,
+    published: all.filter((t) => t.status === 'published').length,
+  };
+  const visits30d = all.reduce((sum, t) => sum + Number(t.visits_30d || 0), 0);
+
   const tours = useMemo(() => {
-    const list = (data?.tours || []) as TourCard[];
+    const list = all;
     if (statusFilter === 'all') return list;
     return list.filter((t) => (statusFilter === 'published' ? t.status === 'published' : t.status !== 'published'));
-  }, [data, statusFilter]);
+  }, [all, statusFilter]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteTour,
@@ -186,10 +194,15 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
               onClick={() => setStatusFilter(value)}
               className={`rounded px-3 py-1.5 font-medium ${statusFilter === value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
             >
-              {label}
+              {label} ({counts[value]})
             </button>
           ))}
         </div>
+        {counts.published > 0 && (
+          <p className="ml-auto self-center text-sm text-gray-600">
+            <strong className="text-gray-900">{visits30d.toLocaleString('es-MX')}</strong> {visits30d === 1 ? 'visita' : 'visitas'} en los últimos 30 días
+          </p>
+        )}
       </div>
 
       {/* Content */}
@@ -237,10 +250,13 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
                   <span className={`absolute left-3 top-3 rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${badge.className}`}>
                     {badge.text}
                   </span>
-                  <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white">
-                    {tour.visibility === 'private' ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
-                    {tour.visibility === 'private' ? 'Privado' : 'Con link'}
-                  </span>
+                  {/* Who can open it only means something once it is published */}
+                  {tour.status === 'published' && (
+                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white">
+                      {tour.visibility === 'private' ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+                      {tour.visibility === 'private' ? 'Privado' : 'Con link'}
+                    </span>
+                  )}
                 </button>
 
                 <div className="flex flex-1 flex-col gap-2 p-4">
@@ -249,11 +265,18 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
                     {description && <p className="mt-0.5 line-clamp-2 text-sm text-gray-600">{description}</p>}
                   </div>
                   <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" />
-                      {stopsCount} {stopsCount === 1 ? 'área' : 'áreas'}
-                    </span>
-                    <span>{getPlantName(tour.plant_id)}</span>
+                    {stopsCount ? (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5" />
+                        {stopsCount} {stopsCount === 1 ? 'área' : 'áreas'}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 font-medium text-amber-700">
+                        <MapPin className="h-3.5 w-3.5" />
+                        Sin paradas · agrégalas en el editor
+                      </span>
+                    )}
+                    {!embedded && <span>{getPlantName(tour.plant_id)}</span>}
                     {tour.status === 'published' && (
                       <button
                         onClick={() => navigate(`/tours/${tour.id}/stats`)}

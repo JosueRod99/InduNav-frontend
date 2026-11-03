@@ -1,14 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Building2, ChevronDown, ChevronRight, Maximize2, Search, UserX, ZoomIn, ZoomOut } from 'lucide-react';
 import { OrgChart } from 'd3-org-chart';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import { getOrgChart, type OrgChartNode } from '../../api/employees';
-import Button from '../../components/ui/Button';
 import { avatarUrl } from '../../utils/avatarUrl';
+import { matchesSearch } from '../../utils/search';
 import type { PlantScopedProps } from '../plants/plantScope';
 import SectionHeader from '../../components/ui/SectionHeader';
+import EmployeeDetailModal from '../../components/employees/EmployeeDetailModal';
+
+// Org chart: white cards (photo, name, position, a thin stripe with the area color), two levels open
+// at first, search that opens the branch and highlights the person, and a click opens the record.
+// People without a boss (other than the top of the chart) are listed apart. Phones get an indented tree.
 
 // Card HTML is built as a string: escape every value that comes from the data
 const esc = (value: unknown) =>
@@ -19,396 +24,383 @@ const ROLE_SHORT = { supervisor: 'Supervisor', quality: 'Calidad', emergency: 'E
 const responsibilityText = (node: OrgChartNode) =>
   (node.responsibilities || []).map((r) => `${ROLE_SHORT[r.role]}: ${r.areas.join(', ')}`).join(' · ');
 
+const NEUTRAL = '#CBD5E1';
+const VIRTUAL_ID = '__sin_jefe__';
+const CARD_W = 250;
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter((w) => w && !w.endsWith('.'))
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+
+const avatarHtml = (node: OrgChartNode, size: number) =>
+  node.avatar_url
+    ? `<img src="${esc(avatarUrl(node.avatar_url, size))}" alt="" style="width:${size}px;height:${size}px;border-radius:9999px;object-fit:cover;flex-shrink:0" />`
+    : `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:#F1F5F9;color:#475569;display:flex;align-items:center;justify-content:center;font-size:${Math.round(size * 0.36)}px;font-weight:600;flex-shrink:0">${esc(initials(node.name || '?'))}</div>`;
+
+const ellipsis = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+
+/** Fit the chart in view, but never zoom in past 100% (a small chart would get huge cards) */
+const fitCapped = (instance: any) => {
+  if (!instance) return;
+  const attrs = instance.getChartState();
+  const layout = attrs.layoutBindings[attrs.layout];
+  const nodes = attrs.root.descendants();
+  const width = Math.max(...nodes.map((d: any) => d.x + layout.nodeRightX(d))) - Math.min(...nodes.map((d: any) => d.x + layout.nodeLeftX(d))) + 100;
+  const height = Math.max(...nodes.map((d: any) => d.y + layout.nodeBottomY(d))) - Math.min(...nodes.map((d: any) => d.y + layout.nodeTopY(d))) + 100;
+  if (0.9 / Math.max(width / attrs.svgWidth, height / attrs.svgHeight) < 1) instance.fit();
+  else {
+    attrs.lastTransform.k = 1;
+    instance.fit({ scale: false });
+  }
+};
+
+/** One card of the chart (desktop) */
+const cardHtml = (node: OrgChartNode & { _highlighted?: boolean }) => {
+  const ring = node._highlighted ? 'box-shadow:0 0 0 3px #3B82F6;border-color:#3B82F6;' : 'box-shadow:0 1px 2px rgba(15,23,42,.06);';
+  if (node.id === VIRTUAL_ID) {
+    return `<div style="width:100%;height:100%;border:1px dashed #94A3B8;border-radius:10px;background:#F8FAFC;display:flex;align-items:center;justify-content:center;font:600 13px system-ui;color:#475569">Sin jefe asignado</div>`;
+  }
+  if (node.is_headcount) {
+    return `<div style="width:100%;height:100%;border:1px dashed #CBD5E1;border-left:3px solid ${esc(node.area_color || NEUTRAL)};border-radius:10px;background:#F8FAFC;padding:10px 12px;font-family:system-ui;display:flex;align-items:center;gap:10px;${ring}">
+        <div style="font-size:22px;font-weight:700;color:#1E293B;min-width:28px;text-align:center">${esc(node.quantity)}</div>
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#0F172A;${ellipsis}">${esc(node.position)}</div>
+          <div style="font-size:11px;color:#64748B;${ellipsis}">Plantilla · ${esc(node.area || node.department)}${node.shift ? ` · ${esc(node.shift)}` : ''}</div>
+        </div>
+      </div>`;
+  }
+  const resp = responsibilityText(node);
+  return `<div style="width:100%;height:100%;background:#fff;border:1px solid #E2E8F0;border-left:3px solid ${esc(node.area_color || NEUTRAL)};border-radius:10px;padding:10px 12px;font-family:system-ui;display:flex;align-items:center;gap:10px;cursor:pointer;${ring}">
+      ${avatarHtml(node, 36)}
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13px;font-weight:600;color:#0F172A;${ellipsis}">${esc(node.name || 'Sin nombre')}</div>
+        <div style="font-size:12px;color:#475569;${ellipsis}">${esc(node.position || 'Sin puesto')}</div>
+        ${node.area ? `<div style="font-size:11px;color:#64748B;${ellipsis}">${esc(node.area)}</div>` : ''}
+        ${resp ? `<div title="${esc(resp)}" style="font-size:11px;color:#92400E;${ellipsis}">★ ${esc(resp)}</div>` : ''}
+      </div>
+    </div>`;
+};
+
+/** Whether the screen is wide enough for the horizontal chart */
+const useWide = () => {
+  const query = '(min-width: 768px)';
+  const [wide, setWide] = useState(() => typeof window === 'undefined' || window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return wide;
+};
+
+/** Phones: indented tree with expand / collapse; a search keeps the people above each match */
+const OrgTree = ({ nodes, search, onOpen }: { nodes: OrgChartNode[]; search: string; onOpen: (n: OrgChartNode) => void }) => {
+  const children = useMemo(() => {
+    const map = new Map<string | null, OrgChartNode[]>();
+    nodes.forEach((n) => map.set(n.parentId, [...(map.get(n.parentId) || []), n]));
+    return map;
+  }, [nodes]);
+  const roots = children.get(null) || [];
+  const [open, setOpen] = useState<Set<string>>(() => new Set(roots.map((r) => r.id)));
+  const visible = useMemo(() => {
+    if (!search.trim()) return null;
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const keep = new Set<string>();
+    nodes
+      .filter((n) => matchesSearch(search, n.name, n.position, n.area))
+      .forEach((n) => {
+        for (let x: OrgChartNode | undefined = n; x; x = x.parentId ? byId.get(x.parentId) : undefined) keep.add(x.id);
+      });
+    return keep;
+  }, [nodes, search]);
+
+  const rows = (parent: string | null, depth: number): React.ReactNode[] =>
+    (children.get(parent) || [])
+      .filter((n) => !visible || visible.has(n.id))
+      .flatMap((n) => {
+        const kids = (children.get(n.id) || []).length;
+        const expanded = kids > 0 && (!!visible || open.has(n.id));
+        return [
+          <li key={n.id} className="flex items-center gap-1.5 py-1.5" style={{ paddingLeft: depth * 16 }}>
+            {kids ? (
+              <button
+                onClick={() =>
+                  setOpen((s) => {
+                    const next = new Set(s);
+                    if (next.has(n.id)) next.delete(n.id);
+                    else next.add(n.id);
+                    return next;
+                  })
+                }
+                className="rounded p-0.5 text-gray-500 hover:bg-gray-100"
+                aria-label={expanded ? `Cerrar equipo de ${n.name}` : `Abrir equipo de ${n.name}`}
+              >
+                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+            ) : (
+              <span className="w-5" />
+            )}
+            <button
+              onClick={() => !n.is_headcount && n.id !== VIRTUAL_ID && onOpen(n)}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-left"
+              style={{ borderLeft: `3px solid ${n.area_color || NEUTRAL}` }}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-gray-900">
+                  {n.is_headcount ? `${n.quantity} · ${n.position}` : n.id === VIRTUAL_ID ? 'Sin jefe asignado' : n.name}
+                </span>
+                {!n.is_headcount && n.id !== VIRTUAL_ID && <span className="block truncate text-xs text-gray-500">{[n.position, n.area].filter(Boolean).join(' · ')}</span>}
+              </span>
+              {kids > 0 && <span className="flex-shrink-0 text-xs text-gray-500">{kids}</span>}
+            </button>
+          </li>,
+          ...(expanded ? rows(n.id, depth + 1) : []),
+        ];
+      });
+
+  const list = rows(null, 0);
+  return list.length ? <ul className="p-2">{list}</ul> : <p className="p-6 text-center text-sm text-gray-500">Nadie coincide con la búsqueda.</p>;
+};
+
 const OrgChartPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
+  const wide = useWide();
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
   const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
+  const [search, setSearch] = useState('');
+  const [showMatches, setShowMatches] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
-  const orgChartInstance = useRef<any>(null);
+  const chart = useRef<any>(null);
 
-  // Fetch organizations
   const { data: organizationsData } = useQuery({
     queryKey: ['organizations'],
     queryFn: () => getOrganizations({ limit: 100 }),
+    enabled: !embedded,
   });
 
-  // Fetch plants for selected organization
   const { data: plantsData } = useQuery({
     queryKey: ['plants', selectedOrg],
     queryFn: () => getPlants({ limit: 100, organization_id: selectedOrg }),
-    enabled: !!selectedOrg,
+    enabled: !!selectedOrg && !embedded,
   });
 
-  // Fetch org chart data for selected organization and plant
   const { data: chartData, isLoading } = useQuery({
     queryKey: ['orgChart', selectedOrg, selectedPlant],
     queryFn: () => getOrgChart(selectedOrg, selectedPlant || undefined),
     enabled: !!selectedOrg,
   });
 
-  useEffect(() => {
-    if (!chartRef.current || !chartData || chartData.length === 0) return;
-
-    // Count roots (employees without manager)
-    const roots = chartData.filter((n: any) => n.parentId === null);
-    console.log(`📊 Org chart has ${roots.length} root node(s):`, roots.map((r: any) => r.name));
-
-    // If multiple roots, create a virtual root
-    let processedData = chartData;
-    if (roots.length > 1) {
-      console.log('⚠️ Multiple roots detected - creating virtual CEO node');
-      const virtualRoot = {
-        id: '__virtual_root__',
-        name: 'Organización',
-        position: 'Estructura organizacional',
-        department: '',
-        email: '',
-        employee_number: '',
-        parentId: null,
-        plant: '',
-        area: '',
-      };
-
-      // Update all roots to point to virtual root
-      processedData = [
-        virtualRoot,
-        ...chartData.map((node: any) =>
-          roots.some((r: any) => r.id === node.id)
-            ? { ...node, parentId: '__virtual_root__' }
-            : node
-        ),
-      ];
-    }
-
-    // Clear existing chart
-    chartRef.current.innerHTML = '';
-
-    // Create org chart instance
-    const chart = new OrgChart();
-
-    orgChartInstance.current = chart
-      .container(chartRef.current)
-      .data(processedData)
-      .nodeWidth(() => 280)
-      .nodeHeight((d: any) => (responsibilityText(d.data) ? 186 : 160))
-      .childrenMargin(() => 60)
-      .compactMarginBetween(() => 40)
-      .compactMarginPair(() => 35)
-      .neighbourMargin(() => 60)
-      .nodeContent((d: any) => {
-        const node: OrgChartNode = d.data;
-        const isVirtual = node.id === '__virtual_root__';
-
-        // Headcount box (people counted by position, without names)
-        if (node.is_headcount) {
-          return `
-            <div style="width: 100%; height: 100%; border-radius: 12px; border: 2px dashed #94A3B8; background: #F8FAFC;
-                        color: #0F172A; padding: 16px; display: flex; flex-direction: column; justify-content: center; gap: 6px;">
-              <div style="font-size: 30px; font-weight: 800; line-height: 1; color: #1D4ED8;">${esc(node.quantity)}</div>
-              <div style="font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${esc(node.position)}</div>
-              <div style="font-size: 12px; color: #475569;">
-                Plantilla · ${esc(node.department)}${node.shift ? ` · ${esc(node.shift)}` : ''}
-              </div>
-            </div>
-          `;
-        }
-
-        return `
-          <div style="
-            background: ${isVirtual
-              ? 'linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%)'
-              : 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)'};
-            border-radius: 12px;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            color: white;
-            overflow: hidden;
-            ${isVirtual ? 'border: 2px dashed rgba(255, 255, 255, 0.4);' : 'border: 1px solid rgba(255, 255, 255, 0.1);'}
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-          ">
-            ${!isVirtual ? `
-              <!-- Header con nombre (y foto) -->
-              <div style="
-                background: rgba(0, 0, 0, 0.15);
-                padding: 12px 16px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                display: flex;
-                align-items: center;
-                gap: 10px;
-              ">
-                ${node.avatar_url ? `<img src="${esc(avatarUrl(node.avatar_url, 40))}" alt="" style="width: 40px; height: 40px; border-radius: 9999px; object-fit: cover; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.6);" />` : ''}
-                <div style="min-width: 0;">
-                <div style="
-                  font-size: 17px;
-                  font-weight: 700;
-                  letter-spacing: -0.01em;
-                  line-height: 1.3;
-                  margin-bottom: 2px;
-                  text-overflow: ellipsis;
-                  overflow: hidden;
-                  white-space: nowrap;
-                ">
-                  ${esc(node.name || 'Sin nombre')}
-                </div>
-                <div style="
-                  font-size: 11px;
-                  opacity: 0.75;
-                  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-                  font-weight: 500;
-                  letter-spacing: 0.5px;
-                ">
-                  ${esc(node.employee_number || '')}
-                </div>
-                </div>
-              </div>
-
-              <!-- Body con información -->
-              <div style="padding: 14px 16px;">
-                <div style="
-                  font-size: 14px;
-                  font-weight: 600;
-                  margin-bottom: 6px;
-                  opacity: 0.95;
-                  line-height: 1.4;
-                ">
-                  ${esc(node.position || 'Sin puesto')}
-                </div>
-
-                <div style="
-                  display: flex;
-                  align-items: center;
-                  gap: 6px;
-                  font-size: 12px;
-                  opacity: 0.85;
-                  margin-bottom: 10px;
-                ">
-                  <span style="
-                    background: rgba(255, 255, 255, 0.2);
-                    padding: 2px 8px;
-                    border-radius: 6px;
-                    font-weight: 500;
-                    font-size: 11px;
-                  ">
-                    ${esc(node.department || 'Sin dpto.')}
-                  </span>
-                </div>
-
-                ${responsibilityText(node) ? `
-                  <div title="${esc(responsibilityText(node))}" style="
-                    font-size: 11px;
-                    font-weight: 600;
-                    background: rgba(250, 204, 21, 0.25);
-                    border-radius: 6px;
-                    padding: 3px 8px;
-                    margin-bottom: 8px;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                  ">
-                    ★ ${esc(responsibilityText(node))}
-                  </div>
-                ` : ''}
-
-                ${node.plant ? `
-                  <div style="
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    font-size: 11px;
-                    opacity: 0.8;
-                    padding-top: 8px;
-                    border-top: 1px solid rgba(255, 255, 255, 0.15);
-                  ">
-                    <span style="font-size: 12px;">📍</span>
-                    <span style="font-weight: 500;">${esc(node.plant)}</span>
-                  </div>
-                ` : ''}
-              </div>
-            ` : `
-              <!-- Nodo virtual -->
-              <div style="
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100%;
-                padding: 20px;
-                text-align: center;
-              ">
-                <div style="
-                  font-size: 32px;
-                  margin-bottom: 12px;
-                  opacity: 0.9;
-                ">
-                  🏢
-                </div>
-                <div style="
-                  font-size: 18px;
-                  font-weight: 700;
-                  margin-bottom: 8px;
-                ">
-                  ${esc(node.name)}
-                </div>
-                <div style="
-                  font-size: 11px;
-                  opacity: 0.7;
-                  font-style: italic;
-                  line-height: 1.4;
-                  max-width: 220px;
-                ">
-                  Empleados sin supervisor asignado
-                </div>
-              </div>
-            `}
-          </div>
-        `;
-      })
-      .render();
-
+  // The top of the chart is the root with the most people under it; other roots have no boss.
+  // Those with a team hang from a "Sin jefe asignado" box; those alone are only listed apart.
+  const { nodes, withoutBoss } = useMemo(() => {
+    const data = chartData || [];
+    const kids = new Map<string, number>();
+    data.forEach((n) => n.parentId && kids.set(n.parentId, (kids.get(n.parentId) || 0) + 1));
+    const size = (id: string): number => data.filter((n) => n.parentId === id).reduce((sum, n) => sum + 1 + size(n.id), 0);
+    const roots = data.filter((n) => !n.parentId);
+    if (roots.length <= 1) return { nodes: data, withoutBoss: [] as OrgChartNode[] };
+    const top = roots.reduce((best, r) => (size(r.id) > size(best.id) ? r : best), roots[0]);
+    const others = roots.filter((r) => r.id !== top.id);
+    const alone = new Set(others.filter((r) => !kids.has(r.id)).map((r) => r.id));
+    const teams = others.filter((r) => kids.has(r.id));
+    const virtual: OrgChartNode = { id: VIRTUAL_ID, name: 'Sin jefe asignado', position: '', department: '', email: '', employee_number: '', parentId: top.id };
+    return {
+      nodes: [
+        ...data.filter((n) => !alone.has(n.id)).map((n) => (teams.some((t) => t.id === n.id) ? { ...n, parentId: VIRTUAL_ID } : n)),
+        ...(teams.length ? [virtual] : []),
+      ],
+      withoutBoss: others.filter((r) => !r.is_headcount),
+    };
   }, [chartData]);
 
-  // Reset plant when organization changes
+  const people = nodes.filter((n) => !n.is_headcount && n.id !== VIRTUAL_ID);
+  const matches = search.trim() ? people.filter((n) => matchesSearch(search, n.name, n.position, n.area)).slice(0, 8) : [];
+
   useEffect(() => {
-    setSelectedPlant('');
-  }, [selectedOrg]);
+    if (!wide || !chartRef.current || !nodes.length) return;
+    chartRef.current.innerHTML = '';
+    chart.current = new OrgChart()
+      .container(chartRef.current as any)
+      .data(nodes.map((n) => ({ ...n })))
+      .nodeWidth(() => CARD_W)
+      .nodeHeight((d: any) => (d.data.is_headcount || d.data.id === VIRTUAL_ID ? 60 : 64 + (d.data.area ? 16 : 0) + (responsibilityText(d.data) ? 16 : 0)))
+      // "N personas" goes under the card, not over its text
+      .nodeButtonWidth(() => 120)
+      .nodeButtonHeight(() => 26)
+      .nodeButtonX(() => -60)
+      .nodeButtonY(() => 6)
+      .childrenMargin(() => 48)
+      .compactMarginBetween(() => 28)
+      .compactMarginPair(() => 28)
+      .neighbourMargin(() => 24)
+      .initialExpandLevel(1)
+      .nodeContent((d: any) => cardHtml(d.data))
+      // The card draws its own border and highlight
+      .nodeUpdate(function (this: any) {
+        this.querySelector?.('.node-rect')?.setAttribute('stroke', 'none');
+      })
+      .linkUpdate(function (this: any) {
+        this.setAttribute('stroke', '#CBD5E1');
+        this.setAttribute('stroke-width', '1');
+      })
+      .buttonContent(({ node }: any) => {
+        const n = node.data._directSubordinates;
+        const open = !!node.children;
+        return `<div style="display:flex;justify-content:center"><div style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;border:1px solid #CBD5E1;border-radius:9999px;background:#fff;padding:2px 8px;font:500 11px system-ui;color:#334155;cursor:pointer">${open ? '▴' : '▾'} ${n} persona${n === 1 ? '' : 's'}</div></div>`;
+      })
+      .onNodeClick((d: any) => {
+        const n: OrgChartNode = d.data ?? d;
+        if (!n.is_headcount && n.id !== VIRTUAL_ID) setDetailId(n.id);
+      })
+      .render();
+    fitCapped(chart.current);
+  }, [nodes, wide]);
 
-  const handleZoomIn = () => {
-    if (orgChartInstance.current) {
-      orgChartInstance.current.zoomIn();
+  const focus = (n: OrgChartNode) => {
+    setSearch(n.name);
+    setShowMatches(false);
+    if (chart.current) {
+      chart.current.clearHighlighting();
+      chart.current.setHighlighted(n.id).render();
     }
   };
 
-  const handleZoomOut = () => {
-    if (orgChartInstance.current) {
-      orgChartInstance.current.zoomOut();
-    }
-  };
-
-  const handleFit = () => {
-    if (orgChartInstance.current) {
-      orgChartInstance.current.fit();
-    }
-  };
+  const controls = [
+    { Icon: ZoomIn, label: 'Acercar', onClick: () => chart.current?.zoomIn() },
+    { Icon: ZoomOut, label: 'Alejar', onClick: () => chart.current?.zoomOut() },
+    { Icon: Maximize2, label: 'Ajustar a la vista', onClick: () => fitCapped(chart.current) },
+  ];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      {/* Header */}
-      <div className="mb-6">
-        <SectionHeader
-          title={embedded ? 'Personal' : 'Organigrama'}
-          description={
-            embedded ? 'Organigrama de la planta: quién reporta a quién, responsables de área y puestos.' : 'Visualiza la estructura jerárquica de la organización'
-          }
-          actions={
-            selectedOrg &&
-            chartData &&
-            chartData.length > 0 && (
-              <>
-                <Button onClick={handleZoomIn} variant="outline" className="gap-2">
-                  <ZoomIn className="h-4 w-4" />
-                  Acercar
-                </Button>
-                <Button onClick={handleZoomOut} variant="outline" className="gap-2">
-                  <ZoomOut className="h-4 w-4" />
-                  Alejar
-                </Button>
-                <Button onClick={handleFit} variant="outline" className="gap-2">
-                  <Maximize2 className="h-4 w-4" />
-                  Ajustar
-                </Button>
-              </>
-            )
-          }
-        />
-        {viewSwitch && <div className="mt-4">{viewSwitch}</div>}
+    <div className="flex flex-col gap-4">
+      <SectionHeader
+        title={embedded ? 'Personal' : 'Organigrama'}
+        description={embedded ? 'Organigrama de la planta: quién reporta a quién, responsables de área y puestos.' : 'Visualiza la estructura jerárquica de la organización'}
+      />
+      {viewSwitch}
 
-        {/* Filters */}
-        <div className="mt-4 flex gap-4">
-          {/* Organization selector */}
-          {!embedded && (
-            <div className="w-64">
-              <label htmlFor="org-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Seleccionar Organización
-              </label>
-              <select
-                id="org-select"
-                value={selectedOrg}
-                onChange={(e) => setSelectedOrg(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              >
-                <option value="">Seleccionar organización</option>
-                {organizationsData?.organizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Plant selector */}
-          {selectedOrg && !embedded && (
-            <div className="w-64">
-              <label htmlFor="plant-select" className="block text-sm font-medium text-gray-700 mb-1">
-                Filtrar por Planta (opcional)
-              </label>
-              <select
-                id="plant-select"
-                value={selectedPlant}
-                onChange={(e) => setSelectedPlant(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                disabled={!plantsData?.plants || plantsData.plants.length === 0}
-              >
-                <option value="">Todas las plantas</option>
-                {plantsData?.plants.map((plant) => (
-                  <option key={plant.id} value={plant.id}>
-                    {plant.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {!embedded && (
+        <div className="flex flex-wrap gap-2">
+          <select aria-label="Organización" value={selectedOrg} onChange={(e) => (setSelectedOrg(e.target.value), setSelectedPlant(''))} className="w-full sm:w-64">
+            <option value="">Seleccionar organización</option>
+            {organizationsData?.organizations.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
+          </select>
+          {selectedOrg && (
+            <select aria-label="Planta" value={selectedPlant} onChange={(e) => setSelectedPlant(e.target.value)} className="w-full sm:w-64">
+              <option value="">Todas las plantas</option>
+              {plantsData?.plants.map((plant) => (
+                <option key={plant.id} value={plant.id}>
+                  {plant.name}
+                </option>
+              ))}
+            </select>
           )}
         </div>
-      </div>
+      )}
 
-      {/* Content */}
+      {selectedOrg && nodes.length > 0 && (
+        <>
+          {/* Find a person: opens the branch, centers and highlights them */}
+          <div className="relative max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setShowMatches(true);
+              }}
+              onFocus={() => setShowMatches(true)}
+              onBlur={() => setTimeout(() => setShowMatches(false), 150)}
+              onKeyDown={(e) => e.key === 'Enter' && matches[0] && focus(matches[0])}
+              placeholder="Buscar persona, puesto o área"
+              aria-label="Buscar en el organigrama"
+              className="w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {wide && showMatches && matches.length > 0 && (
+              <ul role="listbox" className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                {matches.map((n) => (
+                  <li key={n.id}>
+                    <button
+                      role="option"
+                      aria-selected={false}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => focus(n)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50"
+                    >
+                      <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ backgroundColor: n.area_color || NEUTRAL }} />
+                      <span className="font-medium text-gray-900">{n.name}</span>
+                      <span className="truncate text-xs text-gray-500">{n.position}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {withoutBoss.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <UserX className="h-4 w-4 flex-shrink-0" />
+              <span className="font-medium">Sin jefe asignado ({withoutBoss.length}):</span>
+              {withoutBoss.map((n) => (
+                <button key={n.id} onClick={() => setDetailId(n.id)} className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-xs hover:border-amber-500" title="Abrir su ficha para asignarle jefe">
+                  {n.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {!selectedOrg ? (
-        <div className="flex-1 bg-white rounded-lg shadow p-8 flex items-center justify-center">
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white p-8">
           <div className="text-center">
             <Building2 className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Selecciona una organización</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Elige una organización para ver su organigrama
-            </p>
+            <p className="mt-1 text-sm text-gray-500">Elige una organización para ver su organigrama</p>
           </div>
         </div>
       ) : isLoading ? (
-        <div className="flex-1 bg-white rounded-lg shadow p-8 flex items-center justify-center">
-          <p className="text-gray-600">Cargando organigrama...</p>
-        </div>
-      ) : !chartData || chartData.length === 0 ? (
-        <div className="flex-1 bg-white rounded-lg shadow p-8 flex items-center justify-center">
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white p-8 text-gray-600">Cargando organigrama...</div>
+      ) : !nodes.length ? (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white p-8">
           <div className="text-center">
             <Building2 className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No hay empleados</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Agrega empleados para visualizar el organigrama
-            </p>
+            <p className="mt-1 text-sm text-gray-500">Agrega empleados para visualizar el organigrama</p>
           </div>
         </div>
+      ) : wide ? (
+        <div className="relative h-[65vh] min-h-[440px] overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+          <div ref={chartRef} className="h-full w-full" />
+          {/* Map-style controls in the corner */}
+          <div className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm">
+            {controls.map(({ Icon, label, onClick }) => (
+              <button key={label} onClick={onClick} title={label} aria-label={label} className="border-b border-gray-200 p-2 text-gray-700 last:border-b-0 hover:bg-gray-50">
+                <Icon className="h-4 w-4" />
+              </button>
+            ))}
+          </div>
+          <p className="pointer-events-none absolute bottom-2 left-3 text-[11px] text-gray-500">Clic en una persona para ver su ficha · la franja de color es su área</p>
+        </div>
       ) : (
-        <div className="flex-1 bg-white rounded-lg shadow overflow-hidden">
-          <div
-            ref={chartRef}
-            className="w-full h-full"
-            style={{ minHeight: '500px' }}
-          />
+        <div className="rounded-lg border border-gray-200 bg-white">
+          <OrgTree nodes={nodes} search={search} onOpen={(n) => setDetailId(n.id)} />
         </div>
       )}
+
+      <EmployeeDetailModal isOpen={!!detailId} onClose={() => setDetailId(null)} employeeId={detailId} />
     </div>
   );
 };

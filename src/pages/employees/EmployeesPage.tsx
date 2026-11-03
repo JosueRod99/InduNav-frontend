@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Users, Building2, FileSpreadsheet, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Building2, FileSpreadsheet, Search, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -41,6 +41,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null); // record with responsibilities
+  const [returnToDetail, setReturnToDetail] = useState<string | null>(null); // edit opened from a record goes back to it
   // Plant name for the import (already cached by the plant workspace)
   const { data: plant } = useQuery({ queryKey: ['plant', plantId], queryFn: () => getPlant(plantId!), enabled: embedded });
   const queryClient = useQueryClient();
@@ -92,6 +93,8 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingEmployee(null);
+    if (returnToDetail) setDetailEmployeeId(returnToDetail);
+    setReturnToDetail(null);
   };
 
   const areas = useMemo(() => {
@@ -175,7 +178,12 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
 
   const ManagerCell = ({ employee }: { employee: Employee }) =>
     employee.manager ? (
-      <button type="button" onClick={() => setDetailEmployeeId(employee.manager!.id)} className="text-left text-sm text-gray-900 hover:text-blue-700 hover:underline">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setDetailEmployeeId(employee.manager!.id);
+        }} className="text-left text-sm text-gray-900 hover:text-blue-700 hover:underline">
         {personName(employee.manager)}
       </button>
     ) : (
@@ -183,7 +191,10 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
     );
 
   const Actions = ({ employee }: { employee: Employee }) => (
-    <span className="flex flex-shrink-0 items-center justify-end gap-1">
+    <span className="flex flex-shrink-0 items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+      <button onClick={() => setDetailEmployeeId(employee.id)} className="rounded p-1.5 text-gray-600 hover:bg-gray-100" aria-label={`Ver ficha de ${personName(employee)}`} title="Ver ficha">
+        <Eye className="h-4 w-4" />
+      </button>
       <button onClick={() => handleEdit(employee)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar a ${personName(employee)}`} title="Editar">
         <Pencil className="h-4 w-4" />
       </button>
@@ -352,7 +363,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {visible.map((employee) => (
-                <tr key={employee.id} className="hover:bg-gray-50">
+                <tr key={employee.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setDetailEmployeeId(employee.id)} title="Ver ficha">
                   <td className="max-w-xs px-4 py-3">
                     <NameCell employee={employee} />
                   </td>
@@ -376,7 +387,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
           {/* Cards (phones) */}
           <ul className="divide-y divide-gray-100 md:hidden">
             {visible.map((employee) => (
-              <li key={employee.id} className="px-4 py-3">
+              <li key={employee.id} className="cursor-pointer px-4 py-3" onClick={() => setDetailEmployeeId(employee.id)}>
                 <div className="flex items-start justify-between gap-2">
                   <NameCell employee={employee} />
                   <Actions employee={employee} />
@@ -411,8 +422,23 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
         </div>
       )}
 
-      <EmployeeModal isOpen={isModalOpen} onClose={handleCloseModal} employee={editingEmployee} organizationId={selectedOrg} />
-      <EmployeeDetailModal isOpen={!!detailEmployeeId} onClose={() => setDetailEmployeeId(null)} employeeId={detailEmployeeId} />
+      <EmployeeModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        employee={editingEmployee}
+        organizationId={selectedOrg}
+        onCreated={(created) => setDetailEmployeeId(created.id)}
+      />
+      <EmployeeDetailModal
+        isOpen={!!detailEmployeeId}
+        onClose={() => setDetailEmployeeId(null)}
+        employeeId={detailEmployeeId}
+        onEdit={(employee) => {
+          setDetailEmployeeId(null);
+          setReturnToDetail(employee.id);
+          handleEdit(employee);
+        }}
+      />
       {embedded && (
         <ImportEmployeesModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} plantId={plantId!} plantName={plant?.name || 'la planta'} />
       )}

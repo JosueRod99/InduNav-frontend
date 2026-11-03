@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Loader2, Save } from 'lucide-react';
@@ -110,7 +109,7 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
 
   return (
     <form
-      className="max-w-3xl space-y-4"
+      className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (canEdit && isDirty && !nameError) save.mutate();
@@ -123,12 +122,13 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
       <section className="rounded-lg border border-gray-200 bg-white">
         <h3 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900">Datos de la planta</h3>
         <fieldset disabled={!canEdit} className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Field id="plant-name" label="Nombre">
-              <input id="plant-name" value={form.name} onChange={set('name')} maxLength={255} className={inputClass} />
-              {canEdit && nameError && <p className="mt-1 text-xs text-red-600">{nameError}</p>}
-            </Field>
-          </div>
+          <Field id="plant-name" label="Nombre">
+            <input id="plant-name" value={form.name} onChange={set('name')} maxLength={255} className={inputClass} />
+            {canEdit && nameError && <p className="mt-1 text-xs text-red-600">{nameError}</p>}
+          </Field>
+          <Field id="plant-slug" label="Identificador" hint="Nombre interno de la planta en el sistema.">
+            <input id="plant-slug" value={plant.slug} disabled readOnly className={`${inputClass} font-mono`} />
+          </Field>
           <div className="sm:col-span-2">
             <Field id="plant-description" label="Descripción" hint="Qué se hace en esta planta. Se muestra en su resumen.">
               <textarea
@@ -188,31 +188,6 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
         </fieldset>
       </section>
 
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 px-1 text-xs text-gray-500 sm:grid-cols-3">
-        <div>
-          <dt className="inline">Identificador: </dt>
-          <dd className="inline font-mono">{plant.slug}</dd>
-        </div>
-        <div>
-          <dt className="inline">Estado: </dt>
-          <dd className="inline">{plant.is_active ? 'Activa' : 'Inactiva'}</dd>
-        </div>
-        <div>
-          <dt className="inline">Creada: </dt>
-          <dd className="inline">{new Date(plant.created_at).toLocaleDateString('es-MX', { dateStyle: 'long' })}</dd>
-        </div>
-      </dl>
-
-      {/* Company-wide texts live on the organization's profile, not here */}
-      {canEdit && (
-        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
-          La misión, visión, valores, logo y fotos de la empresa se capturan en el{' '}
-          <Link to={`/organizations/${plant.organization_id}/perfil`} className="font-semibold underline hover:no-underline">
-            Perfil de la empresa
-          </Link>
-          {' '}y se muestran en todos sus tours.
-        </p>
-      )}
 
       {/* Photos save on their own when uploaded (not with the form's button) */}
       <section className="rounded-lg border border-gray-200 bg-white">

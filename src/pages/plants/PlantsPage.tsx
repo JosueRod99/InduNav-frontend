@@ -11,6 +11,7 @@ import type { Plant } from '../../types';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useBackState, useNavigateWithBack } from '../../hooks/useBackNavigation';
 import { useAuthStore } from '../../store/authStore';
+import { avatarUrl } from '../../utils/avatarUrl';
 
 const SECTION_LABELS: Record<string, string> = {
   layout: 'Layout',
@@ -181,9 +182,13 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
                 <tr key={plant.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(plantPath(plant.id))}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <Factory className="h-5 w-5 text-green-600" />
-                      </div>
+                      {plant.cover_url ? (
+                        <img src={avatarUrl(plant.cover_url, 40) || ''} alt="" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                          <Factory className="h-5 w-5 text-green-600" />
+                        </div>
+                      )}
                       <div className="ml-4">
                         <Link
                           to={plantPath(plant.id)}

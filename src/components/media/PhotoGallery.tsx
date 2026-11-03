@@ -24,7 +24,14 @@ const PhotoGallery = ({ organizationId, plantId = null, canEdit, emptyText }: Ph
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
 
   const { data: photos = [], isLoading } = useQuery({ queryKey, queryFn: () => getPhotos(organizationId, plantId) });
-  const setPhotos = (list: OrganizationPhoto[]) => queryClient.setQueryData(queryKey, list);
+  const setPhotos = (list: OrganizationPhoto[]) => {
+    queryClient.setQueryData(queryKey, list);
+    // The plant's cover is its icon in the plant list and its header
+    if (plantId) {
+      queryClient.invalidateQueries({ queryKey: ['plant', plantId] });
+      queryClient.invalidateQueries({ queryKey: ['plants'] });
+    }
+  };
   const onError = (error: any) => toast.error(error.response?.data?.message || 'No se pudo guardar el cambio');
 
   const update = useMutation({

@@ -22,9 +22,10 @@ interface EmployeeModalProps {
   onClose: () => void;
   employee?: Employee | null;
   organizationId?: string;
+  onCreated?: (employee: Employee) => void; // e.g. open the new person's record to add responsibilities
 }
 
-const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeModalProps) => {
+const EmployeeModal = ({ isOpen, onClose, employee, organizationId, onCreated }: EmployeeModalProps) => {
   const queryClient = useQueryClient();
   const [primaryAreaId, setPrimaryAreaId] = useState<string | null>(null); // For new employees
   const [formData, setFormData] = useState<CreateEmployeeRequest>({
@@ -146,12 +147,15 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId }: EmployeeMo
 
       return newEmployee;
     },
-    onSuccess: () => {
-      toast.success('Empleado creado exitosamente');
+    onSuccess: (newEmployee) => {
+      toast.success(onCreated ? 'Empleado creado: ahora puedes asignarle responsabilidades y certificaciones' : 'Empleado creado exitosamente', {
+        duration: onCreated ? 5000 : undefined,
+      });
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['orgChart'] });
       queryClient.invalidateQueries({ queryKey: ['employee-assignments'] });
       onClose();
+      onCreated?.(newEmployee);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Error al crear empleado');

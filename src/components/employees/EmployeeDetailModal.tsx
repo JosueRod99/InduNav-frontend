@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, Mail, Phone, Briefcase, Building2, Calendar, MapPin, Award, Users } from 'lucide-react';
-import { getEmployee } from '../../api/employees';
+import { X, Mail, Phone, Briefcase, Building2, Calendar, MapPin, Award, Users, Pencil, UserRound } from 'lucide-react';
+import { getEmployee, type Employee } from '../../api/employees';
 import { getAssignmentsByEmployee } from '../../api/areaAssignments';
 import Badge from '../ui/Badge';
 import { personName } from '../../utils/personName';
@@ -13,9 +13,10 @@ interface EmployeeDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   employeeId: string | null;
+  onEdit?: (employee: Employee) => void; // "Editar" in the header (where the edit form is available)
 }
 
-const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModalProps) => {
+const EmployeeDetailModal = ({ isOpen, onClose, employeeId, onEdit }: EmployeeDetailModalProps) => {
   // Fetch employee details
   const { data: employee, isLoading } = useQuery({
     queryKey: ['employee', employeeId],
@@ -29,6 +30,15 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
     queryFn: () => getAssignmentsByEmployee(employeeId!, false),
     enabled: isOpen && !!employeeId,
   });
+
+  // Who they report to (the single-employee endpoint only sends the id)
+  const managerId = employee?.manager?.id ?? employee?.reports_to ?? null;
+  const { data: manager } = useQuery({
+    queryKey: ['employee', managerId],
+    queryFn: () => getEmployee(managerId!),
+    enabled: isOpen && !!managerId && !employee?.manager,
+  });
+  const managerName = employee?.manager ? personName(employee.manager) : manager ? personName(manager) : null;
 
   if (!isOpen || !employeeId) return null;
 
@@ -47,17 +57,26 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
               <h2 className="text-xl font-semibold text-gray-900">
                 {isLoading ? 'Cargando...' : personName(employee)}
               </h2>
-              {employee?.employee_number && (
-                <p className="text-sm text-gray-500 font-mono">{employee.employee_number}</p>
+              {employee && (
+                <p className="text-sm text-gray-600">
+                  {[employee.position, primaryAssignment?.area_name, employee.employee_number].filter(Boolean).join(' · ')}
+                </p>
               )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onEdit && employee && (
+              <button
+                onClick={() => onEdit(employee)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Pencil className="h-4 w-4" /> Editar
+              </button>
+            )}
+            <button onClick={onClose} className="text-gray-400 transition-colors hover:text-gray-600" aria-label="Cerrar">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -66,6 +85,13 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
           </div>
         ) : employee ? (
           <div className="p-6 space-y-6">
+            {/* First what the person is in charge of and their certifications, then the rest */}
+            {/* Areas this person is in charge of (independent of where they work) */}
+            <EmployeeResponsibilities employee={employee} />
+
+            {/* Own certifications and the company/plant/area ones that cover the employee */}
+            <EmployeeCertifications employeeId={employee.id} plantId={employee.plant_id} />
+
             {/* Basic Information */}
             <div>
               <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -82,6 +108,11 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
                   icon={<Building2 className="h-4 w-4 text-gray-500" />}
                   label="Departamento"
                   value={employee.department}
+                />
+                <InfoRow
+                  icon={<UserRound className="h-4 w-4 text-gray-500" />}
+                  label="Reporta a"
+                  value={managerName || (managerId ? '…' : 'Sin jefe asignado')}
                 />
                 <InfoRow
                   icon={<Calendar className="h-4 w-4 text-gray-500" />}
@@ -249,12 +280,6 @@ const EmployeeDetailModal = ({ isOpen, onClose, employeeId }: EmployeeDetailModa
                 </div>
               )}
             </div>
-
-            {/* Areas this person is in charge of (independent of where they work) */}
-            <EmployeeResponsibilities employee={employee} />
-
-            {/* Own certifications and the company/plant/area ones that cover the employee */}
-            <EmployeeCertifications employeeId={employee.id} />
 
             {/* Status */}
             <div className="pt-4 border-t border-gray-200">

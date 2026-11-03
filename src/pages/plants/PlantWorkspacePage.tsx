@@ -1,14 +1,15 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Factory, Loader2, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Loader2, MapPin, Settings } from 'lucide-react';
 import { getPlant, getPlants } from '../../api/plants';
 import PlantSummaryTab from './PlantSummaryTab';
 import PlantSettingsTab from './PlantSettingsTab';
 import ToursPage from '../tours/ToursPage'; // also a top-level page: no separate chunk
-import { MANAGERS, PLANT_TABS, type PlantTab } from './plantTabs';
+import { IN_HEADER, MANAGERS, PLANT_TABS, type PlantTab } from './plantTabs';
 import { useAuthStore } from '../../store/authStore';
 import { useBackTarget } from '../../hooks/useBackNavigation';
+import { avatarUrl } from '../../utils/avatarUrl';
 
 // Plant workspace: everything about one plant behind tabs (/plants/:plantId/:tab). The module
 // pages render here with the plant fixed, so there are no repeated organization/plant filters.
@@ -76,6 +77,24 @@ const PlantWorkspacePage = () => {
     activeTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [tab, plant?.id]);
 
+  // When the tabs do not fit: a fade and an arrow on the side that has more
+  const barRef = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+  const measure = useCallback(() => {
+    const el = barRef.current;
+    if (!el) return;
+    setMore({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, plant?.id]);
+  const scrollTabs = (direction: 1 | -1) => barRef.current?.scrollBy({ left: direction * 240, behavior: 'smooth' });
+
   const activeTab = tabs.find((t) => t.id === tab)?.id;
   if (!activeTab) return <Navigate to={`/plants/${plantId}/resumen`} replace />;
 
@@ -113,8 +132,12 @@ const PlantWorkspacePage = () => {
             <ChevronRight className="h-3.5 w-3.5" />
             <span className="truncate text-gray-700">{plant.name}</span>
           </nav>
-          <h2 className="mt-0.5 flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <Factory className="h-6 w-6 flex-shrink-0 text-green-600" />
+          {/* Cover photo beside the name and location (as tall as those two lines) */}
+          <div className="mt-0.5 flex items-center gap-3">
+            {plant.cover_url && <img src={avatarUrl(plant.cover_url, 56) || ''} alt="" className="h-14 w-14 flex-shrink-0 rounded-lg object-cover" />}
+            <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+            {!plant.cover_url && <Factory className="h-6 w-6 flex-shrink-0 text-green-600" />}
             <span className="truncate">{plant.name}</span>
             {!plant.is_active && (
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Inactiva</span>
@@ -126,8 +149,22 @@ const PlantWorkspacePage = () => {
               {plant.location}
             </p>
           )}
+            </div>
+          </div>
         </div>
 
+        <div className="flex flex-wrap items-end gap-2">
+        {/* Plant settings: beside the switcher, not one more tab */}
+        <Link
+          to={`/plants/${plant.id}/configuracion`}
+          aria-current={activeTab === 'configuracion' ? 'page' : undefined}
+          onMouseEnter={() => prefetch('configuracion')}
+          className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === 'configuracion' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Settings className="h-4 w-4" /> Configuración
+        </Link>
         {otherPlants.length > 1 && (
           <label className="text-xs text-gray-500">
             Cambiar de planta
@@ -145,12 +182,14 @@ const PlantWorkspacePage = () => {
             </select>
           </label>
         )}
+        </div>
       </div>
 
-      {/* Tabs (scroll sideways on small screens) */}
-      <div className="overflow-x-auto border-b border-gray-200">
+      {/* Tabs (scroll sideways when they do not fit, with a fade and arrows on the side that has more) */}
+      <div className="relative border-b border-gray-200">
+      <div ref={barRef} onScroll={measure} className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <nav className="-mb-px flex gap-1" aria-label="Secciones de la planta">
-          {tabs.map(({ id, label, Icon }) => (
+          {tabs.filter((t) => !IN_HEADER.includes(t.id)).map(({ id, label, Icon }) => (
             <Link
               key={id}
               to={`/plants/${plant.id}/${id}`}
@@ -169,6 +208,25 @@ const PlantWorkspacePage = () => {
             </Link>
           ))}
         </nav>
+      </div>
+      {(['left', 'right'] as const).map(
+        (side) =>
+          more[side] && (
+            <div
+              key={side}
+              className={`pointer-events-none absolute inset-y-0 flex items-center ${side === 'left' ? 'left-0 bg-gradient-to-r pr-6' : 'right-0 justify-end bg-gradient-to-l pl-6'} from-gray-50 via-gray-50/90 to-transparent`}
+            >
+              <button
+                type="button"
+                onClick={() => scrollTabs(side === 'left' ? -1 : 1)}
+                className="pointer-events-auto rounded-full border border-gray-200 bg-white p-1 text-gray-600 shadow-sm hover:text-gray-900"
+                aria-label={side === 'left' ? 'Ver secciones anteriores' : 'Ver más secciones'}
+              >
+                {side === 'left' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+            </div>
+          )
+      )}
       </div>
 
       {/* Content: key = plant, so switching plants starts each tab fresh */}

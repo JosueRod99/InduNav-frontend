@@ -227,7 +227,7 @@ const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
   return (
     <div className="space-y-4">
       {/* Key numbers: each one opens its tab */}
-      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${stats.length >= 6 ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
+      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${stats.length >= 6 ? 'xl:grid-cols-6' : 'xl:grid-cols-5'}`}>
         {stats.map(({ key, tab, Icon, label, value, detail }) => (
           <Link
             key={key}
