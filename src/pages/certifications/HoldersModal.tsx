@@ -6,6 +6,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { formatDate, getRoster, saveHolders, type RosterRow } from '../../api/certifications';
 import { personName } from '../../utils/personName';
+import { matchesSearch } from '../../utils/search';
 
 // People certification: the plant's employees with a checkbox each (who holds it) and an optional
 // date. The expiry is computed from the certification's validity. Changes are saved together.
@@ -32,8 +33,7 @@ const HoldersModal = ({ typeId, plantId, onClose, readOnly = false }: { typeId: 
     return d && (d.holds !== row.holds || (d.holds && d.obtained_date !== (row.obtained_date?.slice(0, 10) || '')));
   });
   const visible = rows.filter((row) => {
-    const text = `${personName(row)} ${row.position || ''}`.toLowerCase();
-    return (!search || text.includes(search.toLowerCase())) && (!area || row.area_name === area);
+    return matchesSearch(search, personName(row), row.position) && (!area || row.area_name === area);
   });
   const holdersCount = rows.filter((row) => current(row).holds).length;
   const setDraft = (row: RosterRow, patch: Partial<Draft>) => setDrafts((d) => ({ ...d, [row.employee_id]: { ...current(row), ...patch } }));

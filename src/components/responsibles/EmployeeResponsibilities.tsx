@@ -19,6 +19,7 @@ import { getPlants } from '../../api/plants';
 import type { Employee } from '../../api/employees';
 import { personName } from '../../utils/personName';
 import { useAuthStore } from '../../store/authStore';
+import { matchesSearch } from '../../utils/search';
 
 // "Responsabilidades" of an employee (their record): the areas they are in charge of, in any plant
 // of the company, unrelated to where they work. Several areas can be added at once.
@@ -53,7 +54,7 @@ const EmployeeResponsibilities = ({ employee }: { employee: Employee }) => {
     () => new Set(responsibilities.filter((r) => r.role === role).map((r) => r.area_id)),
     [responsibilities, role]
   );
-  const areas = (areasData?.areas || []).filter((a) => !filter || a.name.toLowerCase().includes(filter.toLowerCase()));
+  const areas = (areasData?.areas || []).filter((a) => matchesSearch(filter, a.name));
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey });

@@ -20,6 +20,7 @@ import UploadDocumentModal from '../modals/UploadDocumentModal';
 import EditDocumentModal from '../modals/EditDocumentModal';
 import NewDocumentVersionModal from '../modals/NewDocumentVersionModal';
 import { useDebounce } from '../../../hooks/useDebounce';
+import { matchesSearch } from '../../../utils/search';
 
 interface DocumentsTabProps {
   areaId: string;
@@ -93,14 +94,7 @@ const DocumentsTab = ({ areaId, area }: DocumentsTabProps) => {
       // No necesitamos filtrar por status aquí
 
       // Filter by search query (debounced)
-      if (debouncedSearchQuery) {
-        const query = debouncedSearchQuery.toLowerCase();
-        const matchesTitle = doc.title.toLowerCase().includes(query);
-        const matchesDescription = doc.description?.toLowerCase().includes(query);
-        const matchesCode = doc.document_code?.toLowerCase().includes(query);
-
-        if (!matchesTitle && !matchesDescription && !matchesCode) return false;
-      }
+      if (!matchesSearch(debouncedSearchQuery, doc.title, doc.description, doc.document_code)) return false;
 
       return true;
     });

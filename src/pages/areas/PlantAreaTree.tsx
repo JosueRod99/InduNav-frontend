@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BadgeAlert, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, MapPinOff, Search, UserX, Wrench } from 'lucide-react';
 import { areaPending, hasPending, type AreaOverview } from '../../api/areas';
+import { matchesSearch, normalizeSearch } from '../../utils/search';
 
 // Tree of the plant areas with aligned figures (people, subareas, equipment) and what needs
 // attention in each one. Search and "solo con pendientes" keep the ancestors of every match.
@@ -90,12 +91,12 @@ const PlantAreaTree = ({ areas, selectedId, onSelect, onMove }: Props) => {
 
   // Rows that match the search / pending filter, plus their ancestors (so they stay in context)
   const visible = useMemo(() => {
-    const text = search.trim().toLowerCase();
+    const text = normalizeSearch(search);
     if (!text && !onlyPending) return null;
     const byId = new Map(areas.map((a) => [a.id, a]));
     const keep = new Set<string>();
     for (const area of areas) {
-      const matches = (!text || `${area.name} ${area.code || ''}`.toLowerCase().includes(text)) && (!onlyPending || hasPending(area));
+      const matches = matchesSearch(text, area.name, area.code) && (!onlyPending || hasPending(area));
       if (!matches) continue;
       for (let node: AreaOverview | undefined = area; node; node = node.parent_area_id ? byId.get(node.parent_area_id) : undefined) keep.add(node.id);
     }

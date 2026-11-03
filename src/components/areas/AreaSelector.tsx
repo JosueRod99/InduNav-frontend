@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Building2, X } from 'lucide-react';
 import type { AreaTreeNode } from '../../api/areas';
+import { matchesSearch } from '../../utils/search';
 
 interface AreaSelectorProps {
   areas: AreaTreeNode[];
@@ -61,10 +62,7 @@ const AreaSelector = ({
 
   // Filter areas by search term
   const filteredAreas = searchTerm
-    ? flatAreas.filter((area) =>
-        area.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (area.code && area.code.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
+    ? flatAreas.filter((area) => matchesSearch(searchTerm, area.name, area.code))
     : flatAreas;
 
   // Close dropdown when clicking outside

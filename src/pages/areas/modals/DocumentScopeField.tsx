@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { getAreas } from '../../../api/areas';
 import { SCOPE_OPTIONS, type DocumentScope } from '../../../api/areaDocuments';
+import { matchesSearch } from '../../../utils/search';
 
 // Who a document applies to: one area (chosen from a list), several areas (checkboxes), the whole
 // plant or the whole company. Areas are those of the plant being worked on.
@@ -28,7 +29,7 @@ const DocumentScopeField = ({ plantId, value, onChange, disabled }: Props) => {
     enabled: !!plantId && (value.scope === 'area' || value.scope === 'areas'),
   });
   const sorted = [...areas].sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  const filtered = sorted.filter((a) => !search || `${a.name} ${a.code || ''}`.toLowerCase().includes(search.toLowerCase()));
+  const filtered = sorted.filter((a) => matchesSearch(search, a.name, a.code));
 
   // Switching between one and several areas keeps the areas already chosen
   const changeScope = (scope: DocumentScope) =>

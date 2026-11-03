@@ -17,6 +17,7 @@ import {
   type StepEquipmentUsageType,
 } from '../../../api/productStepEquipment';
 import type { ProductProcessStep } from '../../../api/products';
+import { matchesSearch } from '../../../utils/search';
 
 interface StepEquipmentModalProps {
   isOpen: boolean;
@@ -49,10 +50,7 @@ const StepEquipmentModal = ({ isOpen, onClose, productId, step }: StepEquipmentM
     enabled: isOpen,
   });
 
-  const matches = (c: StepEquipmentCandidate) => {
-    const q = search.trim().toLowerCase();
-    return !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q);
-  };
+  const matches = (c: StepEquipmentCandidate) => matchesSearch(search, c.name, c.code);
   const inArea = (candidates?.in_area || []).filter(matches);
   const otherInPlant = (candidates?.other_in_plant || []).filter(matches);
 

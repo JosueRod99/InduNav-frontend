@@ -10,6 +10,7 @@ import {
 } from '../../../api/areaAssignments';
 import apiClient from '../../../api/client';
 import { useDebounce } from '../../../hooks/useDebounce';
+import { matchesSearch } from '../../../utils/search';
 
 interface ManageAssignmentsModalProps {
   isOpen: boolean;
@@ -65,13 +66,7 @@ const ManageAssignmentsModal = ({ isOpen, onClose, areaId, area }: ManageAssignm
 
     // Apply search filter
     if (debouncedSearch) {
-      const query = debouncedSearch.toLowerCase();
-      filtered = filtered.filter((e: any) => {
-        const fullName = `${e.first_name} ${e.last_name}`.toLowerCase();
-        const employeeNumber = e.employee_number?.toLowerCase() || '';
-        const position = e.position?.toLowerCase() || '';
-        return fullName.includes(query) || employeeNumber.includes(query) || position.includes(query);
-      });
+      filtered = filtered.filter((e: any) => matchesSearch(debouncedSearch, `${e.first_name} ${e.last_name}`, e.employee_number, e.position));
     }
 
     return filtered;

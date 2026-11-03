@@ -39,6 +39,7 @@ export interface Employee {
     first_name: string;
     last_name: string;
   };
+  certification_alerts?: number; // person certifications expired or about to expire (list endpoint)
   // New organizational area system
   primary_area?: {
     id: string;

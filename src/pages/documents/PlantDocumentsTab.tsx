@@ -31,6 +31,7 @@ import UploadDocumentModal from "../areas/modals/UploadDocumentModal";
 import EditDocumentModal from "../areas/modals/EditDocumentModal";
 import NewDocumentVersionModal from "../areas/modals/NewDocumentVersionModal";
 import SectionHeader from "../../components/ui/SectionHeader";
+import { matchesSearch } from '../../utils/search';
 
 // Plant document library: everything that applies to its areas, to the whole plant or to the
 // whole company, with who each document applies to.
@@ -99,11 +100,7 @@ const PlantDocumentsTab = ({ plant }: Props) => {
       return false;
     if (areaFilter && !appliesToArea(d, areaFilter)) return false;
     if (onlyPending && d.document_type !== "pending") return false;
-    if (search) {
-      const text =
-        `${d.document_code || ""} ${d.title} ${d.description || ""}`.toLowerCase();
-      if (!text.includes(search.toLowerCase())) return false;
-    }
+    if (!matchesSearch(search, d.document_code, d.title, d.description)) return false;
     return true;
   });
 

@@ -9,6 +9,7 @@ import ProcessStepsList from './ProcessStepsList';
 import ProcessEditorModal from './ProcessEditorModal';
 import { useAuthStore } from '../../store/authStore';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { matchesSearch, normalizeSearch } from '../../utils/search';
 
 // "Procesos" tab of a plant (PLAN_LAB_KRAFT.md point 5): processes that go across areas
 // ("Del pedido a la entrega"). The list and one process (?proceso=<id>) live in the same tab.
@@ -131,11 +132,11 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
   }
 
   // All processes of the plant
-  const text = search.trim().toLowerCase();
+  const text = normalizeSearch(search);
   const visibleProcesses = (processes || []).filter(
     (p) =>
       (!statusFilter || p.status === statusFilter) &&
-      (!text || `${p.name} ${p.code || ''} ${p.objective || ''} ${p.areas.map((a) => a.name).join(' ')}`.toLowerCase().includes(text))
+      matchesSearch(text, p.name, p.code, p.objective, ...p.areas.map((a) => a.name))
   );
   return (
     <div className="space-y-4">

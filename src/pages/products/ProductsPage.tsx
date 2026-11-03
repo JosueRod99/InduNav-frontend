@@ -19,6 +19,7 @@ import { getPlants } from '../../api/plants';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { matchesSearch } from '../../utils/search';
 
 // Products of the plant: summary (each card filters), one row of filters, and a table with the
 // route of each product through the areas (cards on phones). The list is filtered in the browser.
@@ -111,10 +112,7 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
     if (selectedStatus && p.status !== selectedStatus) return false;
     if (selectedArea === NO_AREA && hasSteps(p)) return false;
     if (selectedArea && selectedArea !== NO_AREA && !p.route?.some((a) => a.id === selectedArea)) return false;
-    if (searchQuery) {
-      const text = `${p.name} ${p.sku} ${p.description || ''}`.toLowerCase();
-      if (!text.includes(searchQuery.toLowerCase())) return false;
-    }
+    if (!matchesSearch(searchQuery, p.name, p.sku, p.description)) return false;
     return true;
   });
 

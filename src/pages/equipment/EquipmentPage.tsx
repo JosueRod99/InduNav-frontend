@@ -19,6 +19,7 @@ import { getPlants } from '../../api/plants';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { matchesSearch } from '../../utils/search';
 
 // Equipment of the plant: summary by status (each one filters), one row of filters, and a table
 // with the area each item is in (cards on phones). The list is filtered in the browser.
@@ -106,10 +107,7 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
     if (selectedStatus && e.status !== selectedStatus) return false;
     if (selectedArea === NO_AREA && e.areas?.length) return false;
     if (selectedArea && selectedArea !== NO_AREA && !e.areas?.some((a) => a.id === selectedArea)) return false;
-    if (searchQuery) {
-      const text = `${e.name} ${e.code} ${e.manufacturer || ''} ${e.model || ''} ${e.description || ''}`.toLowerCase();
-      if (!text.includes(searchQuery.toLowerCase())) return false;
-    }
+    if (!matchesSearch(searchQuery, e.name, e.code, e.manufacturer, e.model, e.description)) return false;
     return true;
   });
 

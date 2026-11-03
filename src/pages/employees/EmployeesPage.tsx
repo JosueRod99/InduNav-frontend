@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Users, MapPin, Building2, FileSpreadsheet } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Building2, FileSpreadsheet, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -14,14 +14,29 @@ import ImportEmployeesModal from './import/ImportEmployeesModal';
 import EmployeeDetailModal from '../../components/employees/EmployeeDetailModal';
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { matchesSearch, normalizeSearch } from '../../utils/search';
+
+// Personnel of the plant: summary (each card filters), one row of filters, and a compact table
+// (name + number + email, position, area, who they report to); cards on phones.
+// Everything is loaded once (up to MAX_LOADED) and filtered here; the list shows PAGE rows at a time.
+
+const MAX_LOADED = 500;
+const PAGE = 50;
+const NO_AREA = '__none__';
+type Quick = '' | 'no_area' | 'no_manager' | 'cert_alerts';
+
+const hasArea = (e: Employee) => !!e.primary_area?.id;
 
 const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
   const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
-  const [selectedDept, setSelectedDept] = useState<string>('');
+  const [selectedArea, setSelectedArea] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'' | 'active' | 'inactive'>('');
+  const [quick, setQuick] = useState<Quick>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [shown, setShown] = useState(PAGE);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -30,34 +45,26 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
   const { data: plant } = useQuery({ queryKey: ['plant', plantId], queryFn: () => getPlant(plantId!), enabled: embedded });
   const queryClient = useQueryClient();
 
-  // Fetch organizations
   const { data: organizationsData } = useQuery({
     queryKey: ['organizations'],
     queryFn: () => getOrganizations({ limit: 100 }),
+    enabled: !embedded,
   });
 
-  // Fetch plants for selected organization
   const { data: plantsData } = useQuery({
     queryKey: ['plants', selectedOrg],
     queryFn: () => getPlants({ organization_id: selectedOrg || undefined, limit: 100 }),
-    enabled: !!selectedOrg,
+    enabled: !!selectedOrg && !embedded,
   });
 
-  // Fetch employees with filters
   const { data: employeesData, isLoading } = useQuery({
-    queryKey: ['employees', selectedOrg, selectedPlant, selectedDept, searchTerm],
-    queryFn: () =>
-      getEmployees({
-        organization_id: selectedOrg || undefined,
-        plant_id: selectedPlant || undefined,
-        department: selectedDept || undefined,
-        search: searchTerm || undefined,
-        limit: 100,
-      }),
+    queryKey: ['employees', selectedOrg, selectedPlant],
+    queryFn: () => getEmployees({ organization_id: selectedOrg || undefined, plant_id: selectedPlant || undefined, limit: MAX_LOADED }),
     enabled: !!selectedOrg,
   });
+  const employees = useMemo(() => employeesData?.employees || [], [employeesData]);
+  const totalInDb = employeesData?.total || 0;
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteEmployee,
     onSuccess: () => {
@@ -65,9 +72,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['orgChart'] });
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al eliminar empleado');
-    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Error al eliminar empleado'),
   });
 
   const handleEdit = (employee: Employee) => {
@@ -76,9 +81,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
   };
 
   const handleDelete = (employee: Employee) => {
-    if (window.confirm(`¿Estás seguro de eliminar a ${personName(employee)}?`)) {
-      deleteMutation.mutate(employee.id);
-    }
+    if (window.confirm(`¿Estás seguro de eliminar a ${personName(employee)}?`)) deleteMutation.mutate(employee.id);
   };
 
   const handleCreate = () => {
@@ -91,13 +94,110 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
     setEditingEmployee(null);
   };
 
-  // Get unique departments from employees
-  const departments = Array.from(
-    new Set(employeesData?.employees.map((e) => e.department).filter(Boolean) || [])
-  ).sort();
+  const areas = useMemo(() => {
+    const map = new Map<string, string>();
+    employees.forEach((e) => hasArea(e) && map.set(e.primary_area!.id, e.primary_area!.name));
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], 'es'));
+  }, [employees]);
+
+  const quickTest: Record<Exclude<Quick, ''>, (e: Employee) => boolean> = {
+    no_area: (e) => !hasArea(e),
+    no_manager: (e) => !e.reports_to,
+    cert_alerts: (e) => (e.certification_alerts || 0) > 0,
+  };
+
+  const text = normalizeSearch(searchTerm);
+  const filtered = employees.filter((e) => {
+    if (quick && !quickTest[quick](e)) return false;
+    if (statusFilter && e.is_active !== (statusFilter === 'active')) return false;
+    if (selectedArea === NO_AREA && hasArea(e)) return false;
+    if (selectedArea && selectedArea !== NO_AREA && e.primary_area?.id !== selectedArea) return false;
+    if (!matchesSearch(text, personName(e), e.email, e.employee_number, e.position)) return false;
+    return true;
+  });
+  const visible = filtered.slice(0, shown);
+
+  const summary: { key: Quick; label: string; value: number; tone: string }[] = [
+    { key: '', label: 'Personas', value: employees.length, tone: 'text-gray-900' },
+    { key: 'no_area', label: 'Sin área', value: employees.filter(quickTest.no_area).length, tone: 'text-amber-700' },
+    { key: 'no_manager', label: 'Sin jefe', value: employees.filter(quickTest.no_manager).length, tone: 'text-amber-700' },
+    { key: 'cert_alerts', label: 'Con certificaciones por vencer', value: employees.filter(quickTest.cert_alerts).length, tone: 'text-red-700' },
+  ];
+  const filtersActive = !!(text || selectedArea || statusFilter || quick);
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedArea('');
+    setStatusFilter('');
+    setQuick('');
+  };
+  // Changing a filter starts the list from the top again
+  const withReset =
+    <T,>(set: (v: T) => void) =>
+    (v: T) => {
+      set(v);
+      setShown(PAGE);
+    };
+
+  const NameCell = ({ employee }: { employee: Employee }) => (
+    <div className="flex min-w-0 items-center gap-3">
+      <EmployeeAvatar person={employee} size={36} />
+      <div className="min-w-0">
+        <button type="button" onClick={() => setDetailEmployeeId(employee.id)} className="text-left text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline">
+          {personName(employee)}
+        </button>
+        {!employee.is_active && (
+          <Badge variant="error" size="sm" className="ml-2">
+            Inactivo
+          </Badge>
+        )}
+        <div className="truncate text-xs text-gray-500">{[employee.employee_number, employee.email].filter(Boolean).join(' · ')}</div>
+      </div>
+    </div>
+  );
+
+  const PositionCell = ({ employee }: { employee: Employee }) => (
+    <div>
+      <div className="text-sm text-gray-900">{employee.position || '—'}</div>
+      {/* Department only when it says something the area does not */}
+      {employee.department && employee.department !== employee.primary_area?.name && <div className="text-xs text-gray-500">Depto. {employee.department}</div>}
+    </div>
+  );
+
+  const AreaCell = ({ employee }: { employee: Employee }) =>
+    hasArea(employee) ? (
+      <span className="inline-flex items-center gap-1.5 text-sm text-gray-900">
+        <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: employee.primary_area!.color || '#94A3B8' }} />
+        {employee.primary_area!.name}
+      </span>
+    ) : (
+      <span className="text-xs text-amber-700">Sin área</span>
+    );
+
+  const ManagerCell = ({ employee }: { employee: Employee }) =>
+    employee.manager ? (
+      <button type="button" onClick={() => setDetailEmployeeId(employee.manager!.id)} className="text-left text-sm text-gray-900 hover:text-blue-700 hover:underline">
+        {personName(employee.manager)}
+      </button>
+    ) : (
+      <span className="text-xs text-amber-700">Sin jefe</span>
+    );
+
+  const Actions = ({ employee }: { employee: Employee }) => (
+    <span className="flex flex-shrink-0 items-center justify-end gap-1">
+      <button onClick={() => handleEdit(employee)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar a ${personName(employee)}`} title="Editar">
+        <Pencil className="h-4 w-4" />
+      </button>
+      <button onClick={() => handleDelete(employee)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar a ${personName(employee)}`} title="Eliminar">
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </span>
+  );
+
+  const organizations = organizationsData?.organizations || [];
+  const plants = plantsData?.plants || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SectionHeader
         title={embedded ? 'Personal' : 'Empleados'}
         description={embedded ? 'Empleados de la planta, su puesto, área y a quién reportan.' : 'Gestiona empleados y su estructura organizacional'}
@@ -121,114 +221,105 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
       />
       {viewSwitch}
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {!embedded && (
-            <div>
-              <label htmlFor="org-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                Organización
-              </label>
-              <select
-                id="org-filter"
-                value={selectedOrg}
-                onChange={(e) => {
-                  setSelectedOrg(e.target.value);
-                  setSelectedPlant('');
-                  setSelectedDept('');
-                }}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              >
-                <option value="">Seleccionar organización</option>
-                {organizationsData?.organizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
+      {/* Organization and plant (only outside the plant workspace) */}
+      {!embedded && (
+        <div className="flex flex-wrap gap-2">
+          <select
+            aria-label="Organización"
+            value={selectedOrg}
+            onChange={(e) => {
+              setSelectedOrg(e.target.value);
+              setSelectedPlant('');
+              setSelectedArea('');
+            }}
+            className="w-full sm:w-64"
+          >
+            <option value="">Seleccionar organización</option>
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
+          </select>
           {selectedOrg && (
-            <>
-              {!embedded && (
-                <div>
-                  <label htmlFor="plant-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                    Planta
-                  </label>
-                  <select
-                    id="plant-filter"
-                    value={selectedPlant}
-                    onChange={(e) => setSelectedPlant(e.target.value)}
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  >
-                    <option value="">Todas las plantas</option>
-                    {plantsData?.plants.map((plant) => (
-                      <option key={plant.id} value={plant.id}>
-                        {plant.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="dept-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Departamento
-                </label>
-                <select
-                  id="dept-filter"
-                  value={selectedDept}
-                  onChange={(e) => setSelectedDept(e.target.value)}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                >
-                  <option value="">Todos los departamentos</option>
-                  {departments.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
-                  Buscar
-                </label>
-                <input
-                  id="search"
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Nombre, email, #empleado..."
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                />
-              </div>
-            </>
+            <select aria-label="Planta" value={selectedPlant} onChange={(e) => setSelectedPlant(e.target.value)} className="w-full sm:w-64">
+              <option value="">Todas las plantas</option>
+              {plants.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           )}
         </div>
-      </div>
+      )}
+
+      {selectedOrg && employees.length > 0 && (
+        <>
+          {/* Summary: each card filters (a second click clears it) */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {summary.map(({ key, label, value, tone }) => (
+              <button
+                key={label}
+                onClick={() => withReset(setQuick)(quick === key ? '' : key)}
+                aria-pressed={quick === key}
+                className={`rounded-lg border bg-white p-3 text-left transition-colors ${quick === key ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200 hover:border-blue-300'}`}
+              >
+                <span className={`block text-2xl font-bold ${value || key === '' ? tone : 'text-gray-400'}`}>{value}</span>
+                <span className="text-xs text-gray-600">{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Filters in one row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative min-w-[14rem] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => withReset(setSearchTerm)(e.target.value)}
+                placeholder="Buscar nombre, puesto o número"
+                aria-label="Buscar personal"
+                className="w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </label>
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+              <select aria-label="Área" value={selectedArea} onChange={(e) => withReset(setSelectedArea)(e.target.value)} className="min-w-0 text-sm">
+                <option value="">Área: todas</option>
+                {areas.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+                <option value={NO_AREA}>Sin área</option>
+              </select>
+              <select aria-label="Estado" value={statusFilter} onChange={(e) => withReset(setStatusFilter)(e.target.value as '' | 'active' | 'inactive')} className="min-w-0 text-sm">
+                <option value="">Estado: todos</option>
+                <option value="active">Activos</option>
+                <option value="inactive">Inactivos</option>
+              </select>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Content */}
       {!selectedOrg ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
+        <div className="rounded-lg bg-white p-8 text-center shadow">
           <Building2 className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">Selecciona una organización</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Elige una organización para ver y gestionar empleados
-          </p>
+          <p className="mt-1 text-sm text-gray-500">Elige una organización para ver y gestionar empleados</p>
         </div>
       ) : isLoading ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
+        <div className="rounded-lg bg-white p-8 text-center shadow">
           <p className="text-gray-600">Cargando empleados...</p>
         </div>
-      ) : !employeesData?.employees.length ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
+      ) : !employees.length ? (
+        <div className="rounded-lg bg-white p-8 text-center shadow">
           <Users className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No hay empleados</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Comienza agregando un nuevo empleado
-          </p>
+          <p className="mt-1 text-sm text-gray-500">Comienza agregando un nuevo empleado</p>
           <div className="mt-6">
             <Button onClick={handleCreate} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -236,152 +327,91 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
             </Button>
           </div>
         </div>
+      ) : !filtered.length ? (
+        <div className="rounded-lg border border-gray-200 bg-white p-10 text-center text-sm text-gray-600">
+          Nadie coincide con los filtros.{' '}
+          {filtersActive && (
+            <button onClick={clearFilters} className="font-medium text-blue-700 hover:underline">
+              Limpiar filtros
+            </button>
+          )}
+        </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Empleado
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          {/* Table (tablets and up) */}
+          <table className="hidden min-w-full divide-y divide-gray-200 md:table">
+            <thead className="bg-gray-50">
+              <tr>
+                {['Empleado', 'Puesto', 'Área', 'Reporta a'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    {h}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    # Empleado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Puesto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Departamento
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ubicación
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Manager
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {employeesData.employees.map((employee) => (
-                  <tr key={employee.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                      <EmployeeAvatar person={employee} size={36} />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          <button
-                            type="button"
-                            onClick={() => setDetailEmployeeId(employee.id)}
-                            className="text-left hover:text-blue-700 hover:underline"
-                          >
-                            {personName(employee)}
-                          </button>
-                        </div>
-                        <div className="text-sm text-gray-500">{employee.email}</div>
-                      </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-mono">
-                        {employee.employee_number}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{employee.position}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant="default">{employee.department}</Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {employee.primary_area ? (
-                        <div className="flex items-start gap-1 text-sm">
-                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: employee.primary_area.color || '#3B82F6' }} />
-                          <div>
-                            <div className="text-gray-900 font-medium">{employee.primary_area.name}</div>
-                            {employee.primary_area.code && (
-                              <div className="text-xs text-gray-500">{employee.primary_area.code}</div>
-                            )}
-                            {employee.plant && (
-                              <div className="text-xs text-gray-500 mt-0.5">{employee.plant.name}</div>
-                            )}
-                          </div>
-                        </div>
-                      ) : employee.plant ? (
-                        <div className="flex items-start gap-1 text-sm text-gray-600">
-                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <div>{employee.plant.name}</div>
-                            <div className="text-xs text-gray-400">Sin área asignada</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">Sin asignar</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {employee.manager ? (
-                        <div className="text-sm text-gray-900">
-                          {personName(employee.manager)}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={employee.is_active ? 'success' : 'error'}>
-                        {employee.is_active ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEdit(employee)}
-                          className="text-blue-600 hover:text-blue-900"
-                          aria-label={`Editar a ${personName(employee)}`}
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(employee)}
-                          aria-label={`Eliminar a ${personName(employee)}`}
-                          title="Eliminar"
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {visible.map((employee) => (
+                <tr key={employee.id} className="hover:bg-gray-50">
+                  <td className="max-w-xs px-4 py-3">
+                    <NameCell employee={employee} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <PositionCell employee={employee} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <AreaCell employee={employee} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <ManagerCell employee={employee} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Actions employee={employee} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-          {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4">
-            <p className="text-sm text-gray-700">
-              Mostrando <span className="font-medium">{employeesData.employees.length}</span> de{' '}
-              <span className="font-medium">{employeesData.total}</span> empleados
-            </p>
+          {/* Cards (phones) */}
+          <ul className="divide-y divide-gray-100 md:hidden">
+            {visible.map((employee) => (
+              <li key={employee.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <NameCell employee={employee} />
+                  <Actions employee={employee} />
+                </div>
+                <div className="mt-2 space-y-1 pl-12 text-sm">
+                  <PositionCell employee={employee} />
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                    <AreaCell employee={employee} />
+                    <span className="inline-flex items-center gap-1">
+                      Reporta a: <ManagerCell employee={employee} />
+                    </span>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Footer: how many are shown, and "Mostrar más" */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+            <span>
+              Mostrando <strong>{visible.length}</strong> de <strong>{filtered.length}</strong> {filtersActive ? 'que coinciden' : 'personas'}
+              {totalInDb > employees.length && (
+                <span className="ml-1 text-amber-700">(se cargaron las primeras {employees.length} de {totalInDb})</span>
+              )}
+            </span>
+            {visible.length < filtered.length && (
+              <Button variant="outline" size="sm" onClick={() => setShown(shown + PAGE)}>
+                Mostrar {Math.min(PAGE, filtered.length - visible.length)} más
+              </Button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Employee Modal */}
-      <EmployeeModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        employee={editingEmployee}
-        organizationId={selectedOrg}
-      />
+      <EmployeeModal isOpen={isModalOpen} onClose={handleCloseModal} employee={editingEmployee} organizationId={selectedOrg} />
       <EmployeeDetailModal isOpen={!!detailEmployeeId} onClose={() => setDetailEmployeeId(null)} employeeId={detailEmployeeId} />
       {embedded && (
         <ImportEmployeesModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} plantId={plantId!} plantName={plant?.name || 'la planta'} />
