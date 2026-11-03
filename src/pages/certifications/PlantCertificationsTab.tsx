@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Award, BadgeCheck, Loader2, Pencil, Plus, Trash2, UserCheck } from 'lucide-react';
+import { Award, Loader2, Pencil, Plus, Trash2, UserCheck } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import {
@@ -100,12 +100,41 @@ const PersonTypeModal = ({
   );
 };
 
+type Urgency = 'expired' | 'expiring' | 'ok' | 'other';
+type Quick = '' | 'ok' | 'expiring' | 'expired' | 'people';
+const URGENCY_ORDER: Record<Urgency, number> = { expired: 0, expiring: 1, other: 2, ok: 3 };
+
+/** Expired, about to expire (within the alert window), valid, or in process / suspended */
+const systemUrgency = (c: SystemCertification, alertDays: number): Urgency => {
+  if (c.effective_status === 'expired') return 'expired';
+  if (c.effective_status !== 'active') return 'other';
+  if (c.expiry_date && new Date(`${c.expiry_date.slice(0, 10)}T12:00:00`).getTime() <= Date.now() + alertDays * 864e5) return 'expiring';
+  return 'ok';
+};
+const personUrgency = (t: PersonCertificationStats): Urgency => (t.expired > 0 ? 'expired' : t.expiring > 0 ? 'expiring' : 'ok');
+const matches = (u: Urgency, quick: Quick) => !quick || quick === 'people' || u === quick;
+const byUrgency = <T,>(rows: T[], urgency: (r: T) => Urgency) =>
+  rows.map((r, i) => ({ r, i, u: urgency(r) })).sort((a, b) => URGENCY_ORDER[a.u] - URGENCY_ORDER[b.u] || a.i - b.i);
+
+const Pill = ({ n, tone, label }: { n: number; tone: 'amber' | 'red'; label: string }) =>
+  n > 0 ? (
+    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${tone === 'red' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
+      {n} {label}
+    </span>
+  ) : (
+    <span className="text-gray-400">—</span>
+  );
+
+const thClass = 'px-4 py-2 font-medium';
+const iconBtn = 'rounded p-1 text-gray-500 hover:bg-gray-100';
+
 const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_id: string; name: string } }) => {
   const queryClient = useQueryClient();
   const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
   const [systemModal, setSystemModal] = useState<{ open: boolean; certification: SystemCertification | null }>({ open: false, certification: null });
   const [typeModal, setTypeModal] = useState<{ open: boolean; type: PersonCertificationStats | null }>({ open: false, type: null });
   const [rosterType, setRosterType] = useState<string | null>(null);
+  const [quick, setQuick] = useState<Quick>('');
 
   const { data, isLoading } = useQuery({ queryKey: ['plant-certifications', plant.id], queryFn: () => getPlantCertifications(plant.id) });
   const refresh = () => {
@@ -123,141 +152,242 @@ const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_i
     );
   }
 
+  // Most urgent first; the summary cards filter both lists
+  const system = byUrgency(data.system, (c) => systemUrgency(c, data.alert_days));
+  const person = byUrgency(data.person, personUrgency);
+  const count = (u: Urgency) => system.filter((x) => x.u === u).length + person.filter((x) => x.u === u).length;
+  const shownSystem = quick === 'people' ? [] : system.filter((x) => matches(x.u, quick));
+  const shownPerson = person.filter((x) => (quick === 'people' ? x.u !== 'ok' : matches(x.u, quick)));
+  const summary: { key: Quick; label: string; value: number; tone: string }[] = [
+    { key: 'ok', label: 'Vigentes', value: count('ok'), tone: 'text-green-700' },
+    { key: 'expiring', label: `Por vencer (${data.alert_days} días)`, value: count('expiring'), tone: 'text-amber-700' },
+    { key: 'expired', label: 'Vencidas', value: count('expired'), tone: 'text-red-700' },
+    { key: 'people', label: 'Personas con alertas', value: data.people_with_alerts, tone: 'text-red-700' },
+  ];
+  const filtered = !!quick;
+  const emptyFiltered = (
+    <p className="px-4 py-6 text-center text-sm text-gray-500">
+      Ninguna coincide con el filtro.{' '}
+      <button onClick={() => setQuick('')} className="font-medium text-blue-700 hover:underline">
+        Ver todas
+      </button>
+    </p>
+  );
+
+  const header = (Icon: typeof Award, iconClass: string, title: string, description: string, onAdd: () => void, addLabel: string) => (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
+      <div>
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+          <Icon className={`h-4 w-4 ${iconClass}`} /> {title}
+        </h3>
+        <p className="mt-0.5 text-xs text-gray-500">{description}</p>
+      </div>
+      {canEdit && (
+        <Button size="sm" className="gap-1.5" onClick={onAdd} aria-label={addLabel}>
+          <Plus className="h-4 w-4" /> Agregar
+        </Button>
+      )}
+    </div>
+  );
+
+  const systemActions = (c: SystemCertification) =>
+    canEdit && (
+      <span className="flex flex-shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={() => setSystemModal({ open: true, certification: c })} className={iconBtn} aria-label={`Editar ${c.name}`}>
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => window.confirm(`¿Quitar ${c.name} (${scopeLabel(c)})?`) && removeSystem.mutate(c.id)}
+          className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"
+          aria-label={`Quitar ${c.name}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </span>
+    );
+
+  const personActions = (t: PersonCertificationStats) =>
+    canEdit && (
+      <span className="flex flex-shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={() => setTypeModal({ open: true, type: t })} className={iconBtn} aria-label={`Editar ${t.name}`}>
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => window.confirm(`¿Eliminar "${t.name}"? Se quita de todo el personal de la empresa.`) && removeType.mutate(t.id)}
+          className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"
+          aria-label={`Eliminar ${t.name}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </span>
+    );
+
+  const status = (c: SystemCertification, u: Urgency) => (
+    <span className="flex flex-wrap items-center gap-1">
+      <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASSES[c.effective_status]}`}>{STATUS_LABELS[c.effective_status]}</span>
+      {u === 'expiring' && <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Por vencer</span>}
+    </span>
+  );
+  const validity = (t: PersonCertificationStats) => (t.validity_months ? `${t.validity_months} meses` : 'Sin vigencia');
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SectionHeader title="Certificaciones" description="Normas y sistemas de la empresa y la planta, y las certificaciones de cada persona." />
+
+      {/* Summary: each card filters both lists */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {summary.map(({ key, label, value, tone }) => (
+          <button
+            key={key}
+            onClick={() => setQuick(quick === key ? '' : key)}
+            aria-pressed={quick === key}
+            className={`rounded-lg border bg-white p-3 text-left transition-colors ${quick === key ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200 hover:border-blue-300'}`}
+          >
+            <span className={`block text-2xl font-bold ${value ? tone : 'text-gray-400'}`}>{value}</span>
+            <span className="text-xs text-gray-600">{label}</span>
+          </button>
+        ))}
+      </div>
 
       {/* System */}
       <section className="rounded-lg border border-gray-200 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
-          <div>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-              <Award className="h-4 w-4 text-amber-500" /> De la empresa y la planta
-            </h3>
-            <p className="mt-0.5 text-xs text-gray-500">Normas y sistemas (ISO 9001, FSC…). Las de toda la empresa aparecen en la ficha de cada empleado.</p>
-          </div>
-          {canEdit && (
-            <Button size="sm" className="gap-1.5" onClick={() => setSystemModal({ open: true, certification: null })}>
-              <Plus className="h-4 w-4" /> Agregar
-            </Button>
-          )}
-        </div>
+        {header(Award, 'text-amber-500', 'De la empresa y la planta', 'Normas y sistemas (ISO 9001, FSC…). Las de toda la empresa aparecen en la ficha de cada empleado.', () => setSystemModal({ open: true, certification: null }), 'Agregar certificación de la empresa o la planta')}
         {data.system.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-gray-500">Sin certificaciones registradas.</p>
+        ) : shownSystem.length === 0 ? (
+          quick === 'people' ? <p className="px-4 py-4 text-center text-xs text-gray-500">El filtro "Personas con alertas" solo aplica al personal.</p> : emptyFiltered
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100 text-sm">
+          <>
+            <table className="hidden min-w-full divide-y divide-gray-100 text-sm md:table">
               <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="px-4 py-2 font-medium">Certificación</th>
-                  <th className="px-4 py-2 font-medium">Aplica a</th>
-                  <th className="px-4 py-2 font-medium">Estado</th>
-                  <th className="px-4 py-2 font-medium">Vence</th>
-                  <th className="px-4 py-2 font-medium">Próxima auditoría</th>
+                  <th className={thClass}>Certificación</th>
+                  <th className={thClass}>Aplica a</th>
+                  <th className={thClass}>Estado</th>
+                  <th className={thClass}>Vence</th>
+                  <th className={thClass}>Próxima auditoría</th>
                   {canEdit && <th className="px-4 py-2" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {data.system.map((c) => (
+                {shownSystem.map(({ r: c, u }) => (
                   <tr key={c.id}>
                     <td className="px-4 py-2">
                       <p className="font-medium text-gray-900">{c.name}</p>
                       <p className="text-xs text-gray-500">{[c.issuing_body, c.certificate_number && `No. ${c.certificate_number}`].filter(Boolean).join(' · ')}</p>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-gray-700">{scopeLabel(c)}</td>
-                    <td className="px-4 py-2">
-                      <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASSES[c.effective_status]}`}>{STATUS_LABELS[c.effective_status]}</span>
-                    </td>
+                    <td className="px-4 py-2">{status(c, u)}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-gray-700">{formatDate(c.expiry_date)}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-gray-700">{formatDate(c.next_audit_date)}</td>
-                    {canEdit && (
-                      <td className="whitespace-nowrap px-4 py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSystemModal({ open: true, certification: c })}
-                          className="rounded p-1 text-gray-500 hover:bg-gray-100"
-                          aria-label={`Editar ${c.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => window.confirm(`¿Quitar ${c.name} (${scopeLabel(c)})?`) && removeSystem.mutate(c.id)}
-                          className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                          aria-label={`Quitar ${c.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    )}
+                    {canEdit && <td className="whitespace-nowrap px-4 py-2">{systemActions(c)}</td>}
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+            <ul className="divide-y divide-gray-100 md:hidden">
+              {shownSystem.map(({ r: c, u }) => (
+                <li key={c.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900">{c.name}</p>
+                      <p className="text-xs text-gray-500">{[scopeLabel(c), c.issuing_body].filter(Boolean).join(' · ')}</p>
+                    </div>
+                    {systemActions(c)}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                    {status(c, u)}
+                    <span>Vence {formatDate(c.expiry_date)}</span>
+                    {c.next_audit_date && <span>Auditoría {formatDate(c.next_audit_date)}</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
 
       {/* People */}
       <section className="rounded-lg border border-gray-200 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
-          <div>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-              <UserCheck className="h-4 w-4 text-blue-600" /> Del personal
-            </h3>
-            <p className="mt-0.5 text-xs text-gray-500">Licencias y cursos por persona (montacargas, auditor interno…). Se marcan con casillas.</p>
-          </div>
-          {canEdit && (
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setTypeModal({ open: true, type: null })}>
-              <Plus className="h-4 w-4" /> Nueva certificación de personal
-            </Button>
-          )}
-        </div>
+        {header(UserCheck, 'text-blue-600', 'Del personal', 'Licencias y cursos por persona (montacargas, auditor interno…). Clic en una para ver y marcar al personal.', () => setTypeModal({ open: true, type: null }), 'Agregar certificación de personal')}
         {data.person.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-gray-500">Sin certificaciones de personal.</p>
+        ) : shownPerson.length === 0 ? (
+          emptyFiltered
         ) : (
-          <ul className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
-            {data.person.map((t) => (
-              <li key={t.id} className="rounded-lg border border-gray-200 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 font-medium text-gray-900">
-                      <BadgeCheck className="h-4 w-4 flex-shrink-0 text-blue-600" />
-                      <span className="truncate">{t.name}</span>
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {[t.issuing_body, t.validity_months && `Vigencia ${t.validity_months} meses`].filter(Boolean).join(' · ') || 'Sin vigencia definida'}
-                    </p>
+          <>
+            <table className="hidden min-w-full divide-y divide-gray-100 text-sm md:table">
+              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className={thClass}>Certificación</th>
+                  <th className={thClass}>Personas</th>
+                  <th className={thClass}>Por vencer</th>
+                  <th className={thClass}>Vencidas</th>
+                  <th className={thClass}>Vigencia</th>
+                  {canEdit && <th className="px-4 py-2" />}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {shownPerson.map(({ r: t }) => (
+                  <tr
+                    key={t.id}
+                    onClick={() => setRosterType(t.id)}
+                    className="cursor-pointer hover:bg-gray-50"
+                    title={canEdit ? 'Ver y marcar personal' : 'Ver personal'}
+                  >
+                    <td className="px-4 py-2">
+                      <p className="font-medium text-gray-900">{t.name}</p>
+                      {t.issuing_body && <p className="text-xs text-gray-500">{t.issuing_body}</p>}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2 text-gray-700">
+                      <strong>{t.holders}</strong> persona{t.holders === 1 ? '' : 's'}
+                    </td>
+                    <td className="px-4 py-2">
+                      <Pill n={t.expiring} tone="amber" label="por vencer" />
+                    </td>
+                    <td className="px-4 py-2">
+                      <Pill n={t.expired} tone="red" label={t.expired === 1 ? 'vencida' : 'vencidas'} />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2 text-gray-700">{validity(t)}</td>
+                    {canEdit && <td className="whitespace-nowrap px-4 py-2">{personActions(t)}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <ul className="divide-y divide-gray-100 md:hidden">
+              {shownPerson.map(({ r: t }) => (
+                <li key={t.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <button onClick={() => setRosterType(t.id)} className="min-w-0 text-left">
+                      <p className="font-medium text-gray-900">{t.name}</p>
+                      <p className="text-xs text-gray-500">{[t.issuing_body, validity(t)].filter(Boolean).join(' · ')}</p>
+                    </button>
+                    {personActions(t)}
                   </div>
-                  {canEdit && (
-                    <span className="flex flex-shrink-0">
-                      <button type="button" onClick={() => setTypeModal({ open: true, type: t })} className="rounded p-1 text-gray-400 hover:bg-gray-100" aria-label={`Editar ${t.name}`}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => window.confirm(`¿Eliminar "${t.name}"? Se quita de todo el personal de la empresa.`) && removeType.mutate(t.id)}
-                        className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                        aria-label={`Eliminar ${t.name}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                  <button onClick={() => setRosterType(t.id)} className="mt-1.5 flex w-full flex-wrap items-center gap-2 text-left text-xs text-gray-700">
+                    <span>
+                      <strong>{t.holders}</strong> persona{t.holders === 1 ? '' : 's'}
                     </span>
-                  )}
-                </div>
-                <p className="mt-2 text-sm text-gray-700">
-                  <strong>{t.holders}</strong> persona{t.holders === 1 ? '' : 's'} en esta planta
-                  {t.expiring > 0 && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">{t.expiring} por vencer</span>}
-                  {t.expired > 0 && <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-800">{t.expired} vencidas</span>}
-                </p>
-                <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => setRosterType(t.id)}>
-                  {canEdit ? 'Ver y marcar personal' : 'Ver personal'}
-                </Button>
-              </li>
-            ))}
-          </ul>
+                    {t.expiring > 0 && <Pill n={t.expiring} tone="amber" label="por vencer" />}
+                    {t.expired > 0 && <Pill n={t.expired} tone="red" label={t.expired === 1 ? 'vencida' : 'vencidas'} />}
+                    <span className="ml-auto font-medium text-blue-700">{canEdit ? 'Ver y marcar' : 'Ver personal'}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
+      {filtered && (
+        <p className="text-xs text-gray-500">
+          Filtrando por <strong>{summary.find((x) => x.key === quick)?.label}</strong>.{' '}
+          <button onClick={() => setQuick('')} className="font-medium text-blue-700 hover:underline">
+            Ver todas
+          </button>
+        </p>
+      )}
 
       <SystemCertificationModal
         isOpen={systemModal.open}

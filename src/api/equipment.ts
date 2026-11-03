@@ -35,6 +35,7 @@ export interface Equipment {
 
   // Media
   primary_image_url: string | null;
+  areas?: { id: string; name: string; color: string | null }[]; // current area assignments (list endpoint)
 
   // Audit Trail
   created_at: Date;

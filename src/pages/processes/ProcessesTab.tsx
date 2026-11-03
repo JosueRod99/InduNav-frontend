@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ArrowLeft, GitBranch, Loader2, MapPin, Pencil, Plus, Trash2, User } from 'lucide-react';
+import { ArrowLeft, GitBranch, Loader2, Pencil, Plus, Search, Trash2, User } from 'lucide-react';
 import Button from '../../components/ui/Button';
-import { deleteProcess, getProcess, getProcesses } from '../../api/processes';
+import { deleteProcess, getProcess, getProcesses, type ProcessSummary } from '../../api/processes';
 import ProcessStepsList from './ProcessStepsList';
 import ProcessEditorModal from './ProcessEditorModal';
 import { useAuthStore } from '../../store/authStore';
@@ -14,6 +14,12 @@ import SectionHeader from '../../components/ui/SectionHeader';
 // ("Del pedido a la entrega"). The list and one process (?proceso=<id>) live in the same tab.
 
 const EDITORS = ['platform_admin', 'org_owner', 'plant_manager'];
+
+// Search and status filter only appear when the list is long enough to need them
+const FILTERS_FROM = 7;
+
+/** Different areas the process goes through (the card shows the count; the detail shows each step) */
+const areaCount = (p: ProcessSummary) => new Set(p.areas.map((a) => a.id)).size;
 
 const StatusBadge = ({ status }: { status: 'draft' | 'active' }) =>
   status === 'active' ? (
@@ -28,6 +34,8 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
   const [searchParams, setSearchParams] = useSearchParams();
   const processId = searchParams.get('proceso');
   const [editor, setEditor] = useState<'new' | 'edit' | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'' | 'active' | 'draft'>('');
   const plant = { id: plantId, organization_id: organizationId };
 
   const { data: processes, isLoading } = useQuery({ queryKey: ['processes', plantId], queryFn: () => getProcesses(plantId) });
@@ -123,6 +131,12 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
   }
 
   // All processes of the plant
+  const text = search.trim().toLowerCase();
+  const visibleProcesses = (processes || []).filter(
+    (p) =>
+      (!statusFilter || p.status === statusFilter) &&
+      (!text || `${p.name} ${p.code || ''} ${p.objective || ''} ${p.areas.map((a) => a.name).join(' ')}`.toLowerCase().includes(text))
+  );
   return (
     <div className="space-y-4">
       <SectionHeader
@@ -147,8 +161,43 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
           <p className="mt-1 text-sm text-gray-600">Por ejemplo "Del pedido a la entrega": qué área hace cada paso y con qué documentos.</p>
         </div>
       ) : (
+        <>
+        {processes.length >= FILTERS_FROM && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative min-w-[14rem] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                placeholder="Buscar por nombre, código, objetivo o área"
+                aria-label="Buscar procesos"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </label>
+            <select aria-label="Estado" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as '' | 'active' | 'draft')} className="text-sm">
+              <option value="">Estado: todos</option>
+              <option value="active">Vigente</option>
+              <option value="draft">Borrador</option>
+            </select>
+          </div>
+        )}
+        {visibleProcesses.length === 0 ? (
+          <div className="rounded-lg border border-gray-200 bg-white p-10 text-center text-sm text-gray-600">
+            Ningún proceso coincide con los filtros.{' '}
+            <button
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('');
+              }}
+              className="font-medium text-blue-700 hover:underline"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        ) : (
         <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {processes.map((p) => (
+          {visibleProcesses.map((p) => (
             <li key={p.id}>
               <button
                 type="button"
@@ -166,20 +215,22 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
                 <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                   <span>
                     {p.step_count} paso{p.step_count === 1 ? '' : 's'}
+                    {areaCount(p) > 0 && ` · ${areaCount(p)} área${areaCount(p) === 1 ? '' : 's'}`}
                   </span>
-                  {p.areas.length > 0 && (
+                  {p.owner_name ? (
                     <span className="inline-flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {p.areas.slice(0, 4).join(', ')}
-                      {p.areas.length > 4 && ` y ${p.areas.length - 4} más`}
+                      <User className="h-3 w-3" /> Dueño: {p.owner_name}
                     </span>
+                  ) : (
+                    <span className="text-amber-700">Sin dueño</span>
                   )}
-                  {p.owner_name && <span>Dueño: {p.owner_name}</span>}
                 </p>
               </button>
             </li>
           ))}
         </ul>
+        )}
+        </>
       )}
       <p className="text-xs text-gray-500">
         Cada área muestra en su pestaña <strong>Procesos</strong> los pasos que le tocan, y los tours los enseñan en su sección{' '}

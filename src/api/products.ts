@@ -52,6 +52,7 @@ export interface Product {
   // Relations (populated by queries)
   process_steps?: ProductProcessStep[];
   process_steps_count?: number;
+  route?: { id: string; name: string; color: string | null }[]; // area of each step, in order (list endpoint)
 }
 
 export interface ProductProcessStep {

@@ -10,7 +10,7 @@ export interface ProcessSummary {
   status: 'draft' | 'active';
   owner_name: string | null;
   step_count: number;
-  areas: string[];
+  areas: { id: string; name: string; color: string | null }[]; // area of each step, in step order
   updated_at: string;
 }
 

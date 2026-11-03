@@ -82,7 +82,14 @@ export const scopeLabel = (c: Pick<SystemCertification, 'scope' | 'plant_name' |
 export const formatDate = (iso: string | null) =>
   iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-export const getPlantCertifications = async (plantId: string): Promise<{ system: SystemCertification[]; person: PersonCertificationStats[] }> =>
+export interface PlantCertifications {
+  system: SystemCertification[];
+  person: PersonCertificationStats[];
+  people_with_alerts: number; // people of the plant with a certification expired or about to expire
+  alert_days: number; // "por vencer" window
+}
+
+export const getPlantCertifications = async (plantId: string): Promise<PlantCertifications> =>
   (await apiClient.get(`/certifications/plant/${plantId}`)).data;
 
 export const getCertificationTypes = async (plantId: string, kind?: 'system' | 'person'): Promise<CertificationType[]> =>
