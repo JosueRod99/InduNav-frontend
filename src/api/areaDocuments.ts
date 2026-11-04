@@ -175,10 +175,10 @@ export const createGeneralDocument = async (data: CreateDocumentRequest): Promis
 };
 
 /** Fields that say where a document applies, for create and update */
-export const scopeFields = (value: { scope: DocumentScope; areaId: string | null; sharedAreaIds: string[]; sharedProductIds?: string[]; sharedEquipmentIds?: string[] }, plantId: string, organizationId: string) => ({
+export const scopeFields = (value: { scope: DocumentScope; areaId: string | null; sharedAreaIds: string[]; sharedProductIds?: string[]; sharedEquipmentIds?: string[] }, plantId: string | undefined, organizationId: string) => ({
   scope: value.scope,
   organizational_area_id: value.scope === 'area' ? value.areaId : null,
-  plant_id: value.scope === 'organization' ? null : plantId,
+  plant_id: value.scope === 'organization' ? null : plantId ?? null,
   organization_id: organizationId,
   shared_area_ids: value.scope === 'areas' ? value.sharedAreaIds : [],
   shared_product_ids: value.scope === 'products' ? value.sharedProductIds || [] : [],
@@ -197,19 +197,29 @@ export const getPlantDocuments = async (plantId: string, options: { includeArchi
   return response.data.data;
 };
 
+/** Documents of the whole organization (it may have no plants) */
+export const getOrganizationDocuments = async (organizationId: string, options: { includeArchived?: boolean } = {}): Promise<AreaDocument[]> => {
+  const response = await apiClient.get(`/organizations/${organizationId}/documents`, { params: options.includeArchived ? { includeArchived: 'true' } : {} });
+  return response.data.data;
+};
+
 /**
  * Code the next document of this type and key would get, e.g. PROC-RH-003.
  * Numbers are per organization, so any area or plant of it gives the same answer.
  */
-export const getNextDocumentCode = async (codeSource: { areaId?: string; plantId?: string }, prefix: string, key: string): Promise<string> => {
-  const url = codeSource.areaId ? `/organizational-areas/${codeSource.areaId}/documents/next-code` : `/plants/${codeSource.plantId}/documents/next-code`;
+export const getNextDocumentCode = async (codeSource: { areaId?: string; plantId?: string; organizationId?: string }, prefix: string, key: string): Promise<string> => {
+  const url = codeSource.areaId
+    ? `/organizational-areas/${codeSource.areaId}/documents/next-code`
+    : codeSource.plantId
+      ? `/plants/${codeSource.plantId}/documents/next-code`
+      : `/organizations/${codeSource.organizationId}/documents/next-code`;
   const response = await apiClient.get(url, { params: { prefix, key } });
   return response.data.data.code;
 };
 
 /** Every document list changes together (a general document shows in many places) */
 export const invalidateDocumentLists = (queryClient: QueryClient) => {
-  for (const key of ['area-documents-active', 'area-documents-archived', 'area-documents-applicable', 'plant-documents']) {
+  for (const key of ['area-documents-active', 'area-documents-archived', 'area-documents-applicable', 'plant-documents', 'organization-documents', 'organization-summary']) {
     queryClient.invalidateQueries({ queryKey: [key] });
   }
   queryClient.invalidateQueries({ queryKey: ['plant-areas-overview'] }); // counts in the area tabs

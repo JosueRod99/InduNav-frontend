@@ -42,3 +42,5 @@ build
 node_modules/
 /.pnp
 .pnp.js
+
+homePreview.ts

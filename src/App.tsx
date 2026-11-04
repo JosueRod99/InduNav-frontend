@@ -214,7 +214,14 @@ function App() {
               }
             />
             <Route path="org-chart" element={<LegacyPlantRedirect tab="personal" query="?vista=organigrama" />} />
-            <Route path="reports" element={<ReportsPage />} />
+            <Route
+              path="reports"
+              element={
+                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner', 'plant_manager']}>
+                  <ReportsPage />
+                </RoleProtectedRoute>
+              }
+            />
           </Route>
 
           {/* 404 - Redirect to dashboard or login */}

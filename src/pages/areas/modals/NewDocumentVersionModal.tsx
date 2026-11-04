@@ -10,7 +10,7 @@ interface NewDocumentVersionModalProps {
   onClose: () => void;
   document: AreaDocument | null;
   organizationId: string;
-  plantId: string;
+  plantId?: string;
   onVersionCreated?: () => void; // Optional callback cuando se crea exitosamente una versión
 }
 
@@ -145,7 +145,7 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
         const formData = new FormData();
         formData.append('file', selectedFile!);
         formData.append('organization_id', organizationId);
-        formData.append('plant_id', plantId);
+        if (plantId) formData.append('plant_id', plantId);
         if (document.organizational_area_id) formData.append('area_id', document.organizational_area_id);
 
         const uploadResponse = await apiClient.post('/upload/document', formData, {

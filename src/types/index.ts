@@ -57,6 +57,12 @@ export interface Organization {
   is_active: boolean;
   settings: Record<string, any>;
   tour_publications_per_month?: number;
+  // Figures of the organizations list
+  plants_count?: number;
+  users_count?: number;
+  tours_published?: number;
+  publications_used?: number;
+  publications_limit?: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -70,6 +76,10 @@ export interface Plant {
   timezone: string;
   is_active: boolean;
   settings: Record<string, any>;
+  // Figures of the plants list
+  areas_count?: number;
+  employees_count?: number;
+  tours_count?: number;
   description?: string | null;
   contact_name?: string | null;
   contact_phone?: string | null;

@@ -32,7 +32,7 @@ const generalItems: NavItem[] = [
   { to: '/dashboard', icon: BarChart3, label: 'Inicio' },
   { to: '/plants', icon: Factory, label: 'Plantas', activePrefix: '/plants' },
   { to: '/tours', icon: Map, label: 'Tours' },
-  { to: '/reports', icon: FileText, label: 'Reportes' },
+  { to: '/reports', icon: FileText, label: 'Reportes', allowedRoles: ['platform_admin', 'org_owner', 'plant_manager'] },
 ];
 
 const adminItems: NavItem[] = [

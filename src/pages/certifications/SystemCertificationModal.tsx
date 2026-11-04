@@ -27,12 +27,15 @@ const NEW_TYPE = '__new__';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  plant: { id: string; organization_id: string; name?: string };
+  plant?: { id: string; organization_id: string; name?: string };
+  organizationId?: string; // opened from the organization page (no plant): it covers the whole company
   defaultAreaId?: string; // opened from an area: a new certification covers that area unless changed
   certification?: SystemCertification | null;
 }
 
-const SystemCertificationModal = ({ isOpen, onClose, plant, certification, defaultAreaId }: Props) => {
+const SystemCertificationModal = ({ isOpen, onClose, plant, organizationId, certification, defaultAreaId }: Props) => {
+  const ownerOrganizationId = plant?.organization_id ?? organizationId!;
+  const owner = plant ? plant.id : { organizationId: ownerOrganizationId };
   const queryClient = useQueryClient();
   const [typeId, setTypeId] = useState('');
   const [newName, setNewName] = useState('');
@@ -47,11 +50,11 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, certification, defau
   const [responsible, setResponsible] = useState('');
   const [notes, setNotes] = useState('');
 
-  const { data: types = [] } = useQuery({ queryKey: ['certification-types', plant.id, 'system'], queryFn: () => getCertificationTypes(plant.id, 'system'), enabled: isOpen });
-  const { data: areasData } = useQuery({ queryKey: ['areas', plant.id, 'all'], queryFn: () => getAreas({ plant_id: plant.id, limit: 500 }), enabled: isOpen });
+  const { data: types = [] } = useQuery({ queryKey: ['certification-types', plant?.id ?? ownerOrganizationId, 'system'], queryFn: () => getCertificationTypes(owner, 'system'), enabled: isOpen });
+  const { data: areasData } = useQuery({ queryKey: ['areas', plant?.id, 'all'], queryFn: () => getAreas({ plant_id: plant!.id, limit: 500 }), enabled: isOpen && !!plant });
   const { data: people } = useQuery({
-    queryKey: ['employees-for-process', plant.organization_id],
-    queryFn: () => getEmployees({ organization_id: plant.organization_id, is_active: true, limit: 500 }),
+    queryKey: ['employees-for-process', ownerOrganizationId],
+    queryFn: () => getEmployees({ organization_id: ownerOrganizationId, is_active: true, limit: 500 }),
     enabled: isOpen,
   });
 
@@ -79,12 +82,13 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, certification, defau
     mutationFn: async () => {
       let id = typeId;
       if (typeId === NEW_TYPE) {
-        id = (await createCertificationType(plant.id, { kind: 'system', name: newName.trim(), issuing_body: newBody.trim() || null })).id;
+        id = (await createCertificationType(owner, { kind: 'system', name: newName.trim(), issuing_body: newBody.trim() || null })).id;
       }
       const payload = {
         type_id: id,
         scope,
-        plant_id: plant.id,
+        plant_id: plant?.id ?? null,
+        ...(plant ? {} : { organization_id: ownerOrganizationId }),
         area_id: scope === 'area' ? areaId : null,
         status,
         certificate_number: number.trim() || null,
@@ -101,6 +105,7 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, certification, defau
       queryClient.invalidateQueries({ queryKey: ['plant-certifications'] });
       queryClient.invalidateQueries({ queryKey: ['certification-types'] });
       queryClient.invalidateQueries({ queryKey: ['plant-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['organization-summary'] });
       onClose();
     },
     onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo guardar la certificación'),
@@ -156,13 +161,14 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, certification, defau
           </div>
         )}
 
+        {plant && (
         <fieldset>
           <legend className="text-sm font-medium text-gray-700">Aplica a</legend>
           <div className="mt-1 flex flex-wrap gap-4 text-sm">
             {(
               [
                 ['organization', 'Toda la empresa'],
-                ['plant', `Esta planta (${plant.name})`],
+                ['plant', `Esta planta (${plant?.name})`],
                 ['area', 'Un área'],
               ] as const
             ).map(([value, label]) => (
@@ -185,6 +191,7 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, certification, defau
             </select>
           )}
         </fieldset>
+        )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block text-sm font-medium text-gray-700">

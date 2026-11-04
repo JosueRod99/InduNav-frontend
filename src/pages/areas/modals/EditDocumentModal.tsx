@@ -23,7 +23,7 @@ interface EditDocumentModalProps {
   onClose: () => void;
   document: AreaDocument | null;
   organizationId: string;
-  plantId: string;
+  plantId?: string; // without one (organization page): only documents of the whole company
 }
 
 const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId }: EditDocumentModalProps) => {
@@ -307,7 +307,7 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
             </div>
 
             {/* Who it applies to (shared by every version) */}
-            <DocumentScopeField plantId={document.plant_id || plantId} value={scope} onChange={setScope} />
+            {(document.plant_id || plantId) && <DocumentScopeField plantId={(document.plant_id || plantId)!} value={scope} onChange={setScope} />}
 
             {/* Title */}
             <div>

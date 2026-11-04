@@ -116,3 +116,41 @@ export const getAuditLog = async (id: string): Promise<AuditLogDetail> => {
   const { data } = await apiClient.get(`/admin/audit/${id}`);
   return data.log;
 };
+
+// "Inicio" of the platform team
+export interface PlatformHomeData {
+  organizations: number;
+  plants: number;
+  tours_published: number;
+  visits_30d: number;
+  visits_prev_30d: number;
+  publications_used: number;
+  organizations_list: {
+    id: string;
+    name: string;
+    slug: string;
+    logo_url: string | null;
+    plan: string;
+    is_active: boolean;
+    publications_limit: number;
+    publications_used: number;
+    plants: number;
+    tours_published: number;
+    visits_30d: number;
+  }[];
+  recent_changes: {
+    id: string;
+    action: string | null;
+    resource: string;
+    resource_id: string | null;
+    user_name: string | null;
+    organization_name: string | null;
+    entity_name: string | null;
+    created_at: string;
+  }[];
+}
+
+export const getPlatformHome = async (): Promise<PlatformHomeData> => {
+  const { data } = await apiClient.get('/admin/home');
+  return data;
+};

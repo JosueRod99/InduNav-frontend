@@ -173,7 +173,7 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
 
   return (
     <form
-      className="max-w-4xl space-y-4"
+      className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (canEdit && isDirty) save.mutate();

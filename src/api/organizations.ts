@@ -87,3 +87,45 @@ export const deleteOrganization = async (id: string): Promise<void> => {
 export const permanentlyDeleteOrganization = async (id: string): Promise<void> => {
   await apiClient.delete(`/organizations/${id}/permanent`);
 };
+
+export interface OrganizationSummary {
+  publications_limit: number;
+  publications_used: number;
+  plants: number;
+  employees: number;
+  headcount: number;
+  tours: number;
+  tours_published: number;
+  tours_unpublished_changes: number;
+  visits_30d: number;
+  visits_prev_30d: number;
+  documents: number;
+  certifications_alert: number;
+  people_certification_alerts: number;
+  plants_list: {
+    id: string;
+    name: string;
+    location: string | null;
+    is_active: boolean;
+    cover_url: string | null;
+    areas: number;
+    employees: number;
+    tours: number;
+    has_plan: boolean;
+  }[];
+  profile_missing: string[];
+  alert_days: number;
+  near_limit_ratio: number;
+}
+
+// "Resumen" tab of an organization
+export const getOrganizationSummary = async (id: string): Promise<OrganizationSummary> => {
+  const { data } = await apiClient.get(`/organizations/${id}/summary`);
+  return data;
+};
+
+// Tour publications of this month and the limit
+export const getOrganizationPublications = async (id: string): Promise<{ limit: number; used: number }> => {
+  const { data } = await apiClient.get(`/organizations/${id}/publications`);
+  return data;
+};

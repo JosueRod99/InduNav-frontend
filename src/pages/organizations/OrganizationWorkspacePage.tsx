@@ -1,26 +1,32 @@
 import { Suspense, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, ChevronRight, Factory, IdCard, Loader2, Pencil, Settings, Users } from 'lucide-react';
+import { Building2, ChevronRight, Factory, FileText, IdCard, LayoutDashboard, Loader2, Pencil, Settings, Users } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
+import ScrollTabs from '../../components/ui/ScrollTabs';
 import { getOrganization } from '../../api/organizations';
 import { useAuthStore } from '../../store/authStore';
 import OrganizationModal from './OrganizationModal';
 
-// Organization page: its plants, users and settings behind tabs (/organizations/:orgId/:tab).
+// Organization page: its summary, plants, documents, users and settings behind tabs (/organizations/:orgId/:tab).
 // Platform admins reach every organization from here; an organization owner sees their own
 // ("Mi empresa"), without the users tab (user management is platform-admin only).
 
 import PlantsPage from '../plants/PlantsPage';
 import UsersPage from '../users/UsersPage';
 import OrganizationProfileTab from './OrganizationProfileTab';
+import OrganizationSummaryTab from './OrganizationSummaryTab';
+import OrganizationLibraryTab from './OrganizationLibraryTab';
 
+const MANAGERS = ['platform_admin', 'org_owner'];
 const TABS = [
-  { id: 'plantas', label: 'Plantas', Icon: Factory, adminOnly: false },
-  { id: 'perfil', label: 'Perfil', Icon: IdCard, adminOnly: false }, // company profile shown in the tours
-  { id: 'usuarios', label: 'Usuarios', Icon: Users, adminOnly: true },
-  { id: 'configuracion', label: 'Configuración', Icon: Settings, adminOnly: false },
+  { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard, adminOnly: false, managersOnly: true },
+  { id: 'plantas', label: 'Plantas', Icon: Factory, adminOnly: false, managersOnly: false },
+  { id: 'perfil', label: 'Perfil', Icon: IdCard, adminOnly: false, managersOnly: false }, // company profile shown in the tours
+  { id: 'documentos', label: 'Documentos y certificaciones', Icon: FileText, adminOnly: false, managersOnly: true },
+  { id: 'usuarios', label: 'Usuarios', Icon: Users, adminOnly: true, managersOnly: false },
+  { id: 'configuracion', label: 'Configuración', Icon: Settings, adminOnly: false, managersOnly: false }, // button in the header
 ] as const;
 
 const PLAN_LABELS: Record<string, string> = { free: 'Gratis', pro: 'Pro', enterprise: 'Enterprise' };
@@ -38,9 +44,10 @@ const OrganizationWorkspacePage = () => {
     retry: (count, err: any) => ![403, 404].includes(err?.response?.status) && count < 2,
   });
 
-  const tabs = TABS.filter((t) => !t.adminOnly || isPlatformAdmin);
+  const isManager = MANAGERS.includes(user?.role?.name || '');
+  const tabs = TABS.filter((t) => (!t.adminOnly || isPlatformAdmin) && (!t.managersOnly || isManager));
   const activeTab = tabs.find((t) => t.id === tab)?.id;
-  if (!activeTab) return <Navigate to={`/organizations/${orgId}/plantas`} replace />;
+  if (!activeTab) return <Navigate to={`/organizations/${orgId}/${tabs[0].id}`} replace />;
 
   if (isLoading) {
     return (
@@ -70,21 +77,38 @@ const OrganizationWorkspacePage = () => {
               <span className="truncate text-gray-700">{organization.name}</span>
             </nav>
           )}
-          <h2 className="mt-0.5 flex items-center gap-2 text-2xl font-bold text-gray-900">
+          {/* Logo beside the name and plan */}
+          <div className="mt-0.5 flex items-center gap-3">
             {organization.logo_url ? (
-              <img src={organization.logo_url} alt="" className="h-8 w-8 rounded object-contain" />
+              <img src={organization.logo_url} alt="" className="h-14 w-14 flex-shrink-0 rounded-lg border border-gray-200 bg-white object-contain" />
             ) : (
-              <Building2 className="h-6 w-6 flex-shrink-0 text-gray-500" />
+              <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100">
+                <Building2 className="h-6 w-6 text-gray-500" />
+              </span>
             )}
-            <span className="truncate">{organization.name}</span>
-            {!organization.is_active && <Badge variant="error">Inactiva</Badge>}
-          </h2>
+            <div className="min-w-0">
+              <h2 className="truncate text-2xl font-bold text-gray-900">{organization.name}</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <Badge variant="default">{PLAN_LABELS[organization.plan] || organization.plan}</Badge>
+                {!organization.is_active && <Badge variant="default">Inactiva</Badge>}
+              </div>
+            </div>
+          </div>
         </div>
+        {/* Settings: in the header, not one more tab */}
+        <Link
+          to={`/organizations/${organization.id}/configuracion`}
+          aria-current={activeTab === 'configuracion' ? 'page' : undefined}
+          className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === 'configuracion' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Settings className="h-4 w-4" /> Configuración
+        </Link>
       </div>
 
-      <div className="overflow-x-auto border-b border-gray-200">
-        <nav className="-mb-px flex gap-1" aria-label="Secciones de la empresa">
-          {tabs.map(({ id, label, Icon }) => (
+      <ScrollTabs label="Secciones de la empresa">
+          {tabs.filter((t) => t.id !== 'configuracion').map(({ id, label, Icon }) => (
             <Link
               key={id}
               to={`/organizations/${organization.id}/${id}`}
@@ -99,8 +123,7 @@ const OrganizationWorkspacePage = () => {
               {label}
             </Link>
           ))}
-        </nav>
-      </div>
+      </ScrollTabs>
 
       <Suspense
         fallback={
@@ -109,13 +132,15 @@ const OrganizationWorkspacePage = () => {
           </p>
         }
       >
+        {activeTab === 'resumen' && <OrganizationSummaryTab organizationId={organization.id} />}
         {activeTab === 'plantas' && <PlantsPage organizationId={organization.id} />}
+        {activeTab === 'documentos' && <OrganizationLibraryTab organization={organization} />}
         {activeTab === 'perfil' && (
           <OrganizationProfileTab organizationId={organization.id} canEdit={isPlatformAdmin || user?.role?.name === 'org_owner'} />
         )}
         {activeTab === 'usuarios' && <UsersPage organizationId={organization.id} />}
         {activeTab === 'configuracion' && (
-          <section className="max-w-2xl rounded-lg border border-gray-200 bg-white">
+          <section className="rounded-lg border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <h3 className="text-sm font-semibold text-gray-900">Datos de la empresa</h3>
               {isPlatformAdmin && (

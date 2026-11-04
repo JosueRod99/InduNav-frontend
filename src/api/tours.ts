@@ -21,6 +21,7 @@ export interface GetToursParams {
   page?: number;
   limit?: number;
   plant_id?: string;
+  organization_id?: string;
   search?: string;
   is_active?: boolean;
   is_public?: boolean;

@@ -89,16 +89,24 @@ export interface PlantCertifications {
   alert_days: number; // "por vencer" window
 }
 
+/** System certifications of the whole organization */
+export const getOrganizationCertifications = async (organizationId: string): Promise<{ system: SystemCertification[]; alert_days: number }> =>
+  (await apiClient.get(`/certifications/organization/${organizationId}`)).data;
+
+/** Whose catalog: of the organization of a plant, or of an organization directly (it may have no plants) */
+type CertificationOwner = string | { organizationId: string };
+const ownerParam = (owner: CertificationOwner) => (typeof owner === 'string' ? { plant_id: owner } : { organization_id: owner.organizationId });
+
 export const getPlantCertifications = async (plantId: string): Promise<PlantCertifications> =>
   (await apiClient.get(`/certifications/plant/${plantId}`)).data;
 
-export const getCertificationTypes = async (plantId: string, kind?: 'system' | 'person'): Promise<CertificationType[]> =>
-  (await apiClient.get('/certifications/types', { params: { plant_id: plantId, kind } })).data.data;
+export const getCertificationTypes = async (owner: CertificationOwner, kind?: 'system' | 'person'): Promise<CertificationType[]> =>
+  (await apiClient.get('/certifications/types', { params: { ...ownerParam(owner), kind } })).data.data;
 
 export const createCertificationType = async (
-  plantId: string,
+  owner: CertificationOwner,
   payload: { kind: 'system' | 'person'; name: string; issuing_body?: string | null; validity_months?: number | null; description?: string | null }
-): Promise<CertificationType> => (await apiClient.post('/certifications/types', { plant_id: plantId, ...payload })).data;
+): Promise<CertificationType> => (await apiClient.post('/certifications/types', { ...ownerParam(owner), ...payload })).data;
 
 export const updateCertificationType = async (
   id: string,
@@ -112,7 +120,8 @@ export const deleteCertificationType = async (id: string) => {
 export interface SystemCertificationInput {
   type_id: string;
   scope: CertificationScope;
-  plant_id: string; // the plant the user is in (also the scope when scope = "plant")
+  plant_id: string | null; // the plant the user is in (also the scope when scope = "plant")
+  organization_id?: string; // from the organization page, where there is no plant
   area_id?: string | null;
   status: CertificationStatus;
   certificate_number?: string | null;

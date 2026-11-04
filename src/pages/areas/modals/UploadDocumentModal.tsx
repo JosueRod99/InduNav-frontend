@@ -22,7 +22,7 @@ interface UploadDocumentModalProps {
   product?: { id: string; sku: string }; // opened from a product: it applies to that product unless changed
   equipment?: { id: string; code: string }; // opened from a piece of equipment: same
   organizationId: string;
-  plantId: string;
+  plantId?: string; // without one (organization page): it applies to the whole company
 }
 
 type DocumentSourceType = 'uploaded' | 'external_link' | 'pending'; // pending: registered now, file later
@@ -52,7 +52,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, product, equipment, orga
       ? { scope: 'products', areaId: null, sharedAreaIds: [], sharedProductIds: [product.id] }
       : areaId
         ? { scope: 'area', areaId, sharedAreaIds: [] }
-        : { scope: 'plant', areaId: null, sharedAreaIds: [] });
+        : { scope: plantId ? 'plant' : 'organization', areaId: null, sharedAreaIds: [] });
   // Default key of automatic codes (PROC-<key>-001): the area's code for one area, GEN otherwise
   const keyAreaId = scopeValue.scope === 'area' ? scopeValue.areaId : null;
   const { data: keyArea } = useQuery({ queryKey: ['organizational-area', keyAreaId], queryFn: () => getArea(keyAreaId!), enabled: isOpen && !!keyAreaId });
@@ -252,7 +252,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, product, equipment, orga
         const formData = new FormData();
         formData.append('file', selectedFile!);
         formData.append('organization_id', organizationId);
-        formData.append('plant_id', plantId);
+        if (plantId) formData.append('plant_id', plantId);
         if (where.organizational_area_id) formData.append('area_id', where.organizational_area_id);
 
         const uploadResponse = await apiClient.post('/upload/document', formData, {
@@ -515,9 +515,9 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, product, equipment, orga
 
               {/* Code: automatic TYPE-KEY-NNN, typed, or none */}
               {/* Who it applies to */}
-              <DocumentScopeField plantId={plantId} value={scopeValue} onChange={setScope} disabled={uploading} />
+              {plantId && <DocumentScopeField plantId={plantId} value={scopeValue} onChange={setScope} disabled={uploading} />}
 
-              <DocumentCodeField codeSource={{ plantId }} value={codeValue} onChange={setCode} disabled={uploading} />
+              <DocumentCodeField codeSource={plantId ? { plantId } : { organizationId }} value={codeValue} onChange={setCode} disabled={uploading} />
 
               {/* Title */}
               <div>

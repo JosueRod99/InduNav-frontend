@@ -11,7 +11,7 @@ export type DocumentCodeValue =
   | { mode: 'none' };
 
 interface Props {
-  codeSource: { areaId?: string; plantId?: string }; // where the next number is asked (same organization)
+  codeSource: { areaId?: string; plantId?: string; organizationId?: string }; // where the next number is asked (same organization)
   value: DocumentCodeValue;
   onChange: (value: DocumentCodeValue) => void;
   disabled?: boolean;
@@ -32,7 +32,7 @@ const DocumentCodeField = ({ codeSource, value, onChange, disabled }: Props) => 
   const validPrefix = /^[A-Z]{2,6}$/.test(prefix);
   const validKey = /^[A-Z0-9]+(-[A-Z0-9]+)*$/.test(debouncedKey);
   const { data: next, isFetching, isError } = useQuery({
-    queryKey: ['next-document-code', codeSource.areaId || codeSource.plantId, prefix, debouncedKey],
+    queryKey: ['next-document-code', codeSource.areaId || codeSource.plantId || codeSource.organizationId, prefix, debouncedKey],
     queryFn: () => getNextDocumentCode(codeSource, prefix, debouncedKey),
     enabled: value.mode === 'auto' && validPrefix && validKey,
     staleTime: 0, // numbers move as documents are saved

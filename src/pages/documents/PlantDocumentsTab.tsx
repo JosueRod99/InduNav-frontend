@@ -18,6 +18,7 @@ import {
   deleteDocument,
   getCategoryLabel,
   getFileIcon,
+  getOrganizationDocuments,
   getPlantDocuments,
   getStatusColor,
   getStatusLabel,
@@ -39,7 +40,8 @@ import { matchesSearch } from "../../utils/search";
 // whole company, with who each document applies to.
 
 interface Props {
-  plant: { id: string; name?: string; organization_id: string };
+  plant?: { id: string; name?: string; organization_id: string };
+  organization?: { id: string; name: string }; // on the organization's page: only what applies to all of it
   area?: { id: string; name: string }; // inside an area's page: only what applies to that area
   product?: { id: string; name: string; sku: string }; // inside a product's page: only its documents
   equipment?: { id: string; name: string; code: string }; // inside a piece of equipment's page: same
@@ -54,14 +56,15 @@ const SCOPE_BADGE: Record<DocumentScope, string> = {
   equipment: "bg-slate-100 text-slate-700",
 };
 
-const PlantDocumentsTab = ({ plant, area, product, equipment }: Props) => {
+const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Props) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<"" | DocumentScope>("");
   const [areaFilter, setAreaFilter] = useState(""); // documents that apply to this area
   const [productFilter, setProductFilter] = useState(""); // documents of this product
   const [equipmentFilter, setEquipmentFilter] = useState(""); // documents of this piece of equipment
-  const linked = !!(product || equipment); // inside a product or equipment page: only its documents
+  const linked = !!(product || equipment || !plant); // inside a product, equipment or organization page: no scope filters
+  const organizationId = plant?.organization_id ?? organization!.id;
   const [onlyPending, setOnlyPending] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [generalOnly, setGeneralOnly] = useState(false); // summary card: whole plant or company
@@ -70,8 +73,13 @@ const PlantDocumentsTab = ({ plant, area, product, equipment }: Props) => {
   const [versioning, setVersioning] = useState<AreaDocument | null>(null);
 
   const { data: allDocuments = [], isLoading } = useQuery({
-    queryKey: ["plant-documents", plant.id],
-    queryFn: () => getPlantDocuments(plant.id, { includeArchived: true }),
+    queryKey: plant
+      ? ["plant-documents", plant.id]
+      : ["organization-documents", organizationId],
+    queryFn: () =>
+      plant
+        ? getPlantDocuments(plant.id, { includeArchived: true })
+        : getOrganizationDocuments(organizationId, { includeArchived: true }),
   });
   const inScope = useMemo(
     () =>
@@ -95,9 +103,10 @@ const PlantDocumentsTab = ({ plant, area, product, equipment }: Props) => {
   );
   const listed = showArchived ? archived : documents;
   const { data: areas = [] } = useQuery({
-    queryKey: ["plant-areas-flat", plant.id],
+    queryKey: ["plant-areas-flat", plant?.id],
     queryFn: async () =>
-      (await getAreas({ plant_id: plant.id, limit: 500 })).areas,
+      (await getAreas({ plant_id: plant!.id, limit: 500 })).areas,
+    enabled: !!plant,
   });
   const sortedAreas = useMemo(
     () => [...areas].sort((a, b) => a.name.localeCompare(b.name, "es")),
@@ -180,9 +189,11 @@ const PlantDocumentsTab = ({ plant, area, product, equipment }: Props) => {
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Documentos"
+        title={plant ? "Documentos" : "Documentos de la empresa"}
         description={
-          equipment
+          !plant
+            ? "Aplican a toda la empresa y aparecen también en los documentos de cada planta."
+            : equipment
             ? "Manuales y otros documentos de este equipo. También aparecen en Documentos de la planta."
             : product
               ? "Fichas técnicas, planos y otros documentos de este producto. También aparecen en Documentos de la planta."
@@ -516,22 +527,22 @@ const PlantDocumentsTab = ({ plant, area, product, equipment }: Props) => {
         areaId={area?.id}
         product={product}
         equipment={equipment}
-        organizationId={plant.organization_id}
-        plantId={plant.id}
+        organizationId={organizationId}
+        plantId={plant?.id}
       />
       <EditDocumentModal
         isOpen={!!editing}
         onClose={() => setEditing(null)}
         document={editing}
-        organizationId={plant.organization_id}
-        plantId={plant.id}
+        organizationId={organizationId}
+        plantId={plant?.id}
       />
       <NewDocumentVersionModal
         isOpen={!!versioning}
         onClose={() => setVersioning(null)}
         document={versioning}
-        organizationId={plant.organization_id}
-        plantId={plant.id}
+        organizationId={organizationId}
+        plantId={plant?.id}
       />
     </div>
   );

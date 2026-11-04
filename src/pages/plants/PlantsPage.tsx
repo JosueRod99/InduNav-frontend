@@ -12,6 +12,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useBackState, useNavigateWithBack } from '../../hooks/useBackNavigation';
 import { useAuthStore } from '../../store/authStore';
 import { avatarUrl } from '../../utils/avatarUrl';
+import SectionHeader from '../../components/ui/SectionHeader';
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 const SECTION_LABELS: Record<string, string> = {
   layout: 'Layout',
@@ -90,20 +93,32 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
   return (
     <div>
       {/* Page Header */}
-      <div className={`flex items-center ${embedded ? 'justify-end mb-4' : 'justify-between mb-8'}`}>
-        {!embedded && (
+      {embedded ? (
+        <SectionHeader
+          className="mb-4"
+          title="Plantas"
+          description="Las plantas de esta empresa."
+          actions={
+            <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
+              <Plus className="h-4 w-4" />
+              Nueva Planta
+            </Button>
+          }
+        />
+      ) : (
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Plantas</h2>
             <p className="mt-1 text-sm text-gray-600">
               {section ? `Elige la planta para ver ${SECTION_LABELS[section]}` : 'Gestiona las plantas industriales'}
             </p>
           </div>
-        )}
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nueva Planta
-        </Button>
-      </div>
+          <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
+            <Plus className="h-4 w-4" />
+            Nueva Planta
+          </Button>
+        </div>
+      )}
 
       {/* Filters (organization: only for platform admins, outside an organization page) */}
       <div className={`mb-6 ${embedded || !isPlatformAdmin ? 'hidden' : ''}`}>
@@ -153,22 +168,67 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <>
+        {/* Cards on phones */}
+        <ul className="space-y-2 md:hidden">
+          {data.plants.map((plant) => (
+            <li key={plant.id} className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="flex items-start gap-3">
+                {plant.cover_url ? (
+                  <img src={avatarUrl(plant.cover_url, 40) || ''} alt="" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100">
+                    <Factory className="h-5 w-5 text-gray-500" />
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <Link to={plantPath(plant.id)} state={backState} className="block text-sm font-medium text-gray-900 hover:text-blue-700">
+                    {plant.name}
+                  </Link>
+                  <p className="text-xs text-gray-500">{[plant.location, !embedded && getOrganizationName(plant.organization_id)].filter(Boolean).join(' · ') || plant.slug}</p>
+                </div>
+                <button onClick={() => handleEdit(plant)} className="text-blue-600 hover:text-blue-900" aria-label={`Editar ${plant.name}`}>
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button onClick={() => handleDelete(plant.id)} className="text-red-600 hover:text-red-900" aria-label={`Eliminar ${plant.name}`}>
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                <Badge variant={plant.is_active ? 'success' : 'error'}>{plant.is_active ? 'Activa' : 'Inactiva'}</Badge>
+                <span>
+                  {plural(plant.areas_count ?? 0, 'área', 'áreas')} · {plural(plant.employees_count ?? 0, 'persona', 'personas')} · {plural(plant.tours_count ?? 0, 'tour', 'tours')}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-hidden rounded-lg bg-white shadow md:block">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Planta
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Organización
-                </th>
+                {!embedded && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Organización
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Ubicación
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Zona Horaria
-                </th>
+                {embedded ? (
+                  ['Áreas', 'Personal', 'Tours'].map((label) => (
+                    <th key={label} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {label}
+                    </th>
+                  ))
+                ) : (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Zona Horaria
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
                 </th>
@@ -202,11 +262,13 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {getOrganizationName(plant.organization_id)}
-                    </div>
-                  </td>
+                  {!embedded && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {getOrganizationName(plant.organization_id)}
+                      </div>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     {plant.location ? (
                       <div className="flex items-center text-sm text-gray-500">
@@ -217,12 +279,20 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
                       <span className="text-sm text-gray-400">-</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{plant.timezone}</div>
-                  </td>
+                  {embedded ? (
+                    [plant.areas_count, plant.employees_count, plant.tours_count].map((value, index) => (
+                      <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {value ?? 0}
+                      </td>
+                    ))
+                  ) : (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{plant.timezone}</div>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Badge variant={plant.is_active ? 'success' : 'error'}>
-                      {plant.is_active ? 'Activo' : 'Inactivo'}
+                      {plant.is_active ? 'Activa' : 'Inactiva'}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
@@ -244,6 +314,7 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/* Modal */}

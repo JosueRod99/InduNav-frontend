@@ -7,6 +7,7 @@ import Badge from '../../components/ui/Badge';
 import UserModal from './UserModal';
 import { getUsers, deleteUser } from '../../api/users';
 import type { User } from '../../types';
+import SectionHeader from '../../components/ui/SectionHeader';
 
 const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
   const embedded = !!organizationId; // organization page tab: only its users
@@ -51,20 +52,32 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
   return (
     <div>
       {/* Page Header */}
-      <div className={`flex items-center ${embedded ? 'justify-end mb-4' : 'justify-between mb-8'}`}>
-        {!embedded && (
+      {embedded ? (
+        <SectionHeader
+          className="mb-4"
+          title="Usuarios"
+          description="Quiénes entran a la plataforma por esta empresa."
+          actions={
+            <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
+              <Plus className="h-4 w-4" />
+              Nuevo Usuario
+            </Button>
+          }
+        />
+      ) : (
+        <div className="mb-8 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Usuarios</h2>
             <p className="mt-1 text-sm text-gray-600">
               Gestiona los usuarios del sistema
             </p>
           </div>
-        )}
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo Usuario
-        </Button>
-      </div>
+          <Button onClick={handleCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Usuario
+          </Button>
+        </div>
+      )}
 
       {/* Content */}
       {isLoading ? (
@@ -90,7 +103,7 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -103,9 +116,11 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Rol
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Organización
-                </th>
+                {!embedded && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Organización
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
                 </th>
@@ -138,11 +153,13 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
                       <span className="text-sm text-gray-900">{user.role?.display_name}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {(user as any).organization_name || '-'}
-                    </div>
-                  </td>
+                  {!embedded && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {(user as any).organization_name || '-'}
+                      </div>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     {user.is_active ? (
                       <Badge variant="success" className="flex items-center gap-1 w-fit">
