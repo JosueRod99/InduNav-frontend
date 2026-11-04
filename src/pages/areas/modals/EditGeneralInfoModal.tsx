@@ -15,16 +15,6 @@ interface EditGeneralInfoModalProps {
 const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalProps) => {
   const queryClient = useQueryClient();
 
-  // Calculate days without accident from last incident date
-  const calculateLastIncidentDate = () => {
-    if (!area.days_without_accident || area.days_without_accident === 0) {
-      return new Date().toISOString().split('T')[0];
-    }
-    const date = new Date();
-    date.setDate(date.getDate() - area.days_without_accident);
-    return date.toISOString().split('T')[0];
-  };
-
   const [formData, setFormData] = useState({
     name: area.name || '',
     code: area.code || '',
@@ -37,7 +27,6 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
     supervisor_id: area.supervisor_id || '',
     emergency_contact_id: area.emergency_contact_id || '',
     quality_manager_id: area.quality_manager_id || '',
-    last_incident_date: calculateLastIncidentDate(),
   });
 
   useEffect(() => {
@@ -54,7 +43,6 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
         supervisor_id: area.supervisor_id || '',
         emergency_contact_id: area.emergency_contact_id || '',
         quality_manager_id: area.quality_manager_id || '',
-        last_incident_date: calculateLastIncidentDate(),
       });
     }
   }, [isOpen, area]);
@@ -75,16 +63,6 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Calculate days_without_accident from last_incident_date
-    const calculateDaysWithoutAccident = () => {
-      if (!formData.last_incident_date) return 0;
-      const lastIncident = new Date(formData.last_incident_date);
-      const today = new Date();
-      const diffTime = today.getTime() - lastIncident.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      return Math.max(0, diffDays);
-    };
-
     // Clean metadata to remove days_without_accident if it exists there
     const cleanMetadata = { ...area.metadata };
     delete cleanMetadata.days_without_accident;
@@ -98,7 +76,6 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
       capacity: formData.capacity ? parseInt(formData.capacity) : null,
       square_meters: formData.square_meters ? parseFloat(formData.square_meters) : null,
       cost_center: formData.cost_center || null,
-      days_without_accident: calculateDaysWithoutAccident(),
       metadata: cleanMetadata, // Clean metadata without days_without_accident
     };
 
@@ -270,31 +247,6 @@ const EditGeneralInfoModal = ({ isOpen, onClose, area }: EditGeneralInfoModalPro
           </p>
 
           {/* Safety Section */}
-          <div className="pt-4 border-t border-gray-200">
-            <h3 className="text-md font-semibold text-gray-900 mb-4">Seguridad</h3>
-
-            <div>
-              <label htmlFor="last_incident_date" className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha del Último Incidente
-              </label>
-              <input
-                type="date"
-                id="last_incident_date"
-                value={formData.last_incident_date}
-                onChange={(e) => setFormData({ ...formData, last_incident_date: e.target.value })}
-                max={new Date().toISOString().split('T')[0]}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              />
-              {formData.last_incident_date && (
-                <p className="mt-2 text-sm text-gray-600">
-                  Días sin accidente: <span className="font-semibold text-green-600">
-                    {Math.floor((new Date().getTime() - new Date(formData.last_incident_date).getTime()) / (1000 * 60 * 60 * 24))} días
-                  </span>
-                </p>
-              )}
-            </div>
-          </div>
-
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 flex-shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>

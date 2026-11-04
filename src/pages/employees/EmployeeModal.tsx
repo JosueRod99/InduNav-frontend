@@ -23,9 +23,11 @@ interface EmployeeModalProps {
   employee?: Employee | null;
   organizationId?: string;
   onCreated?: (employee: Employee) => void; // e.g. open the new person's record to add responsibilities
+  defaultPlantId?: string; // created inside a plant
+  defaultArea?: { id: string; name: string }; // created inside an area: assigned there unless another main area is chosen
 }
 
-const EmployeeModal = ({ isOpen, onClose, employee, organizationId, onCreated }: EmployeeModalProps) => {
+const EmployeeModal = ({ isOpen, onClose, employee, organizationId, onCreated, defaultPlantId, defaultArea }: EmployeeModalProps) => {
   const queryClient = useQueryClient();
   const [primaryAreaId, setPrimaryAreaId] = useState<string | null>(null); // For new employees
   const [formData, setFormData] = useState<CreateEmployeeRequest>({
@@ -128,9 +130,9 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId, onCreated }:
         reports_to: employee.reports_to || '',
       });
     } else if (organizationId) {
-      setFormData(prev => ({ ...prev, organization_id: organizationId }));
+      setFormData(prev => ({ ...prev, organization_id: organizationId, plant_id: prev.plant_id || defaultPlantId || '' }));
     }
-  }, [employee, organizationId]);
+  }, [employee, organizationId, defaultPlantId]);
 
   const createMutation = useMutation({
     mutationFn: async (payload: CreateEmployeeRequest) => {
@@ -138,9 +140,10 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId, onCreated }:
       const newEmployee = await createEmployee(payload);
 
       // Then create primary area assignment if area was selected
-      if (primaryAreaId) {
+      const areaToAssign = primaryAreaId || defaultArea?.id;
+      if (areaToAssign) {
         await createAssignment(newEmployee.id, {
-          organizational_area_id: primaryAreaId,
+          organizational_area_id: areaToAssign,
           assignment_type: 'primary',
         });
       }
@@ -475,6 +478,7 @@ const EmployeeModal = ({ isOpen, onClose, employee, organizationId, onCreated }:
               plantId={formData.plant_id}
               onPrimaryAreaChange={setPrimaryAreaId}
             />
+            {!employee && defaultArea && !primaryAreaId && <p className="mt-2 text-xs text-blue-700">Quedará asignado a "{defaultArea.name}" como área principal.</p>}
           </div>
         )}
       </form>

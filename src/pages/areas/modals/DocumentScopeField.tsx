@@ -2,16 +2,21 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { getAreas } from '../../../api/areas';
+import { getProducts } from '../../../api/products';
+import { getEquipment } from '../../../api/equipment';
 import { SCOPE_OPTIONS, type DocumentScope } from '../../../api/areaDocuments';
 import { matchesSearch } from '../../../utils/search';
 
 // Who a document applies to: one area (chosen from a list), several areas (checkboxes), the whole
-// plant or the whole company. Areas are those of the plant being worked on.
+// plant, the whole company, or one or several products or pieces of equipment. All of them are those
+// of the plant being worked on.
 
 export interface DocumentScopeValue {
   scope: DocumentScope;
   areaId: string | null; // "area" scope
   sharedAreaIds: string[]; // "areas" scope
+  sharedProductIds?: string[]; // "products" scope
+  sharedEquipmentIds?: string[]; // "equipment" scope
 }
 
 interface Props {
@@ -28,6 +33,22 @@ const DocumentScopeField = ({ plantId, value, onChange, disabled }: Props) => {
     queryFn: async () => (await getAreas({ plant_id: plantId, limit: 500 })).areas,
     enabled: !!plantId && (value.scope === 'area' || value.scope === 'areas'),
   });
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-for-documents', plantId],
+    queryFn: () => getProducts({ plant_id: plantId, limit: 500 }),
+    enabled: !!plantId && value.scope === 'products',
+  });
+  const productIds = value.sharedProductIds || [];
+  const filteredProducts = [...products].sort((a, b) => a.name.localeCompare(b.name, 'es')).filter((p) => matchesSearch(search, p.name, p.sku));
+  const toggleProduct = (id: string) => onChange({ ...value, sharedProductIds: productIds.includes(id) ? productIds.filter((x) => x !== id) : [...productIds, id] });
+  const { data: equipment = [] } = useQuery({
+    queryKey: ['equipment-for-documents', plantId],
+    queryFn: () => getEquipment({ plant_id: plantId }),
+    enabled: !!plantId && value.scope === 'equipment',
+  });
+  const equipmentIds = value.sharedEquipmentIds || [];
+  const filteredEquipment = [...equipment].sort((a, b) => a.name.localeCompare(b.name, 'es')).filter((e) => matchesSearch(search, e.name, e.code));
+  const toggleEquipment = (id: string) => onChange({ ...value, sharedEquipmentIds: equipmentIds.includes(id) ? equipmentIds.filter((x) => x !== id) : [...equipmentIds, id] });
   const sorted = [...areas].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   const filtered = sorted.filter((a) => matchesSearch(search, a.name, a.code));
 
@@ -121,6 +142,72 @@ const DocumentScopeField = ({ plantId, value, onChange, disabled }: Props) => {
               </li>
             ))}
             {filtered.length === 0 && <li className="px-2 py-3 text-center text-xs text-gray-500">Sin áreas</li>}
+          </ul>
+        </div>
+      )}
+
+      {value.scope === 'products' && (
+        <div className="mt-2 rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2">
+            <span className="text-xs font-medium text-gray-700">
+              {productIds.length} producto{productIds.length === 1 ? '' : 's'} seleccionado{productIds.length === 1 ? '' : 's'}
+            </span>
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar producto"
+                aria-label="Buscar producto"
+                className="w-36 rounded-md border border-gray-300 py-1 pl-7 pr-2 text-xs"
+              />
+            </label>
+          </div>
+          <ul className="max-h-44 overflow-y-auto p-1">
+            {filteredProducts.map((product) => (
+              <li key={product.id}>
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50">
+                  <input type="checkbox" checked={productIds.includes(product.id)} onChange={() => toggleProduct(product.id)} className="rounded text-blue-600 focus:ring-blue-500" />
+                  <span className="text-gray-900">{product.name}</span>
+                  <span className="font-mono text-xs text-gray-500">{product.sku}</span>
+                </label>
+              </li>
+            ))}
+            {filteredProducts.length === 0 && <li className="px-2 py-3 text-center text-xs text-gray-500">Sin productos</li>}
+          </ul>
+        </div>
+      )}
+
+      {value.scope === 'equipment' && (
+        <div className="mt-2 rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2">
+            <span className="text-xs font-medium text-gray-700">
+              {equipmentIds.length} equipo{equipmentIds.length === 1 ? '' : 's'} seleccionado{equipmentIds.length === 1 ? '' : 's'}
+            </span>
+            <label className="relative">
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar equipo"
+                aria-label="Buscar equipo"
+                className="w-36 rounded-md border border-gray-300 py-1 pl-7 pr-2 text-xs"
+              />
+            </label>
+          </div>
+          <ul className="max-h-44 overflow-y-auto p-1">
+            {filteredEquipment.map((item) => (
+              <li key={item.id}>
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50">
+                  <input type="checkbox" checked={equipmentIds.includes(item.id)} onChange={() => toggleEquipment(item.id)} className="rounded text-blue-600 focus:ring-blue-500" />
+                  <span className="text-gray-900">{item.name}</span>
+                  <span className="font-mono text-xs text-gray-500">{item.code}</span>
+                </label>
+              </li>
+            ))}
+            {filteredEquipment.length === 0 && <li className="px-2 py-3 text-center text-xs text-gray-500">Sin equipos</li>}
           </ul>
         </div>
       )}

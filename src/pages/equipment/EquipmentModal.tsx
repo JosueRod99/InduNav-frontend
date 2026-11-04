@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import {
   createEquipment,
+  createAreaAssignment,
   updateEquipment,
   type Equipment,
   type CreateEquipmentRequest,
@@ -23,6 +24,8 @@ interface EquipmentModalProps {
   equipment?: Equipment | null;
   organizationId: string;
   plantId?: string;
+  areaId?: string; // created from an area: it is assigned there right away
+  onCreated?: (equipment: Equipment) => void; // e.g. open the new item's detail
 }
 
 const EquipmentModal = ({
@@ -31,6 +34,8 @@ const EquipmentModal = ({
   equipment,
   organizationId,
   plantId,
+  areaId,
+  onCreated,
 }: EquipmentModalProps) => {
   const queryClient = useQueryClient();
   const isEditing = !!equipment;
@@ -93,11 +98,18 @@ const EquipmentModal = ({
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: createEquipment,
-    onSuccess: () => {
-      toast.success('Equipo creado exitosamente');
+    mutationFn: async (data: Parameters<typeof createEquipment>[0]) => {
+      const created = await createEquipment(data);
+      if (areaId) await createAreaAssignment(created.id, { organizational_area_id: areaId, assignment_type: 'permanent' });
+      return created;
+    },
+    onSuccess: (created) => {
+      toast.success(areaId ? 'Equipo creado y asignado a esta área' : 'Equipo creado exitosamente');
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['area-equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['plant-areas-overview'] });
       onClose();
+      onCreated?.(created);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Error al crear equipo');

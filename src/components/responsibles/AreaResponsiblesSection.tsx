@@ -52,6 +52,7 @@ const AreaResponsiblesSection = ({ area, onOpenEmployee }: Props) => {
     queryClient.invalidateQueries({ queryKey: ['organizational-area', area.id] }); // main supervisor shown elsewhere
     queryClient.invalidateQueries({ queryKey: ['employee-responsibilities'] });
     queryClient.invalidateQueries({ queryKey: ['orgChart'] });
+    queryClient.invalidateQueries({ queryKey: ['plant-areas-overview'] }); // "Sin supervisor" in the summaries
   };
   const onError = (error: any) => toast.error(error.response?.data?.message || 'No se pudo guardar el cambio');
 

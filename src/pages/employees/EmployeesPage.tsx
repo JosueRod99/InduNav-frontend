@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Users, Building2, FileSpreadsheet, Search, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Building2, FileSpreadsheet, Search, Eye, UserMinus, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -14,6 +14,12 @@ import ImportEmployeesModal from './import/ImportEmployeesModal';
 import EmployeeDetailModal from '../../components/employees/EmployeeDetailModal';
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useAuthStore } from '../../store/authStore';
+import { MANAGERS } from '../plants/plantTabs';
+import { endAssignment, getEmployeesByArea, updateAssignment, type AssignmentType, type EmployeeAreaAssignment } from '../../api/areaAssignments';
+import AreaHeadcountSection from '../../components/headcount/AreaHeadcountSection';
+import ManageAssignmentsModal from '../areas/modals/ManageAssignmentsModal';
+import EditAssignmentModal from '../areas/modals/EditAssignmentModal';
 import { matchesSearch, normalizeSearch } from '../../utils/search';
 
 // Personnel of the plant: summary (each card filters), one row of filters, and a compact table
@@ -25,9 +31,15 @@ const PAGE = 50;
 const NO_AREA = '__none__';
 type Quick = '' | 'no_area' | 'no_manager' | 'cert_alerts';
 
+const ASSIGNMENT: Record<AssignmentType, { label: string; variant: 'primary' | 'default' | 'warning' }> = {
+  primary: { label: 'Principal', variant: 'primary' },
+  secondary: { label: 'Secundario', variant: 'default' },
+  temporary: { label: 'Temporal', variant: 'warning' },
+};
+
 const hasArea = (e: Employee) => !!e.primary_area?.id;
 
-const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps = {}) => {
+const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
@@ -45,6 +57,43 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
   // Plant name for the import (already cached by the plant workspace)
   const { data: plant } = useQuery({ queryKey: ['plant', plantId], queryFn: () => getPlant(plantId!), enabled: embedded });
   const queryClient = useQueryClient();
+  const role = useAuthStore((state) => state.user?.role?.name) || '';
+  // Inside an area page other roles can read the list: same limits as the API
+  const canManage = !area || MANAGERS.includes(role);
+  const canAssign = !!area && [...MANAGERS, 'plant_manager'].includes(role);
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<EmployeeAreaAssignment | null>(null);
+
+  // Inside an area: who is assigned to it, how, and since when
+  const { data: assignments } = useQuery({
+    queryKey: ['area-employees', area?.id],
+    queryFn: () => getEmployeesByArea(area!.id),
+    enabled: !!area,
+  });
+  const assignmentOf = useMemo(() => new Map((Array.isArray(assignments) ? assignments : []).map((a) => [a.employee_id, a])), [assignments]);
+  const refreshAssignments = () => {
+    queryClient.invalidateQueries({ queryKey: ['area-employees', area?.id] });
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
+    queryClient.invalidateQueries({ queryKey: ['plant-areas-overview'] });
+  };
+  const endMutation = useMutation({
+    mutationFn: (id: string) => endAssignment(id, { end_date: new Date().toISOString().split('T')[0] }),
+    onSuccess: () => {
+      toast.success('Se quitó del área');
+      refreshAssignments();
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'No se pudo quitar del área'),
+  });
+  const updateAssignmentMutation = useMutation({
+    mutationFn: ({ id, type, roleInArea }: { id: string; type: AssignmentType; roleInArea: string }) =>
+      updateAssignment(id, { assignment_type: type, role_in_area: roleInArea || undefined }),
+    onSuccess: () => {
+      setEditingAssignment(null);
+      toast.success('Asignación actualizada');
+      refreshAssignments();
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'No se pudo actualizar la asignación'),
+  });
 
   const { data: organizationsData } = useQuery({
     queryKey: ['organizations'],
@@ -59,11 +108,15 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
   });
 
   const { data: employeesData, isLoading } = useQuery({
-    queryKey: ['employees', selectedOrg, selectedPlant],
-    queryFn: () => getEmployees({ organization_id: selectedOrg || undefined, plant_id: selectedPlant || undefined, limit: MAX_LOADED }),
+    // Inside an area: the whole company, since someone from another plant can be assigned to it
+    queryKey: ['employees', selectedOrg, area ? 'company' : selectedPlant],
+    queryFn: () => getEmployees({ organization_id: selectedOrg || undefined, plant_id: area ? undefined : selectedPlant || undefined, limit: MAX_LOADED }),
     enabled: !!selectedOrg,
   });
-  const employees = useMemo(() => employeesData?.employees || [], [employeesData]);
+  const employees = useMemo(() => {
+    const list = employeesData?.employees || [];
+    return area ? list.filter((e) => assignmentOf.has(e.id)) : list;
+  }, [employeesData, area, assignmentOf]);
   const totalInDb = employeesData?.total || 0;
 
   const deleteMutation = useMutation({
@@ -113,8 +166,9 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
   const filtered = employees.filter((e) => {
     if (quick && !quickTest[quick](e)) return false;
     if (statusFilter && e.is_active !== (statusFilter === 'active')) return false;
-    if (selectedArea === NO_AREA && hasArea(e)) return false;
-    if (selectedArea && selectedArea !== NO_AREA && e.primary_area?.id !== selectedArea) return false;
+    if (area && selectedArea && assignmentOf.get(e.id)?.assignment_type !== selectedArea) return false;
+    if (!area && selectedArea === NO_AREA && hasArea(e)) return false;
+    if (!area && selectedArea && selectedArea !== NO_AREA && e.primary_area?.id !== selectedArea) return false;
     if (!matchesSearch(text, personName(e), e.email, e.employee_number, e.position)) return false;
     return true;
   });
@@ -122,7 +176,8 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
 
   const summary: { key: Quick; label: string; value: number; tone: string }[] = [
     { key: '', label: 'Personas', value: employees.length, tone: 'text-gray-900' },
-    { key: 'no_area', label: 'Sin área', value: employees.filter(quickTest.no_area).length, tone: 'text-amber-700' },
+    // Inside an area everyone has one
+    ...(area ? [] : [{ key: 'no_area' as Quick, label: 'Sin área', value: employees.filter(quickTest.no_area).length, tone: 'text-amber-700' }]),
     { key: 'no_manager', label: 'Sin jefe', value: employees.filter(quickTest.no_manager).length, tone: 'text-amber-700' },
     { key: 'cert_alerts', label: 'Con certificaciones por vencer', value: employees.filter(quickTest.cert_alerts).length, tone: 'text-red-700' },
   ];
@@ -190,17 +245,57 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
       <span className="text-xs text-amber-700">Sin jefe</span>
     );
 
+  // Inside an area: how the person is assigned; clicking it changes the type or the role
+  const AssignmentCell = ({ employee }: { employee: Employee }) => {
+    const assignment = assignmentOf.get(employee.id);
+    if (!assignment) return null;
+    const info = ASSIGNMENT[assignment.assignment_type as AssignmentType];
+    const badge = (
+      <Badge variant={info?.variant || 'default'} size="sm">
+        {info?.label || assignment.assignment_type}
+      </Badge>
+    );
+    return (
+      <span className="inline-flex flex-col items-start gap-0.5" onClick={(e) => e.stopPropagation()}>
+        {canAssign ? (
+          <button type="button" onClick={() => setEditingAssignment(assignment)} title="Cambiar tipo o rol en el área" aria-label={`Cambiar asignación de ${personName(employee)}`}>
+            {badge}
+          </button>
+        ) : (
+          badge
+        )}
+        {assignment.role_in_area && <span className="text-xs text-gray-500">{assignment.role_in_area}</span>}
+      </span>
+    );
+  };
+
   const Actions = ({ employee }: { employee: Employee }) => (
     <span className="flex flex-shrink-0 items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
       <button onClick={() => setDetailEmployeeId(employee.id)} className="rounded p-1.5 text-gray-600 hover:bg-gray-100" aria-label={`Ver ficha de ${personName(employee)}`} title="Ver ficha">
         <Eye className="h-4 w-4" />
       </button>
-      <button onClick={() => handleEdit(employee)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar a ${personName(employee)}`} title="Editar">
-        <Pencil className="h-4 w-4" />
-      </button>
-      <button onClick={() => handleDelete(employee)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar a ${personName(employee)}`} title="Eliminar">
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {canManage && (
+        <>
+          <button onClick={() => handleEdit(employee)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar a ${personName(employee)}`} title="Editar">
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button onClick={() => handleDelete(employee)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar a ${personName(employee)}`} title="Eliminar empleado">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </>
+      )}
+      {/* Only leaves this area; the person stays in the company */}
+      {area && canAssign && assignmentOf.get(employee.id) && (
+        <button
+          onClick={() => window.confirm(`¿Quitar a ${personName(employee)} de "${area.name}"? Sigue siendo empleado de la empresa.`) && endMutation.mutate(assignmentOf.get(employee.id)!.id)}
+          disabled={endMutation.isPending}
+          className="rounded p-1.5 text-amber-600 hover:bg-amber-50"
+          aria-label={`Quitar a ${personName(employee)} del área`}
+          title="Quitar del área"
+        >
+          <UserMinus className="h-4 w-4" />
+        </button>
+      )}
     </span>
   );
 
@@ -211,9 +306,30 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
     <div className="space-y-4">
       <SectionHeader
         title={embedded ? 'Personal' : 'Empleados'}
-        description={embedded ? 'Empleados de la planta, su puesto, área y a quién reportan.' : 'Gestiona empleados y su estructura organizacional'}
+        description={
+          area
+            ? `Empleados asignados a "${area.name}", su puesto y a quién reportan.`
+            : embedded
+              ? 'Empleados de la planta, su puesto, área y a quién reportan.'
+              : 'Gestiona empleados y su estructura organizacional'
+        }
         actions={
-          selectedOrg && (
+          area ? (
+            <>
+              {canAssign && (
+                <Button variant="outline" onClick={() => setIsAssignOpen(true)} className="gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Asignar Empleados
+                </Button>
+              )}
+              {canManage && (
+                <Button onClick={handleCreate} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Nuevo Empleado
+                </Button>
+              )}
+            </>
+          ) : selectedOrg && (
             <>
               {/* Import works on one plant: available inside the plant workspace */}
               {embedded && (
@@ -268,7 +384,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
       {selectedOrg && employees.length > 0 && (
         <>
           {/* Summary: each card filters (a second click clears it) */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className={`grid grid-cols-2 gap-3 ${area ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
             {summary.map(({ key, label, value, tone }) => (
               <button
                 key={label}
@@ -296,15 +412,26 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
               />
             </label>
             <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-              <select aria-label="Área" value={selectedArea} onChange={(e) => withReset(setSelectedArea)(e.target.value)} className="min-w-0 text-sm">
-                <option value="">Área: todas</option>
-                {areas.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-                <option value={NO_AREA}>Sin área</option>
-              </select>
+              {area ? (
+                <select aria-label="Asignación" value={selectedArea} onChange={(e) => withReset(setSelectedArea)(e.target.value)} className="min-w-0 text-sm">
+                  <option value="">Asignación: todas</option>
+                  {Object.entries(ASSIGNMENT).map(([value, { label }]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select aria-label="Área" value={selectedArea} onChange={(e) => withReset(setSelectedArea)(e.target.value)} className="min-w-0 text-sm">
+                  <option value="">Área: todas</option>
+                  {areas.map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                  <option value={NO_AREA}>Sin área</option>
+                </select>
+              )}
               <select aria-label="Estado" value={statusFilter} onChange={(e) => withReset(setStatusFilter)(e.target.value as '' | 'active' | 'inactive')} className="min-w-0 text-sm">
                 <option value="">Estado: todos</option>
                 <option value="active">Activos</option>
@@ -329,14 +456,16 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
       ) : !employees.length ? (
         <div className="rounded-lg bg-white p-8 text-center shadow">
           <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No hay empleados</h3>
-          <p className="mt-1 text-sm text-gray-500">Comienza agregando un nuevo empleado</p>
-          <div className="mt-6">
-            <Button onClick={handleCreate} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nuevo Empleado
-            </Button>
-          </div>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">{area ? 'Sin empleados con nombre asignados' : 'No hay empleados'}</h3>
+          <p className="mt-1 text-sm text-gray-500">{area ? 'Aún no hay empleados asignados a esta área.' : 'Comienza agregando un nuevo empleado'}</p>
+          {(area ? canAssign : true) && (
+            <div className="mt-6">
+              <Button onClick={area ? () => setIsAssignOpen(true) : handleCreate} className="gap-2">
+                {area ? <UserPlus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {area ? 'Asignar Empleados' : 'Nuevo Empleado'}
+              </Button>
+            </div>
+          )}
         </div>
       ) : !filtered.length ? (
         <div className="rounded-lg border border-gray-200 bg-white p-10 text-center text-sm text-gray-600">
@@ -353,7 +482,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
           <table className="hidden min-w-full divide-y divide-gray-200 md:table">
             <thead className="bg-gray-50">
               <tr>
-                {['Empleado', 'Puesto', 'Área', 'Reporta a'].map((h) => (
+                {['Empleado', 'Puesto', area ? 'Asignación' : 'Área', 'Reporta a'].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     {h}
                   </th>
@@ -370,9 +499,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
                   <td className="px-4 py-3">
                     <PositionCell employee={employee} />
                   </td>
-                  <td className="px-4 py-3">
-                    <AreaCell employee={employee} />
-                  </td>
+                  <td className="px-4 py-3">{area ? <AssignmentCell employee={employee} /> : <AreaCell employee={employee} />}</td>
                   <td className="px-4 py-3">
                     <ManagerCell employee={employee} />
                   </td>
@@ -395,7 +522,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
                 <div className="mt-2 space-y-1 pl-12 text-sm">
                   <PositionCell employee={employee} />
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
-                    <AreaCell employee={employee} />
+                    {area ? <AssignmentCell employee={employee} /> : <AreaCell employee={employee} />}
                     <span className="inline-flex items-center gap-1">
                       Reporta a: <ManagerCell employee={employee} />
                     </span>
@@ -409,8 +536,8 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
             <span>
               Mostrando <strong>{visible.length}</strong> de <strong>{filtered.length}</strong> {filtersActive ? 'que coinciden' : 'personas'}
-              {totalInDb > employees.length && (
-                <span className="ml-1 text-amber-700">(se cargaron las primeras {employees.length} de {totalInDb})</span>
+              {totalInDb > (employeesData?.employees.length || 0) && (
+                <span className="ml-1 text-amber-700">(se cargaron las primeras {employeesData?.employees.length} de {totalInDb})</span>
               )}
             </span>
             {visible.length < filtered.length && (
@@ -422,18 +549,36 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch }: PlantScopedProps
         </div>
       )}
 
+      {/* Inside an area: people counted by position (without names), assigning and the type of assignment */}
+      {area && <AreaHeadcountSection areaId={area.id} namedCount={employees.length} />}
+      {area && <ManageAssignmentsModal isOpen={isAssignOpen} onClose={() => setIsAssignOpen(false)} areaId={area.id} area={area as any} />}
+      {editingAssignment && (
+        <EditAssignmentModal
+          isOpen
+          onClose={() => setEditingAssignment(null)}
+          assignment={editingAssignment}
+          onSave={(type, roleInArea) => updateAssignmentMutation.mutate({ id: editingAssignment.id, type, roleInArea })}
+          isLoading={updateAssignmentMutation.isPending}
+        />
+      )}
+
       <EmployeeModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         employee={editingEmployee}
         organizationId={selectedOrg}
-        onCreated={(created) => setDetailEmployeeId(created.id)}
+        onCreated={(created) => {
+          setDetailEmployeeId(created.id);
+          if (area) refreshAssignments();
+        }}
+        defaultPlantId={plantId}
+        defaultArea={area}
       />
       <EmployeeDetailModal
         isOpen={!!detailEmployeeId}
         onClose={() => setDetailEmployeeId(null)}
         employeeId={detailEmployeeId}
-        onEdit={(employee) => {
+        onEdit={!canManage ? undefined : (employee) => {
           setDetailEmployeeId(null);
           setReturnToDetail(employee.id);
           handleEdit(employee);

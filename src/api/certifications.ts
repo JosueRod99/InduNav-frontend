@@ -149,5 +149,5 @@ export const getEmployeeCertifications = async (
 
 export const getAreaCertifications = async (
   areaId: string
-): Promise<{ system: SystemCertification[]; person: PersonCertificationStats[]; staff: number }> =>
+): Promise<PlantCertifications & { staff: number }> =>
   (await apiClient.get(`/certifications/area/${areaId}`)).data;

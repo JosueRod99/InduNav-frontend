@@ -78,7 +78,7 @@ const AreaLayoutBackgroundModal = ({
           });
     },
     onSuccess: () => {
-      toast.success(layout ? 'Fondo actualizado' : 'Layout del área creado');
+      toast.success(layout ? 'Plano actualizado' : 'Layout del área creado');
       queryClient.invalidateQueries({ queryKey: ['area-layout', area.id] });
       onClose();
     },
@@ -123,7 +123,7 @@ const AreaLayoutBackgroundModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={layout ? 'Cambiar fondo del layout' : `Crear layout de ${area.name}`}
+      title={layout ? 'Cambiar plano' : `Crear layout de ${area.name}`}
       size="lg"
       footer={
         <>

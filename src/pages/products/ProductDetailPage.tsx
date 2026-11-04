@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Edit, Package } from 'lucide-react';
-import { getProduct } from '../../api/products';
+import { ArrowLeft, Edit, FileText, GitBranch, Image as ImageIcon, LayoutDashboard, Lock, Package, Wrench } from 'lucide-react';
+import { getProcessSteps, getProduct, getProductImages } from '../../api/products';
+import { getPlantDocuments } from '../../api/areaDocuments';
+import { getProductEquipment } from '../../api/productStepEquipment';
+import ScrollTabs from '../../components/ui/ScrollTabs';
+import PlantDocumentsTab from '../documents/PlantDocumentsTab';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import { PRODUCT_CATEGORY_LABELS, PRODUCT_STATUS_LABELS } from '../../api/products';
@@ -15,12 +19,15 @@ import GalleryTab from './tabs/GalleryTab';
 import ProductEquipmentTab from './tabs/ProductEquipmentTab';
 import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
 
-type TabType = 'general' | 'process' | 'equipment' | 'gallery';
+type TabType = 'general' | 'process' | 'equipment' | 'documents' | 'gallery';
 
 const ProductDetailPage = () => {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('general');
+  // Active tab lives in the URL (?tab=process) so it survives reloading and coming back
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get('tab') as TabType) || 'general';
+  const setActiveTab = (tab: TabType) => setSearchParams({ tab }, { replace: true });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Fetch product details
@@ -29,6 +36,17 @@ const ProductDetailPage = () => {
     queryFn: () => getProduct(productId!, true),
     enabled: !!productId,
   });
+
+  // Counts of the tabs (same queries the tabs use)
+  const { data: steps = [] } = useQuery({ queryKey: ['process-steps', productId], queryFn: () => getProcessSteps(productId!), enabled: !!productId });
+  const { data: links = [] } = useQuery({ queryKey: ['product-equipment', productId], queryFn: () => getProductEquipment(productId!), enabled: !!productId });
+  const { data: library = [] } = useQuery({
+    queryKey: ['plant-documents', product?.plant_id],
+    queryFn: () => getPlantDocuments(product!.plant_id, { includeArchived: true }),
+    enabled: !!product?.plant_id,
+  });
+  const documentCount = library.filter((d) => d.status !== 'archived' && d.shared_products?.some((p) => p.id === productId)).length;
+  const { data: images = [] } = useQuery({ queryKey: ['product-images', productId], queryFn: () => getProductImages(productId!), enabled: !!productId });
 
   if (isLoading) {
     return (
@@ -50,11 +68,12 @@ const ProductDetailPage = () => {
     );
   }
 
-  const tabs: Array<{ id: TabType; label: string }> = [
-    { id: 'general', label: 'General' },
-    { id: 'process', label: 'Proceso de Fabricación' },
-    { id: 'equipment', label: 'Equipos' },
-    { id: 'gallery', label: 'Galería' },
+  const tabs: { id: TabType; label: string; Icon: typeof Package; count?: number }[] = [
+    { id: 'general', label: 'Resumen', Icon: LayoutDashboard },
+    { id: 'process', label: 'Proceso', Icon: GitBranch, count: steps.length },
+    { id: 'equipment', label: 'Equipos', Icon: Wrench, count: new Set(links.map((l) => l.equipment_id)).size },
+    { id: 'documents', label: 'Documentos', Icon: FileText, count: documentCount },
+    { id: 'gallery', label: 'Galería', Icon: ImageIcon, count: images.length },
   ];
 
   const renderTabContent = () => {
@@ -65,6 +84,8 @@ const ProductDetailPage = () => {
         return <ProcessTab productId={productId!} />;
       case 'equipment':
         return <ProductEquipmentTab productId={productId!} />;
+      case 'documents':
+        return <PlantDocumentsTab plant={{ id: product.plant_id, organization_id: product.organization_id }} product={{ id: product.id, name: product.name, sku: product.sku }} />;
       case 'gallery':
         return <GalleryTab productId={productId!} product={product} />;
       default:
@@ -73,76 +94,61 @@ const ProductDetailPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <PlantBreadcrumb plantId={product.plant_id} tab="productos" current={product.name} />
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <Badge variant="info" className="font-mono">
-              {product.sku}
-            </Badge>
-            <Badge
-              variant={
-                product.status === 'active'
-                  ? 'success'
-                  : product.status === 'discontinued'
-                  ? 'error'
-                  : 'warning'
-              }
-            >
-              {PRODUCT_STATUS_LABELS[product.status]}
-            </Badge>
-          </div>
-
-          <div className="flex items-center gap-4">
+      <div className="min-w-0">
+        <PlantBreadcrumb plantId={product.plant_id} tab="productos" current={product.name} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
             {product.primary_image_url ? (
-              <img
-                src={product.primary_image_url}
-                alt={product.name}
-                className="h-20 w-20 rounded-lg object-cover border border-gray-200"
-              />
+              <img src={product.primary_image_url} alt="" className="h-14 w-14 flex-shrink-0 rounded-lg border border-gray-200 object-cover" />
             ) : (
-              <div className="h-20 w-20 rounded-lg bg-gray-200 flex items-center justify-center border border-gray-300">
-                <Package className="h-10 w-10 text-gray-400" />
-              </div>
+              <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100">
+                <Package className="h-6 w-6 text-gray-400" />
+              </span>
             )}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{product.name}</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {PRODUCT_CATEGORY_LABELS[product.category]} • Revisión {product.revision}
-              </p>
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">{product.name}</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-gray-600">
+                <Badge variant="info" className="font-mono">
+                  {product.sku}
+                </Badge>
+                <Badge variant={product.status === 'active' ? 'success' : product.status === 'discontinued' ? 'error' : 'warning'}>{PRODUCT_STATUS_LABELS[product.status]}</Badge>
+                {product.is_private && (
+                  <span className="inline-flex items-center gap-1 text-gray-500" title="No sale en los tours">
+                    <Lock className="h-3.5 w-3.5" /> Privado
+                  </span>
+                )}
+                <span>
+                  {PRODUCT_CATEGORY_LABELS[product.category]} · Revisión {product.revision}
+                </span>
+              </div>
             </div>
           </div>
+          <Button onClick={() => setIsEditModalOpen(true)} variant="outline" className="gap-2">
+            <Edit className="h-4 w-4" />
+            Editar producto
+          </Button>
         </div>
-
-        <Button onClick={() => setIsEditModalOpen(true)} className="gap-2">
-          <Edit className="h-4 w-4" />
-          Editar
-        </Button>
       </div>
 
-      {/* Tabs (scroll sideways on small screens) */}
-      <div className="overflow-x-auto border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8 [&>*]:whitespace-nowrap">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }
-              `}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      {/* Tabs (scroll sideways when they do not fit) */}
+      <ScrollTabs label="Secciones del producto">
+        {tabs.map(({ id, label, Icon, count }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            aria-current={activeTab === id ? 'page' : undefined}
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+            {count ? <span className={`rounded-full px-1.5 text-xs ${activeTab === id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{count}</span> : null}
+          </button>
+        ))}
+      </ScrollTabs>
 
       {/* Tab Content */}
       <div>{renderTabContent()}</div>

@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../../store/authStore';
+import { MANAGERS } from '../plants/plantTabs';
 import { ChevronRight, Lock, Plus, Pencil, Trash2, Package, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -33,13 +35,13 @@ const STATUS_BADGE: Record<ProductStatus, 'success' | 'warning' | 'error'> = {
 type Quick = '' | 'active' | 'no_steps' | 'private';
 const NO_AREA = '__none__';
 
-const Route = ({ product }: { product: Product }) =>
+const Route = ({ product, highlight }: { product: Product; highlight?: string }) =>
   product.route?.length ? (
     <span className="flex flex-wrap items-center gap-0.5">
       {product.route.map((a, i) => (
         <span key={`${a.id}${i}`} className="inline-flex items-center gap-0.5">
           {i > 0 && <ChevronRight className="h-3 w-3 text-gray-400" />}
-          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${a.id === highlight ? 'bg-blue-100 font-semibold text-blue-800' : 'bg-gray-100 text-gray-700'}`}>
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: a.color || '#94A3B8' }} />
             {a.name}
           </span>
@@ -50,11 +52,14 @@ const Route = ({ product }: { product: Product }) =>
     <span className="text-xs text-amber-700">Sin pasos</span>
   );
 
-const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
+const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const queryClient = useQueryClient();
+  const role = useAuthStore((state) => state.user?.role?.name) || '';
+  // Inside an area page other roles can read the list; editing and the detail page are for these
+  const canManage = !area || MANAGERS.includes(role);
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
   const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
@@ -79,12 +84,14 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   });
 
   // Every product of the plant (or organization): the summary counts all of them, filters run here
-  const { data: products = [], isLoading } = useQuery({
+  const { data: allProducts = [], isLoading } = useQuery({
     queryKey: ['products', selectedOrg, selectedPlant],
     queryFn: () =>
       getProducts({ organization_id: selectedOrg || undefined, plant_id: selectedPlant || undefined, include_process_steps: true }),
     enabled: !!selectedOrg,
   });
+
+  const products = useMemo(() => (area ? allProducts.filter((p) => p.route?.some((a) => a.id === area.id)) : allProducts), [allProducts, area]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteProduct,
@@ -119,7 +126,8 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const summary: { key: Quick; label: string; value: number; tone: string }[] = [
     { key: '', label: 'Productos', value: products.length, tone: 'text-gray-900' },
     { key: 'active', label: 'Activos', value: products.filter((p) => p.status === 'active').length, tone: 'text-green-700' },
-    { key: 'no_steps', label: 'Sin pasos de proceso', value: products.filter((p) => !hasSteps(p)).length, tone: 'text-amber-700' },
+    // Inside an area every product has steps
+    ...(area ? [] : [{ key: 'no_steps' as Quick, label: 'Sin pasos de proceso', value: products.filter((p) => !hasSteps(p)).length, tone: 'text-amber-700' }]),
     { key: 'private', label: 'Privados (no salen en tours)', value: products.filter((p) => p.is_private).length, tone: 'text-gray-700' },
   ];
 
@@ -142,7 +150,7 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
     setEditingProduct(null);
   };
 
-  const openDetails = (id: string) => navigate(`/products/${id}`);
+  const openDetails = (id: string) => canManage && navigate(`/products/${id}`);
   const filtersActive = !!(searchQuery || selectedCategory || selectedStatus || selectedArea || quick);
   const clearFilters = () => {
     setSearchQuery('');
@@ -176,9 +184,10 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
     <div className="space-y-4">
       <SectionHeader
         title="Productos"
-        description="Catálogo de productos que se fabrican en la planta y sus pasos de proceso."
+        description={area ? `Productos que pasan por "${area.name}" en su proceso de fabricación.` : 'Catálogo de productos que se fabrican en la planta y sus pasos de proceso.'}
         actions={
-          selectedOrg && (
+          selectedOrg &&
+          canManage && (
             <Button onClick={handleCreateNew} className="gap-2">
               <Plus className="h-4 w-4" />
               Nuevo Producto
@@ -220,7 +229,7 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
       {selectedOrg && (
         <>
           {/* Summary: each card filters */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className={`grid grid-cols-2 gap-3 ${area ? 'sm:grid-cols-3' : 'sm:grid-cols-4'}`}>
             {summary.map(({ key, label, value, tone }) => (
               <button
                 key={label}
@@ -257,7 +266,8 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                 </option>
               ))}
             </select>
-            <select aria-label="Área" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)} className="text-sm">
+{!area && (
+                        <select aria-label="Área" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)} className="text-sm">
               <option value="">Área: todas</option>
               {areas.map(([id, name]) => (
                 <option key={id} value={id}>
@@ -266,6 +276,7 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
               ))}
               <option value={NO_AREA}>Sin pasos</option>
             </select>
+            )}
             <select aria-label="Estado" value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value as ProductStatus | '')} className="text-sm">
               <option value="">Estado: todos</option>
               {Object.entries(PRODUCT_STATUS_LABELS).map(([value, label]) => (
@@ -290,12 +301,26 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
       ) : products.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
           <Package className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-          <h3 className="mb-2 text-lg font-medium text-gray-900">No hay productos registrados</h3>
-          <p className="mb-4 text-gray-600">Comienza agregando tu primer producto</p>
-          <Button onClick={handleCreateNew} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar Primer Producto
-          </Button>
+          <h3 className="mb-2 text-lg font-medium text-gray-900">{area ? 'No hay productos en esta área' : 'No hay productos registrados'}</h3>
+          {area ? (
+            <>
+              <p className="mb-4 text-gray-600">Esta área no participa en ningún proceso de fabricación actualmente.</p>
+              {canManage && (
+                <Button onClick={handleCreateNew} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Nuevo Producto
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="mb-4 text-gray-600">Comienza agregando tu primer producto</p>
+              <Button onClick={handleCreateNew} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Agregar Primer Producto
+              </Button>
+            </>
+          )}
         </div>
       ) : visible.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-10 text-center text-sm text-gray-600">
@@ -323,7 +348,7 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {visible.map((product) => (
-                  <tr key={product.id} className="cursor-pointer transition-colors hover:bg-gray-50" onClick={() => openDetails(product.id)}>
+                  <tr key={product.id} className={`transition-colors hover:bg-gray-50 ${canManage ? 'cursor-pointer' : ''}`} onClick={() => openDetails(product.id)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {product.primary_image_url ? (
@@ -341,13 +366,13 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                       <Badge variant="info">{PRODUCT_CATEGORY_LABELS[product.category]}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <Route product={product} />
+                      <Route product={product} highlight={area?.id} />
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={STATUS_BADGE[product.status]}>{PRODUCT_STATUS_LABELS[product.status]}</Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <div className={`flex items-center justify-end gap-2 ${canManage ? '' : 'hidden'}`} onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => handleEdit(product)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" title="Editar" aria-label={`Editar ${product.name}`}>
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -385,8 +410,8 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   <Badge variant={STATUS_BADGE[product.status]}>{PRODUCT_STATUS_LABELS[product.status]}</Badge>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <Route product={product} />
-                  <span className="flex flex-shrink-0 gap-1">
+                  <Route product={product} highlight={area?.id} />
+                  <span className={`flex flex-shrink-0 gap-1 ${canManage ? '' : 'hidden'}`}>
                     <button onClick={() => handleEdit(product)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar ${product.name}`}>
                       <Pencil className="h-4 w-4" />
                     </button>
@@ -402,7 +427,7 @@ const ProductsPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
       )}
 
       {isModalOpen && (
-        <ProductModal isOpen={isModalOpen} onClose={handleCloseModal} product={editingProduct} organizationId={selectedOrg} plantId={selectedPlant || ''} />
+        <ProductModal isOpen={isModalOpen} onClose={handleCloseModal} product={editingProduct} organizationId={selectedOrg} plantId={selectedPlant || ''} onCreated={(created) => openDetails(created.id)} />
       )}
     </div>
   );

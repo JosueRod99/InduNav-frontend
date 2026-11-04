@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, MapPin, Clock, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Edit, Trash2, MapPin, Clock, ChevronDown, ChevronRight, ChevronUp, AlertTriangle, GripVertical, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
 import {
   getProcessSteps,
   deleteProcessStep,
   moveProcessStep,
+  reorderProcessSteps,
   type ProductProcessStep,
 } from '../../../api/products';
 import ProcessStepModal from '../modals/ProcessStepModal';
 import StepEquipmentModal from '../modals/StepEquipmentModal';
 import { useAuthStore } from '../../../store/authStore';
+import { useBackState } from '../../../hooks/useBackNavigation';
+import SectionHeader from '../../../components/ui/SectionHeader';
 import { EQUIPMENT_STATUS_COLORS, EQUIPMENT_STATUS_LABELS } from '../../../api/equipment';
 import {
   getProductEquipment,
@@ -98,6 +102,31 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
     },
   });
 
+  // Drag a step onto another to move it there (phones keep the arrows: no drag on touch)
+  const backState = useBackState();
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const reorderMutation = useMutation({
+    mutationFn: (ordered: ProductProcessStep[]) => reorderProcessSteps(productId, ordered.map((s, index) => ({ id: s.id, step_number: index + 1 }))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['process-steps', productId] });
+      queryClient.invalidateQueries({ queryKey: ['product-equipment', productId] });
+      queryClient.invalidateQueries({ queryKey: ['product', productId] });
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo reordenar'),
+  });
+  const dropOn = (targetId: string) => {
+    const from = processSteps.findIndex((s) => s.id === draggingId);
+    const to = processSteps.findIndex((s) => s.id === targetId);
+    setDraggingId(null);
+    setDropTargetId(null);
+    if (from < 0 || to < 0 || from === to) return;
+    const ordered = [...processSteps];
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(to, 0, moved);
+    reorderMutation.mutate(ordered);
+  };
+
   const handleEdit = (step: ProductProcessStep) => {
     setEditingStep(step);
     setIsModalOpen(true);
@@ -149,19 +178,20 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium text-gray-900">Flujo de Producción</h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Secuencia de áreas por las que pasa el producto durante su fabricación
-          </p>
-        </div>
-        <Button onClick={handleCreateNew} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Agregar Paso
-        </Button>
-      </div>
+      <SectionHeader
+        title="Proceso"
+        description={
+          <>
+            Pasos por los que pasa el producto, en orden.<span className="hidden sm:inline"> Arrastra un paso para moverlo.</span>
+          </>
+        }
+        actions={
+          <Button onClick={handleCreateNew} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Agregar Paso
+          </Button>
+        }
+      />
 
       {/* Process Steps */}
       {processSteps.length === 0 ? (
@@ -171,7 +201,7 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
             No hay pasos de proceso
           </h3>
           <p className="text-gray-600 mb-4">
-            Define el flujo de producción agregando pasos secuenciales
+            Agrega los pasos por los que pasa el producto, en orden
           </p>
           <Button onClick={handleCreateNew} className="gap-2">
             <Plus className="h-4 w-4" />
@@ -185,10 +215,37 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
             const hasDetails = step.description || step.notes;
 
             return (
-              <div key={step.id}>
+              <div
+                key={step.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', step.id);
+                  setDraggingId(step.id);
+                }}
+                onDragEnd={() => {
+                  setDraggingId(null);
+                  setDropTargetId(null);
+                }}
+                onDragOver={(e) => {
+                  if (!draggingId || draggingId === step.id) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  setDropTargetId(step.id);
+                }}
+                onDragLeave={() => dropTargetId === step.id && setDropTargetId(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  dropOn(step.id);
+                }}
+                className={dropTargetId === step.id ? 'bg-blue-50 ring-2 ring-inset ring-blue-400' : draggingId === step.id ? 'opacity-50' : ''}
+              >
                 <div className="p-3">
                   {/* Compact Header - Always Visible */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-2 sm:items-center sm:gap-3">
+                    <span className="hidden cursor-grab text-gray-300 hover:text-gray-500 active:cursor-grabbing sm:block" title="Arrastra para mover" aria-hidden>
+                      <GripVertical className="h-4 w-4" />
+                    </span>
                     {/* Step Number */}
                     <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-semibold">
                       {step.step_number}
@@ -211,25 +268,23 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
 
                     {/* Step Name & Area */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                         <h4 className="text-sm font-medium text-gray-900">
                           {step.step_name}
                         </h4>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <MapPin className="h-3 w-3 text-gray-400" />
+                        <Link
+                          to={`/areas/${step.organizational_area_id}`}
+                          state={backState}
+                          className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-blue-700 hover:underline"
+                        >
+                          <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: step.area_color || '#94A3B8' }} />
                           <span>
                             {step.area_name || 'Sin área'}
                             {step.area_code && (
                               <span className="text-gray-400 ml-1">({step.area_code})</span>
                             )}
                           </span>
-                          {step.area_color && (
-                            <div
-                              className="h-2.5 w-2.5 rounded-full"
-                              style={{ backgroundColor: step.area_color }}
-                            />
-                          )}
-                        </div>
+                        </Link>
                         {/* Duration - Always visible */}
                         {step.estimated_duration_hours && (
                           <div className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -242,11 +297,11 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1">
-                      {/* Move Up */}
+                      {/* Move Up (phones: desktop drags) */}
                       <button
                         onClick={() => handleMoveUp(step.id)}
                         disabled={step.step_number === 1 || moveMutation.isPending}
-                        className="p-1.5 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-1.5 sm:hidden text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Mover arriba"
                       >
                         <ChevronUp className="h-3.5 w-3.5" />
@@ -255,7 +310,7 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
                       <button
                         onClick={() => handleMoveDown(step.id)}
                         disabled={step.step_number === processSteps.length || moveMutation.isPending}
-                        className="p-1.5 text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-1.5 sm:hidden text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Mover abajo"
                       >
                         <ChevronDown className="h-3.5 w-3.5" />
@@ -282,7 +337,7 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
 
                   {/* Equipment used in this step */}
                   {((equipmentByStep[step.id]?.length ?? 0) > 0 || canEditEquipment) && (
-                    <div className="mt-2 ml-11 flex flex-wrap items-center gap-1.5">
+                    <div className="mt-2 ml-10 flex flex-wrap items-center gap-1.5 sm:ml-[3.75rem]">
                       {(equipmentByStep[step.id] || []).map((link) => (
                         <span
                           key={link.id}
@@ -332,7 +387,7 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
 
                   {/* Expanded Details */}
                   {isExpanded && hasDetails && (
-                    <div className="mt-2 ml-11 space-y-1.5">
+                    <div className="mt-2 ml-10 space-y-1.5 sm:ml-[3.75rem]">
                       {/* Description */}
                       {step.description && (
                         <p className="text-xs text-gray-600">{step.description}</p>

@@ -21,6 +21,7 @@ interface ProductModalProps {
   product?: Product | null;
   organizationId: string;
   plantId: string;
+  onCreated?: (product: Product) => void; // e.g. open the new product to add its process steps
 }
 
 const ProductModal = ({
@@ -29,6 +30,7 @@ const ProductModal = ({
   product,
   organizationId,
   plantId,
+  onCreated,
 }: ProductModalProps) => {
   const queryClient = useQueryClient();
 
@@ -72,10 +74,11 @@ const ProductModal = ({
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (data: CreateProductRequest) => createProduct(data),
-    onSuccess: () => {
-      toast.success('Producto creado exitosamente');
+    onSuccess: (created) => {
+      toast.success(onCreated ? 'Producto creado: agrégale sus pasos de proceso' : 'Producto creado exitosamente');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       onClose();
+      onCreated?.(created);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Error al crear producto');

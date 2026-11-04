@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import apiClient from './client';
 
 // Who a document applies to: one area · several areas · the whole plant · the whole organization.
-export type DocumentScope = 'area' | 'areas' | 'plant' | 'organization';
+export type DocumentScope = 'area' | 'areas' | 'plant' | 'organization' | 'products' | 'equipment';
 
 export interface AreaDocument {
   id: string;
@@ -13,6 +13,8 @@ export interface AreaDocument {
   area_name?: string | null;
   plant_name?: string | null;
   shared_areas?: { id: string; name: string }[];
+  shared_products?: { id: string; name: string; sku: string }[]; // "products" scope
+  shared_equipment?: { id: string; name: string; code: string }[]; // "equipment" scope
   title: string;
   description?: string | null;
   document_code?: string | null;
@@ -49,6 +51,8 @@ export interface CreateDocumentRequest {
   organization_id?: string | null;
   scope?: DocumentScope;
   shared_area_ids?: string[];
+  shared_product_ids?: string[];
+  shared_equipment_ids?: string[];
   title: string;
   description?: string;
   document_code?: string;
@@ -171,12 +175,14 @@ export const createGeneralDocument = async (data: CreateDocumentRequest): Promis
 };
 
 /** Fields that say where a document applies, for create and update */
-export const scopeFields = (value: { scope: DocumentScope; areaId: string | null; sharedAreaIds: string[] }, plantId: string, organizationId: string) => ({
+export const scopeFields = (value: { scope: DocumentScope; areaId: string | null; sharedAreaIds: string[]; sharedProductIds?: string[]; sharedEquipmentIds?: string[] }, plantId: string, organizationId: string) => ({
   scope: value.scope,
   organizational_area_id: value.scope === 'area' ? value.areaId : null,
   plant_id: value.scope === 'organization' ? null : plantId,
   organization_id: organizationId,
   shared_area_ids: value.scope === 'areas' ? value.sharedAreaIds : [],
+  shared_product_ids: value.scope === 'products' ? value.sharedProductIds || [] : [],
+  shared_equipment_ids: value.scope === 'equipment' ? value.sharedEquipmentIds || [] : [],
 });
 
 /** Documents that apply to an area besides its own: several areas including it, the plant, the organization */
@@ -206,6 +212,7 @@ export const invalidateDocumentLists = (queryClient: QueryClient) => {
   for (const key of ['area-documents-active', 'area-documents-archived', 'area-documents-applicable', 'plant-documents']) {
     queryClient.invalidateQueries({ queryKey: [key] });
   }
+  queryClient.invalidateQueries({ queryKey: ['plant-areas-overview'] }); // counts in the area tabs
 };
 
 export const SCOPE_OPTIONS: { value: DocumentScope; label: string; hint: string }[] = [
@@ -213,10 +220,20 @@ export const SCOPE_OPTIONS: { value: DocumentScope; label: string; hint: string 
   { value: 'areas', label: 'Varias áreas', hint: 'Las áreas que elijas' },
   { value: 'plant', label: 'Toda la planta', hint: 'Todas las áreas de la planta' },
   { value: 'organization', label: 'Toda la empresa', hint: 'Todas las áreas de todas las plantas' },
+  { value: 'products', label: 'Productos', hint: 'Uno o varios productos' },
+  { value: 'equipment', label: 'Equipos', hint: 'Uno o varios equipos' },
 ];
 
 /** Who it applies to: "Calidad", "Línea 1, Línea 2", "5 áreas", "Toda la planta", "Toda la empresa" */
-export const scopeLabel = (doc: Pick<AreaDocument, 'scope' | 'shared_areas' | 'area_name'>) => {
+export const scopeLabel = (doc: Pick<AreaDocument, 'scope' | 'shared_areas' | 'area_name' | 'shared_products' | 'shared_equipment'>) => {
+  if (doc.scope === 'equipment') {
+    const equipment = (doc.shared_equipment || []).map((e) => e.name);
+    return equipment.length <= 2 ? equipment.join(', ') : `${equipment.length} equipos`;
+  }
+  if (doc.scope === 'products') {
+    const products = (doc.shared_products || []).map((p) => p.name);
+    return products.length <= 2 ? products.join(', ') : `${products.length} productos`;
+  }
   if (doc.scope === 'organization') return 'Toda la empresa';
   if (doc.scope === 'plant') return 'Toda la planta';
   if (doc.scope === 'area') return doc.area_name || 'Un área';

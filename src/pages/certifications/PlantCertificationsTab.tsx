@@ -9,6 +9,7 @@ import {
   deleteCertificationType,
   deleteSystemCertification,
   formatDate,
+  getAreaCertifications,
   getPlantCertifications,
   scopeLabel,
   STATUS_CLASSES,
@@ -128,7 +129,7 @@ const Pill = ({ n, tone, label }: { n: number; tone: 'amber' | 'red'; label: str
 const thClass = 'px-4 py-2 font-medium';
 const iconBtn = 'rounded p-1 text-gray-500 hover:bg-gray-100';
 
-const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_id: string; name: string } }) => {
+const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organization_id: string; name?: string }; area?: { id: string; name: string } }) => {
   const queryClient = useQueryClient();
   const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
   const [systemModal, setSystemModal] = useState<{ open: boolean; certification: SystemCertification | null }>({ open: false, certification: null });
@@ -136,7 +137,11 @@ const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_i
   const [rosterType, setRosterType] = useState<string | null>(null);
   const [quick, setQuick] = useState<Quick>('');
 
-  const { data, isLoading } = useQuery({ queryKey: ['plant-certifications', plant.id], queryFn: () => getPlantCertifications(plant.id) });
+  // Inside an area's page: what covers that area and the certifications of its staff
+  const { data, isLoading } = useQuery({
+    queryKey: ['plant-certifications', plant.id, area?.id ?? 'plant'],
+    queryFn: () => (area ? getAreaCertifications(area.id) : getPlantCertifications(plant.id)),
+  });
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['plant-certifications'] });
     queryClient.invalidateQueries({ queryKey: ['plant-summary'] });
@@ -162,7 +167,7 @@ const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_i
     { key: 'ok', label: 'Vigentes', value: count('ok'), tone: 'text-green-700' },
     { key: 'expiring', label: `Por vencer (${data.alert_days} días)`, value: count('expiring'), tone: 'text-amber-700' },
     { key: 'expired', label: 'Vencidas', value: count('expired'), tone: 'text-red-700' },
-    { key: 'people', label: 'Personas con alertas', value: data.people_with_alerts, tone: 'text-red-700' },
+    { key: 'people', label: area ? 'Personas del área con alertas' : 'Personas con alertas', value: data.people_with_alerts, tone: 'text-red-700' },
   ];
   const filtered = !!quick;
   const emptyFiltered = (
@@ -234,7 +239,10 @@ const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_i
 
   return (
     <div className="space-y-4">
-      <SectionHeader title="Certificaciones" description="Normas y sistemas de la empresa y la planta, y las certificaciones de cada persona." />
+      <SectionHeader
+        title="Certificaciones"
+        description={area ? `Las que cubren "${area.name}" y las de su personal.` : 'Normas y sistemas de la empresa y la planta, y las certificaciones de cada persona.'}
+      />
 
       {/* Summary: each card filters both lists */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -253,7 +261,7 @@ const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_i
 
       {/* System */}
       <section className="rounded-lg border border-gray-200 bg-white">
-        {header(Award, 'text-amber-500', 'De la empresa y la planta', 'Normas y sistemas (ISO 9001, FSC…). Las de toda la empresa aparecen en la ficha de cada empleado.', () => setSystemModal({ open: true, certification: null }), 'Agregar certificación de la empresa o la planta')}
+        {header(Award, 'text-amber-500', area ? 'Del área, la planta y la empresa' : 'De la empresa y la planta', 'Normas y sistemas (ISO 9001, FSC…). Las de toda la empresa aparecen en la ficha de cada empleado.', () => setSystemModal({ open: true, certification: null }), 'Agregar certificación de la empresa o la planta')}
         {data.system.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-gray-500">Sin certificaciones registradas.</p>
         ) : shownSystem.length === 0 ? (
@@ -394,6 +402,7 @@ const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_i
         onClose={() => setSystemModal({ open: false, certification: null })}
         plant={plant}
         certification={systemModal.certification}
+        defaultAreaId={area?.id}
       />
       <PersonTypeModal
         plantId={plant.id}
@@ -404,7 +413,7 @@ const PlantCertificationsTab = ({ plant }: { plant: { id: string; organization_i
           if (createdId) setRosterType(createdId); // straight to the checkboxes
         }}
       />
-      <HoldersModal typeId={rosterType} plantId={plant.id} onClose={() => setRosterType(null)} readOnly={!canEdit} />
+      <HoldersModal typeId={rosterType} plantId={plant.id} onClose={() => setRosterType(null)} readOnly={!canEdit} initialArea={area?.name} />
     </div>
   );
 };

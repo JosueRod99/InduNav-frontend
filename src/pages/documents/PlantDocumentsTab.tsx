@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArchiveRestore,
   ExternalLink,
   Eye,
   GitBranch,
@@ -13,6 +14,7 @@ import {
 import toast from "react-hot-toast";
 import {
   appliesToArea,
+  updateDocument,
   deleteDocument,
   getCategoryLabel,
   getFileIcon,
@@ -31,13 +33,16 @@ import UploadDocumentModal from "../areas/modals/UploadDocumentModal";
 import EditDocumentModal from "../areas/modals/EditDocumentModal";
 import NewDocumentVersionModal from "../areas/modals/NewDocumentVersionModal";
 import SectionHeader from "../../components/ui/SectionHeader";
-import { matchesSearch } from '../../utils/search';
+import { matchesSearch } from "../../utils/search";
 
 // Plant document library: everything that applies to its areas, to the whole plant or to the
 // whole company, with who each document applies to.
 
 interface Props {
-  plant: { id: string; name: string; organization_id: string };
+  plant: { id: string; name?: string; organization_id: string };
+  area?: { id: string; name: string }; // inside an area's page: only what applies to that area
+  product?: { id: string; name: string; sku: string }; // inside a product's page: only its documents
+  equipment?: { id: string; name: string; code: string }; // inside a piece of equipment's page: same
 }
 
 const SCOPE_BADGE: Record<DocumentScope, string> = {
@@ -45,23 +50,50 @@ const SCOPE_BADGE: Record<DocumentScope, string> = {
   plant: "bg-blue-50 text-blue-800",
   areas: "bg-violet-50 text-violet-800",
   area: "bg-gray-100 text-gray-700",
+  products: "bg-amber-50 text-amber-800",
+  equipment: "bg-slate-100 text-slate-700",
 };
 
-const PlantDocumentsTab = ({ plant }: Props) => {
+const PlantDocumentsTab = ({ plant, area, product, equipment }: Props) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<"" | DocumentScope>("");
   const [areaFilter, setAreaFilter] = useState(""); // documents that apply to this area
+  const [productFilter, setProductFilter] = useState(""); // documents of this product
+  const [equipmentFilter, setEquipmentFilter] = useState(""); // documents of this piece of equipment
+  const linked = !!(product || equipment); // inside a product or equipment page: only its documents
   const [onlyPending, setOnlyPending] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [generalOnly, setGeneralOnly] = useState(false); // summary card: whole plant or company
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<AreaDocument | null>(null);
   const [versioning, setVersioning] = useState<AreaDocument | null>(null);
 
-  const { data: documents = [], isLoading } = useQuery({
+  const { data: allDocuments = [], isLoading } = useQuery({
     queryKey: ["plant-documents", plant.id],
-    queryFn: () => getPlantDocuments(plant.id),
+    queryFn: () => getPlantDocuments(plant.id, { includeArchived: true }),
   });
+  const inScope = useMemo(
+    () =>
+      area
+        ? allDocuments.filter((d) => appliesToArea(d, area.id))
+        : product
+          ? allDocuments.filter((d) => d.shared_products?.some((p) => p.id === product.id))
+          : equipment
+            ? allDocuments.filter((d) => d.shared_equipment?.some((e) => e.id === equipment.id))
+            : allDocuments,
+    [allDocuments, area, product, equipment],
+  );
+  // Active and archived are two separate views; the summary always counts the active ones
+  const documents = useMemo(
+    () => inScope.filter((d) => d.status !== "archived"),
+    [inScope],
+  );
+  const archived = useMemo(
+    () => inScope.filter((d) => d.status === "archived"),
+    [inScope],
+  );
+  const listed = showArchived ? archived : documents;
   const { data: areas = [] } = useQuery({
     queryKey: ["plant-areas-flat", plant.id],
     queryFn: async () =>
@@ -71,6 +103,16 @@ const PlantDocumentsTab = ({ plant }: Props) => {
     () => [...areas].sort((a, b) => a.name.localeCompare(b.name, "es")),
     [areas],
   );
+
+  const restore = useMutation({
+    mutationFn: (id: string) => updateDocument(id, { status: "active" }),
+    onSuccess: () => {
+      toast.success("Documento restaurado");
+      invalidateDocumentLists(queryClient);
+    },
+    onError: (error: any) =>
+      toast.error(error.response?.data?.message || "No se pudo restaurar"),
+  });
 
   const archive = useMutation({
     mutationFn: deleteDocument,
@@ -94,13 +136,41 @@ const PlantDocumentsTab = ({ plant }: Props) => {
     [documents],
   );
 
-  const visible = documents.filter((d) => {
+  // Products that have documents (for the filter)
+  const productsWithDocs = useMemo(() => {
+    const map = new Map<string, string>();
+    inScope.forEach((d) =>
+      d.shared_products?.forEach((p) => map.set(p.id, p.name)),
+    );
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], "es"));
+  }, [inScope]);
+
+  const equipmentWithDocs = useMemo(() => {
+    const map = new Map<string, string>();
+    inScope.forEach((d) =>
+      d.shared_equipment?.forEach((e) => map.set(e.id, e.name)),
+    );
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], "es"));
+  }, [inScope]);
+
+  const visible = listed.filter((d) => {
+    if (
+      equipmentFilter &&
+      !d.shared_equipment?.some((e) => e.id === equipmentFilter)
+    )
+      return false;
+    if (
+      productFilter &&
+      !d.shared_products?.some((p) => p.id === productFilter)
+    )
+      return false;
     if (scopeFilter && d.scope !== scopeFilter) return false;
     if (generalOnly && d.scope !== "plant" && d.scope !== "organization")
       return false;
     if (areaFilter && !appliesToArea(d, areaFilter)) return false;
     if (onlyPending && d.document_type !== "pending") return false;
-    if (!matchesSearch(search, d.document_code, d.title, d.description)) return false;
+    if (!matchesSearch(search, d.document_code, d.title, d.description))
+      return false;
     return true;
   });
 
@@ -111,7 +181,15 @@ const PlantDocumentsTab = ({ plant }: Props) => {
     <div className="space-y-4">
       <SectionHeader
         title="Documentos"
-        description="Todos los documentos de la planta y de la empresa, y a quién aplica cada uno."
+        description={
+          equipment
+            ? "Manuales y otros documentos de este equipo. También aparecen en Documentos de la planta."
+            : product
+              ? "Fichas técnicas, planos y otros documentos de este producto. También aparecen en Documentos de la planta."
+              : area
+                ? `Los de "${area.name}" y los generales que le aplican.`
+                : "Todos los documentos de la planta y de la empresa, y a quién aplica cada uno."
+        }
         actions={
           <Button onClick={() => setCreating(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Nuevo documento
@@ -120,7 +198,9 @@ const PlantDocumentsTab = ({ plant }: Props) => {
       />
 
       {/* Summary: each card filters (a second click clears it) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div
+        className={`grid grid-cols-2 gap-3 ${linked ? "" : "sm:grid-cols-4"}`}
+      >
         {[
           {
             label: "Documentos",
@@ -132,24 +212,28 @@ const PlantDocumentsTab = ({ plant }: Props) => {
               setOnlyPending(false);
             },
           },
-          {
-            label: "Toda la planta o empresa",
-            value: counts.general,
-            active: generalOnly,
-            onClick: () => {
-              setScopeFilter("");
-              setGeneralOnly(!generalOnly);
-            },
-          },
-          {
-            label: "De varias áreas",
-            value: counts.shared,
-            active: scopeFilter === "areas",
-            onClick: () => {
-              setGeneralOnly(false);
-              setScopeFilter(scopeFilter === "areas" ? "" : "areas");
-            },
-          },
+          ...(linked
+            ? []
+            : [
+                {
+                  label: "Toda la planta o empresa",
+                  value: counts.general,
+                  active: generalOnly,
+                  onClick: () => {
+                    setScopeFilter("");
+                    setGeneralOnly(!generalOnly);
+                  },
+                },
+                {
+                  label: "De varias áreas",
+                  value: counts.shared,
+                  active: scopeFilter === "areas",
+                  onClick: () => {
+                    setGeneralOnly(false);
+                    setScopeFilter(scopeFilter === "areas" ? "" : "areas");
+                  },
+                },
+              ]),
           {
             label: "Sin archivo",
             value: counts.pending,
@@ -185,36 +269,72 @@ const PlantDocumentsTab = ({ plant }: Props) => {
           />
         </label>
         {/* Side by side on phones */}
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <select
-            value={scopeFilter}
-            onChange={(e) => {
-              setGeneralOnly(false);
-              setScopeFilter(e.target.value as typeof scopeFilter);
-            }}
-            aria-label="Alcance"
-            className={`${selectClass} min-w-0`}
-          >
-            <option value="">Alcance: todos</option>
-            <option value="organization">Toda la empresa</option>
-            <option value="plant">Toda la planta</option>
-            <option value="areas">Varias áreas</option>
-            <option value="area">Un área</option>
-          </select>
-          <select
-            value={areaFilter}
-            onChange={(e) => setAreaFilter(e.target.value)}
-            aria-label="Aplica al área"
-            className={`${selectClass} min-w-0`}
-          >
-            <option value="">Aplica a: todas</option>
-            {sortedAreas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!linked && (
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+            <select
+              value={scopeFilter}
+              onChange={(e) => {
+                setGeneralOnly(false);
+                setScopeFilter(e.target.value as typeof scopeFilter);
+              }}
+              aria-label="Alcance"
+              className={`${selectClass} min-w-0`}
+            >
+              <option value="">Alcance: todos</option>
+              <option value="organization">Toda la empresa</option>
+              <option value="plant">Toda la planta</option>
+              <option value="areas">Varias áreas</option>
+              <option value="area">Un área</option>
+              <option value="products">Productos</option>
+              <option value="equipment">Equipos</option>
+            </select>
+            {!area && (
+              <select
+                value={areaFilter}
+                onChange={(e) => setAreaFilter(e.target.value)}
+                aria-label="Aplica al área"
+                className={`${selectClass} min-w-0`}
+              >
+                <option value="">Aplica a: todas</option>
+                {sortedAreas.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {!area && equipmentWithDocs.length > 0 && (
+              <select
+                value={equipmentFilter}
+                onChange={(e) => setEquipmentFilter(e.target.value)}
+                aria-label="Equipo"
+                className={`${selectClass} min-w-0`}
+              >
+                <option value="">Equipo: todos</option>
+                {equipmentWithDocs.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {!area && productsWithDocs.length > 0 && (
+              <select
+                value={productFilter}
+                onChange={(e) => setProductFilter(e.target.value)}
+                aria-label="Producto"
+                className={`${selectClass} min-w-0`}
+              >
+                <option value="">Producto: todos</option>
+                {productsWithDocs.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
         <label className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700">
           <input
             type="checkbox"
@@ -223,6 +343,17 @@ const PlantDocumentsTab = ({ plant }: Props) => {
             className="rounded text-blue-600"
           />
           Solo sin archivo
+        </label>
+        <label
+          className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${showArchived ? "border-amber-300 bg-amber-50 text-amber-900" : "border-gray-300 text-gray-700"}`}
+        >
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+            className="rounded text-amber-600"
+          />
+          Ver archivados ({archived.length})
         </label>
       </div>
 
@@ -234,9 +365,11 @@ const PlantDocumentsTab = ({ plant }: Props) => {
           </p>
         ) : visible.length === 0 ? (
           <p className="p-8 text-center text-sm text-gray-600">
-            {documents.length
+            {listed.length
               ? "Ningún documento coincide con los filtros."
-              : "Aún no hay documentos."}
+              : showArchived
+                ? "No hay documentos archivados."
+                : "Aún no hay documentos."}
           </p>
         ) : (
           <ul className="divide-y divide-gray-100">
@@ -271,7 +404,15 @@ const PlantDocumentsTab = ({ plant }: Props) => {
                             ? (doc.shared_areas || [])
                                 .map((a) => a.name)
                                 .join(", ")
-                            : undefined
+                            : doc.scope === "products"
+                              ? (doc.shared_products || [])
+                                  .map((p) => p.name)
+                                  .join(", ")
+                              : doc.scope === "equipment"
+                                ? (doc.shared_equipment || [])
+                                    .map((e) => e.name)
+                                    .join(", ")
+                                : undefined
                         }
                       >
                         {(doc.scope === "plant" ||
@@ -297,7 +438,9 @@ const PlantDocumentsTab = ({ plant }: Props) => {
                   </div>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-3 pl-9 sm:pl-0">
-                  {doc.document_type === "pending" ? (
+                  {doc.document_type === "pending" &&
+                  doc.status === "archived" ? null : doc.document_type ===
+                    "pending" ? (
                     <button
                       onClick={() => setVersioning(doc)}
                       className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
@@ -316,14 +459,16 @@ const PlantDocumentsTab = ({ plant }: Props) => {
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
-                      <button
-                        onClick={() => setVersioning(doc)}
-                        className="text-purple-600 hover:text-purple-900"
-                        title="Subir una nueva versión"
-                        aria-label={`Nueva versión de ${doc.title}`}
-                      >
-                        <GitBranch className="h-4 w-4" />
-                      </button>
+                      {doc.status !== "archived" && (
+                        <button
+                          onClick={() => setVersioning(doc)}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Subir una nueva versión"
+                          aria-label={`Nueva versión de ${doc.title}`}
+                        >
+                          <GitBranch className="h-4 w-4" />
+                        </button>
+                      )}
                     </>
                   )}
                   <button
@@ -334,18 +479,30 @@ const PlantDocumentsTab = ({ plant }: Props) => {
                   >
                     <Eye className="h-4 w-4" />
                   </button>
-                  <button
-                    onClick={() =>
-                      window.confirm(`¿Archivar "${doc.title}"?`) &&
-                      archive.mutate(doc.id)
-                    }
-                    disabled={archive.isPending}
-                    className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                    title="Archivar"
-                    aria-label={`Archivar ${doc.title}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {doc.status === "archived" ? (
+                    <button
+                      onClick={() => restore.mutate(doc.id)}
+                      disabled={restore.isPending}
+                      className="text-green-700 hover:text-green-900 disabled:opacity-50"
+                      title="Restaurar"
+                      aria-label={`Restaurar ${doc.title}`}
+                    >
+                      <ArchiveRestore className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() =>
+                        window.confirm(`¿Archivar "${doc.title}"?`) &&
+                        archive.mutate(doc.id)
+                      }
+                      disabled={archive.isPending}
+                      className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                      title="Archivar"
+                      aria-label={`Archivar ${doc.title}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </li>
             ))}
@@ -356,6 +513,9 @@ const PlantDocumentsTab = ({ plant }: Props) => {
       <UploadDocumentModal
         isOpen={creating}
         onClose={() => setCreating(false)}
+        areaId={area?.id}
+        product={product}
+        equipment={equipment}
         organizationId={plant.organization_id}
         plantId={plant.id}
       />

@@ -10,6 +10,8 @@ import {
   type Product,
 } from '../../../api/products';
 import Badge from '../../../components/ui/Badge';
+import Button from '../../../components/ui/Button';
+import SectionHeader from '../../../components/ui/SectionHeader';
 import UploadProductImageModal from '../modals/UploadProductImageModal';
 import ViewImageModal from '../modals/ViewImageModal';
 
@@ -82,19 +84,17 @@ const GalleryTab = ({ productId, product }: GalleryTabProps) => {
   if (!images || images.length === 0) {
     return (
       <>
+        <SectionHeader title="Galería" description="La imagen principal se muestra en los tours y en las listas de productos." />
         <div className="text-center py-12">
           <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Sin Imágenes</h3>
           <p className="text-gray-600 mb-4">
             Aún no hay imágenes en la galería de este producto.
           </p>
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
+          <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" />
             Subir Imágenes
-          </button>
+          </Button>
         </div>
 
         <UploadProductImageModal
@@ -111,23 +111,16 @@ const GalleryTab = ({ productId, product }: GalleryTabProps) => {
   return (
     <div className="space-y-6">
       {/* Summary and Controls */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">
-            Galería de Imágenes ({images.length})
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Imágenes del producto ordenadas por preferencia
-          </p>
-        </div>
-        <button
-          onClick={() => setIsUploadModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          <Upload className="h-4 w-4" />
-          Subir Imágenes
-        </button>
-      </div>
+      <SectionHeader
+        title={`Galería (${images.length})`}
+        description="La imagen principal se muestra en los tours y en las listas de productos."
+        actions={
+          <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" />
+            Subir Imágenes
+          </Button>
+        }
+      />
 
       {/* Images Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

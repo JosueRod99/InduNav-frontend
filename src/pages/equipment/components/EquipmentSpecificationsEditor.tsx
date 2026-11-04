@@ -93,9 +93,9 @@ const EquipmentSpecificationsEditor = ({ equipmentId, specifications }: Equipmen
 
   if (!isEditing) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Especificaciones Técnicas</h3>
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-gray-900">Especificaciones técnicas</h3>
           <Button
             onClick={() => setIsEditing(true)}
             variant="outline"
@@ -103,7 +103,7 @@ const EquipmentSpecificationsEditor = ({ equipmentId, specifications }: Equipmen
             className="gap-2"
           >
             <Edit className="h-4 w-4" />
-            Editar
+            Editar especificaciones
           </Button>
         </div>
 

@@ -1,25 +1,29 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Wrench, Edit } from 'lucide-react';
+import { Edit, FileText, Image as ImageIcon, LayoutDashboard, MapPin, Package, Wrench } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
+import ScrollTabs from '../../components/ui/ScrollTabs';
 import EquipmentModal from './EquipmentModal';
 import EquipmentGalleryTab from './tabs/EquipmentGalleryTab';
-import EquipmentDocumentsTab from './tabs/EquipmentDocumentsTab';
 import EquipmentAssignmentsTab from './tabs/EquipmentAssignmentsTab';
 import EquipmentProductsTab from './tabs/EquipmentProductsTab';
-import EquipmentSpecificationsEditor from './components/EquipmentSpecificationsEditor';
-import {
-  getEquipmentById,
-  EQUIPMENT_TYPE_LABELS,
-  EQUIPMENT_STATUS_LABELS,
-} from '../../api/equipment';
+import EquipmentSummaryTab from './tabs/EquipmentSummaryTab';
+import PlantDocumentsTab from '../documents/PlantDocumentsTab';
+import { getEquipmentById, getEquipmentImages, EQUIPMENT_TYPE_LABELS, EQUIPMENT_STATUS_LABELS } from '../../api/equipment';
+import { getEquipmentProducts } from '../../api/productStepEquipment';
+import { getPlantDocuments } from '../../api/areaDocuments';
 import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
+
+type TabType = 'general' | 'location' | 'products' | 'documents' | 'gallery';
 
 const EquipmentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<'general' | 'gallery' | 'documents' | 'assignments' | 'products'>('general');
+  // Active tab lives in the URL (?tab=location) so it survives reloading and coming back
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get('tab') as TabType) || 'general';
+  const setActiveTab = (tab: TabType) => setSearchParams({ tab }, { replace: true });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: equipment, isLoading } = useQuery({
@@ -27,6 +31,16 @@ const EquipmentDetailPage = () => {
     queryFn: () => getEquipmentById(id!),
     enabled: !!id,
   });
+
+  // Counts of the tabs (same queries the tabs use)
+  const { data: links = [] } = useQuery({ queryKey: ['equipment-products', id], queryFn: () => getEquipmentProducts(id!), enabled: !!id });
+  const { data: images = [] } = useQuery({ queryKey: ['equipment-images', id], queryFn: () => getEquipmentImages(id!), enabled: !!id });
+  const { data: library = [] } = useQuery({
+    queryKey: ['plant-documents', equipment?.plant_id],
+    queryFn: () => getPlantDocuments(equipment!.plant_id, { includeArchived: true }),
+    enabled: !!equipment?.plant_id,
+  });
+  const documentCount = library.filter((d) => d.status !== 'archived' && d.shared_equipment?.some((e) => e.id === id)).length;
 
   if (isLoading) {
     return (
@@ -44,273 +58,78 @@ const EquipmentDetailPage = () => {
     );
   }
 
+  const tabs: { id: TabType; label: string; Icon: typeof Wrench; count?: number }[] = [
+    { id: 'general', label: 'Resumen', Icon: LayoutDashboard },
+    { id: 'location', label: 'Ubicación', Icon: MapPin },
+    { id: 'products', label: 'Productos', Icon: Package, count: new Set(links.map((l) => l.product_id)).size },
+    { id: 'documents', label: 'Documentos', Icon: FileText, count: documentCount },
+    { id: 'gallery', label: 'Galería', Icon: ImageIcon, count: images.length },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <PlantBreadcrumb plantId={equipment.plant_id} tab="equipos" current={equipment.name} />
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <Badge variant="info" className="font-mono">
-              {equipment.code}
-            </Badge>
-            <Badge
-              variant={
-                equipment.status === 'active'
-                  ? 'success'
-                  : equipment.status === 'maintenance'
-                  ? 'warning'
-                  : equipment.status === 'out_of_service'
-                  ? 'error'
-                  : 'default'
-              }
-            >
-              {EQUIPMENT_STATUS_LABELS[equipment.status]}
-            </Badge>
-          </div>
-
-          <div className="flex items-center gap-4">
+      <div className="min-w-0">
+        <PlantBreadcrumb plantId={equipment.plant_id} tab="equipos" current={equipment.name} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
             {equipment.primary_image_url ? (
-              <img
-                src={equipment.primary_image_url}
-                alt={equipment.name}
-                className="h-20 w-20 rounded-lg object-cover border border-gray-200"
-              />
+              <img src={equipment.primary_image_url} alt="" className="h-14 w-14 flex-shrink-0 rounded-lg border border-gray-200 object-cover" />
             ) : (
-              <div className="h-20 w-20 rounded-lg bg-gray-200 flex items-center justify-center border border-gray-300">
-                <Wrench className="h-10 w-10 text-gray-400" />
-              </div>
+              <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100">
+                <Wrench className="h-6 w-6 text-gray-400" />
+              </span>
             )}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{equipment.name}</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {EQUIPMENT_TYPE_LABELS[equipment.equipment_type]}
-                {equipment.manufacturer && ` • ${equipment.manufacturer}`}
-              </p>
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">{equipment.name}</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-gray-600">
+                <Badge variant="info" className="font-mono">
+                  {equipment.code}
+                </Badge>
+                <Badge variant={equipment.status === 'active' ? 'success' : equipment.status === 'maintenance' ? 'warning' : equipment.status === 'out_of_service' ? 'error' : 'default'}>
+                  {EQUIPMENT_STATUS_LABELS[equipment.status]}
+                </Badge>
+                <span>{EQUIPMENT_TYPE_LABELS[equipment.equipment_type]}</span>
+              </div>
             </div>
           </div>
-        </div>
-
-        <Button onClick={() => setIsEditModalOpen(true)} className="gap-2">
-          <Edit className="h-4 w-4" />
-          Editar
-        </Button>
-      </div>
-
-      {/* Tabs (scroll sideways on small screens) */}
-      <div className="overflow-x-auto border-b border-gray-200">
-        <div className="flex gap-4 [&>*]:whitespace-nowrap">
-          <button
-            onClick={() => setActiveTab('general')}
-            className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'general'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            General
-          </button>
-          <button
-            onClick={() => setActiveTab('gallery')}
-            className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'gallery'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Galería
-          </button>
-          <button
-            onClick={() => setActiveTab('documents')}
-            className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'documents'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Documentos
-          </button>
-          <button
-            onClick={() => setActiveTab('assignments')}
-            className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'assignments'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Asignaciones
-          </button>
-          <button
-            onClick={() => setActiveTab('products')}
-            className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'products'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Productos
-          </button>
+          <Button onClick={() => setIsEditModalOpen(true)} variant="outline" className="gap-2">
+            <Edit className="h-4 w-4" />
+            Editar equipo
+          </Button>
         </div>
       </div>
 
-      {/* Tab Content */}
+      {/* Tabs (scroll sideways when they do not fit) */}
+      <ScrollTabs label="Secciones del equipo">
+        {tabs.map(({ id: tabId, label, Icon, count }) => (
+          <button
+            key={tabId}
+            onClick={() => setActiveTab(tabId)}
+            aria-current={activeTab === tabId ? 'page' : undefined}
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === tabId ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+            {count ? <span className={`rounded-full px-1.5 text-xs ${activeTab === tabId ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{count}</span> : null}
+          </button>
+        ))}
+      </ScrollTabs>
+
       <div>
-        {activeTab === 'general' && (
-          <div className="space-y-6">
-            {/* Basic Information */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información Básica</h3>
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Código</dt>
-                  <dd className="mt-1 text-sm font-mono text-gray-900">{equipment.code}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Nombre</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{equipment.name}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Tipo</dt>
-                  <dd className="mt-1">
-                    <Badge variant="info">
-                      {EQUIPMENT_TYPE_LABELS[equipment.equipment_type]}
-                    </Badge>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Estado</dt>
-                  <dd className="mt-1">
-                    <Badge
-                      variant={
-                        equipment.status === 'active'
-                          ? 'success'
-                          : equipment.status === 'maintenance'
-                          ? 'warning'
-                          : equipment.status === 'out_of_service'
-                          ? 'error'
-                          : 'default'
-                      }
-                    >
-                      {EQUIPMENT_STATUS_LABELS[equipment.status]}
-                    </Badge>
-                  </dd>
-                </div>
-                {equipment.manufacturer && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Fabricante</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{equipment.manufacturer}</dd>
-                  </div>
-                )}
-                {equipment.model && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Modelo</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{equipment.model}</dd>
-                  </div>
-                )}
-                {equipment.serial_number && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Número de Serie</dt>
-                    <dd className="mt-1 text-sm font-mono text-gray-900">{equipment.serial_number}</dd>
-                  </div>
-                )}
-                {equipment.acquisition_date && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Fecha de Adquisición</dt>
-                    <dd className="mt-1 text-sm text-gray-900">
-                      {new Date(equipment.acquisition_date).toLocaleDateString('es-MX', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
-                    </dd>
-                  </div>
-                )}
-                {equipment.warranty_expiry_date && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Vencimiento de Garantía</dt>
-                    <dd className="mt-1 text-sm text-gray-900">
-                      {new Date(equipment.warranty_expiry_date).toLocaleDateString('es-MX', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
-                    </dd>
-                  </div>
-                )}
-                {equipment.description && (
-                  <div className="md:col-span-2">
-                    <dt className="text-sm font-medium text-gray-500">Descripción</dt>
-                    <dd className="mt-1 text-sm text-gray-900">{equipment.description}</dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-
-            {/* Technical Specifications */}
-            <EquipmentSpecificationsEditor
-              equipmentId={equipment.id}
-              specifications={equipment.specifications || {}}
-            />
-
-            {/* Audit Information */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Información de Auditoría</h3>
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Fecha de Creación</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {new Date(equipment.created_at).toLocaleDateString('es-MX', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Última Actualización</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {new Date(equipment.updated_at).toLocaleDateString('es-MX', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'gallery' && (
-          <EquipmentGalleryTab equipmentId={id!} equipment={equipment} />
-        )}
-
+        {activeTab === 'general' && <EquipmentSummaryTab equipment={equipment} onEdit={() => setIsEditModalOpen(true)} />}
+        {activeTab === 'location' && <EquipmentAssignmentsTab equipmentId={id!} equipment={equipment} />}
+        {activeTab === 'products' && <EquipmentProductsTab equipmentId={id!} equipment={equipment} />}
         {activeTab === 'documents' && (
-          <EquipmentDocumentsTab equipmentId={id!} equipment={equipment} />
+          <PlantDocumentsTab plant={{ id: equipment.plant_id, organization_id: equipment.organization_id }} equipment={{ id: equipment.id, name: equipment.name, code: equipment.code }} />
         )}
-
-        {activeTab === 'assignments' && (
-          <EquipmentAssignmentsTab equipmentId={id!} equipment={equipment} />
-        )}
-
-        {activeTab === 'products' && (
-          <EquipmentProductsTab equipmentId={id!} equipment={equipment} />
-        )}
+        {activeTab === 'gallery' && <EquipmentGalleryTab equipmentId={id!} equipment={equipment} />}
       </div>
 
-      {/* Edit Modal */}
       {isEditModalOpen && (
-        <EquipmentModal
-          isOpen={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
-          equipment={equipment}
-          organizationId={equipment.organization_id}
-          plantId={equipment.plant_id}
-        />
+        <EquipmentModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} equipment={equipment} organizationId={equipment.organization_id} plantId={equipment.plant_id} />
       )}
     </div>
   );

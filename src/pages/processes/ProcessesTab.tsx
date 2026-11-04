@@ -29,7 +29,7 @@ const StatusBadge = ({ status }: { status: 'draft' | 'active' }) =>
     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">Borrador</span>
   );
 
-const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizationId: string }) => {
+const ProcessesTab = ({ plantId, organizationId, area }: { plantId: string; organizationId: string; area?: { id: string; name: string } }) => {
   const queryClient = useQueryClient();
   const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -46,7 +46,17 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
     enabled: !!processId,
   });
 
-  const open = (id: string | null) => setSearchParams(id ? { proceso: id } : {}, { replace: false });
+  // Keeps the rest of the URL (inside an area page, ?tab=processes)
+  const open = (id: string | null) =>
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (id) next.set('proceso', id);
+        else next.delete('proceso');
+        return next;
+      },
+      { replace: false }
+    );
 
   const remove = useMutation({
     mutationFn: (id: string) => deleteProcess(id),
@@ -133,7 +143,8 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
 
   // All processes of the plant
   const text = normalizeSearch(search);
-  const visibleProcesses = (processes || []).filter(
+  const inScope = (processes || []).filter((p) => !area || p.areas.some((a) => a.id === area.id));
+  const visibleProcesses = inScope.filter(
     (p) =>
       (!statusFilter || p.status === statusFilter) &&
       matchesSearch(text, p.name, p.code, p.objective, ...p.areas.map((a) => a.name))
@@ -142,7 +153,7 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
     <div className="space-y-4">
       <SectionHeader
         title="Procesos"
-        description="Procesos que recorren varias áreas de la planta, paso a paso."
+        description={area ? `Procesos de la planta con pasos en "${area.name}".` : 'Procesos que recorren varias áreas de la planta, paso a paso.'}
         actions={
           canEdit && (
             <Button onClick={() => setEditor('new')} className="gap-1.5">
@@ -155,15 +166,17 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
         <p className="flex items-center gap-2 text-gray-600">
           <Loader2 className="h-4 w-4 animate-spin" /> Cargando procesos…
         </p>
-      ) : !processes?.length ? (
+      ) : !inScope.length ? (
         <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center">
           <GitBranch className="mx-auto mb-3 h-10 w-10 text-gray-400" />
-          <p className="font-medium text-gray-900">Todavía no hay procesos</p>
-          <p className="mt-1 text-sm text-gray-600">Por ejemplo "Del pedido a la entrega": qué área hace cada paso y con qué documentos.</p>
+          <p className="font-medium text-gray-900">{area ? 'Esta área no participa en ningún proceso' : 'Todavía no hay procesos'}</p>
+          <p className="mt-1 text-sm text-gray-600">
+            {area ? 'En cada proceso se elige qué área hace cada paso.' : 'Por ejemplo "Del pedido a la entrega": qué área hace cada paso y con qué documentos.'}
+          </p>
         </div>
       ) : (
         <>
-        {processes.length >= FILTERS_FROM && (
+        {inScope.length >= FILTERS_FROM && (
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative min-w-[14rem] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -218,6 +231,7 @@ const ProcessesTab = ({ plantId, organizationId }: { plantId: string; organizati
                     {p.step_count} paso{p.step_count === 1 ? '' : 's'}
                     {areaCount(p) > 0 && ` · ${areaCount(p)} área${areaCount(p) === 1 ? '' : 's'}`}
                   </span>
+                  {area && <span className="font-medium text-blue-700">{p.areas.filter((a) => a.id === area.id).length} aquí</span>}
                   {p.owner_name ? (
                     <span className="inline-flex items-center gap-1">
                       <User className="h-3 w-3" /> Dueño: {p.owner_name}

@@ -60,6 +60,7 @@ const EmployeeResponsibilities = ({ employee }: { employee: Employee }) => {
     queryClient.invalidateQueries({ queryKey });
     queryClient.invalidateQueries({ queryKey: ['area-responsibles'] });
     queryClient.invalidateQueries({ queryKey: ['orgChart'] });
+    queryClient.invalidateQueries({ queryKey: ['plant-areas-overview'] }); // "Sin supervisor" in the summaries
   };
 
   const add = useMutation({

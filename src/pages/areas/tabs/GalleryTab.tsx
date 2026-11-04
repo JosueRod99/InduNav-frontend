@@ -42,6 +42,8 @@ const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
   if (!photos || photos.length === 0) {
     return (
       <>
+        <h2 className="text-lg font-semibold text-gray-900">Galería</h2>
+        <p className="mt-0.5 text-sm text-gray-600">Estas fotos se muestran en la sección Galería de los tours.</p>
         <div className="text-center py-12">
           <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Sin Fotos</h3>
@@ -89,16 +91,12 @@ const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
   return (
     <div className="space-y-8">
       {/* Summary and Controls */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">
-            Galería de Fotos ({photos.length})
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Fotos del área organizadas por categoría
-          </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-gray-900">Galería ({photos.length})</h2>
+          <p className="mt-0.5 text-sm text-gray-600">Estas fotos se muestran en la sección Galería de los tours.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {/* View Mode Toggle */}
           <div className="inline-flex rounded-md shadow-sm" role="group">
             <button

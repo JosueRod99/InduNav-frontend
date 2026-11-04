@@ -6,4 +6,5 @@ export interface PlantScopedProps {
   plantId?: string;
   organizationId?: string;
   viewSwitch?: ReactNode; // shown right under the section header (e.g. Personal: Lista / Organigrama)
+  area?: { id: string; name: string }; // inside an area's page: same section, only what belongs to that area
 }

@@ -19,13 +19,15 @@ interface UploadDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
   areaId?: string; // opened from an area: it applies to that area unless changed
+  product?: { id: string; sku: string }; // opened from a product: it applies to that product unless changed
+  equipment?: { id: string; code: string }; // opened from a piece of equipment: same
   organizationId: string;
   plantId: string;
 }
 
 type DocumentSourceType = 'uploaded' | 'external_link' | 'pending'; // pending: registered now, file later
 
-const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId }: UploadDocumentModalProps) => {
+const UploadDocumentModal = ({ isOpen, onClose, areaId, product, equipment, organizationId, plantId }: UploadDocumentModalProps) => {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,12 +44,22 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
   const [uploading, setUploading] = useState(false);
   // Who it applies to: from an area, that area; from the plant library, the whole plant
   const [scope, setScope] = useState<DocumentScopeValue | null>(null);
-  const scopeValue: DocumentScopeValue = scope || (areaId ? { scope: 'area', areaId, sharedAreaIds: [] } : { scope: 'plant', areaId: null, sharedAreaIds: [] });
+  const scopeValue: DocumentScopeValue =
+    scope ||
+    (equipment
+      ? { scope: 'equipment', areaId: null, sharedAreaIds: [], sharedEquipmentIds: [equipment.id] }
+      : product
+      ? { scope: 'products', areaId: null, sharedAreaIds: [], sharedProductIds: [product.id] }
+      : areaId
+        ? { scope: 'area', areaId, sharedAreaIds: [] }
+        : { scope: 'plant', areaId: null, sharedAreaIds: [] });
   // Default key of automatic codes (PROC-<key>-001): the area's code for one area, GEN otherwise
   const keyAreaId = scopeValue.scope === 'area' ? scopeValue.areaId : null;
   const { data: keyArea } = useQuery({ queryKey: ['organizational-area', keyAreaId], queryFn: () => getArea(keyAreaId!), enabled: isOpen && !!keyAreaId });
   const [code, setCode] = useState<DocumentCodeValue | null>(null);
-  const defaultKey = keyAreaId ? (keyArea?.code || '').toUpperCase() : 'GEN';
+  // Opened from a product or a piece of equipment: its SKU or code, when it is usable as a key
+  const ownKey = (product?.sku || equipment?.code || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').replace(/^-+|-+$/g, '');
+  const defaultKey = keyAreaId ? (keyArea?.code || '').toUpperCase() : (scopeValue.scope === 'products' || scopeValue.scope === 'equipment') && ownKey && ownKey.length <= 20 ? ownKey : 'GEN';
   const codeValue: DocumentCodeValue = code || { mode: 'auto', prefix: codeTypeForCategory(category) || 'PROC', key: defaultKey };
 
   const createDocumentMutation = useMutation({
@@ -193,6 +205,16 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, organizationId, plantId 
 
     if (scopeValue.scope === 'areas' && scopeValue.sharedAreaIds.length === 0) {
       alert('Elige al menos un área a la que aplica.');
+      return;
+    }
+
+    if (scopeValue.scope === 'equipment' && !scopeValue.sharedEquipmentIds?.length) {
+      alert('Elige al menos un equipo al que aplica.');
+      return;
+    }
+
+    if (scopeValue.scope === 'products' && !scopeValue.sharedProductIds?.length) {
+      alert('Elige al menos un producto al que aplica.');
       return;
     }
 

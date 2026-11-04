@@ -88,10 +88,9 @@ const LiveSectionPreview = ({ sectionKey, stop, areaId }: LiveSectionPreviewProp
         if (!s) return null;
         return (
           <div className="space-y-1.5 text-xs text-gray-700">
-            {s.days_without_accident !== null && <p>{s.days_without_accident} días sin accidentes</p>}
             {s.required_ppe.length > 0 && (
               <p className="flex flex-wrap items-center gap-1">
-                <HardHat className="h-3.5 w-3.5 text-amber-600" />
+                <HardHat className="h-3.5 w-3.5 text-gray-500" />
                 {s.required_ppe.join(' · ')}
               </p>
             )}

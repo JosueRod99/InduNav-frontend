@@ -27,11 +27,12 @@ const NEW_TYPE = '__new__';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  plant: { id: string; organization_id: string; name: string };
+  plant: { id: string; organization_id: string; name?: string };
+  defaultAreaId?: string; // opened from an area: a new certification covers that area unless changed
   certification?: SystemCertification | null;
 }
 
-const SystemCertificationModal = ({ isOpen, onClose, plant, certification }: Props) => {
+const SystemCertificationModal = ({ isOpen, onClose, plant, certification, defaultAreaId }: Props) => {
   const queryClient = useQueryClient();
   const [typeId, setTypeId] = useState('');
   const [newName, setNewName] = useState('');
@@ -59,8 +60,8 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, certification }: Pro
     setTypeId(certification?.type_id || '');
     setNewName('');
     setNewBody('');
-    setScope(certification?.scope || 'organization');
-    setAreaId(certification?.area_id || '');
+    setScope(certification?.scope || (defaultAreaId ? 'area' : 'organization'));
+    setAreaId(certification?.area_id || defaultAreaId || '');
     setStatus(certification?.status || 'active');
     setNumber(certification?.certificate_number || '');
     setIssue(certification?.issue_date?.slice(0, 10) || '');

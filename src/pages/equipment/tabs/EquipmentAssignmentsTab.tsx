@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Plus, Calendar, ArrowRight, History, Trash2, StopCircle } from 'lucide-react';
+import { MapPin, Map as MapIcon, Plus, Calendar, ArrowRight, History, Trash2, StopCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
@@ -18,6 +18,8 @@ import {
   type EquipmentAreaAssignment,
 } from '../../../api/equipment';
 import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
+import SectionHeader from '../../../components/ui/SectionHeader';
+import { floorLabel } from '../../../utils/floors';
 
 interface EquipmentAssignmentsTabProps {
   equipmentId: string;
@@ -140,6 +142,8 @@ const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignment
     }
   };
 
+  const placed = equipment.placed_on || [];
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -149,43 +153,46 @@ const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignment
   }
 
   return (
-    <div className="space-y-6">
-      {/* Current Location */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Ubicación Actual</h3>
-          {!showForm && (
-            <Button onClick={() => setShowForm(true)} size="sm" className="gap-2">
+    <div className="space-y-4">
+      <SectionHeader
+        title="Ubicación"
+        description="Dónde está el equipo ahora, si está en el plano y por dónde ha pasado."
+        actions={
+          !showForm && (
+            <Button onClick={() => setShowForm(true)} className="gap-2">
               {current ? <ArrowRight className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {current ? 'Reubicar' : 'Asignar a Área'}
             </Button>
-          )}
-        </div>
+          )
+        }
+      />
 
+      {/* Current Location */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
         {current ? (
-          <div className="flex items-start justify-between gap-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
-              <MapPin className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
               <div className="min-w-0">
                 <button
                   onClick={() => navigate(`/areas/${current.organizational_area_id}`)}
-                  className="text-base font-semibold text-blue-900 hover:underline text-left"
+                  className="text-base font-semibold text-gray-900 hover:text-blue-700 hover:underline text-left"
                 >
                   {current.area_name}
                 </button>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   {current.area_code && (
-                    <span className="text-xs font-mono text-blue-700">{current.area_code}</span>
+                    <span className="text-xs font-mono text-gray-500">{current.area_code}</span>
                   )}
                   <Badge variant={current.assignment_type === 'temporary' ? 'warning' : 'info'}>
                     {ASSIGNMENT_TYPE_LABELS[current.assignment_type]}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-blue-800 mt-2">
+                <div className="flex items-center gap-1 text-xs text-gray-600 mt-2">
                   <Calendar className="h-3 w-3" />
                   <span>Desde {formatDate(current.start_date)}</span>
                 </div>
-                {current.notes && <p className="text-sm text-blue-900 mt-2">{current.notes}</p>}
+                {current.notes && <p className="text-sm text-gray-700 mt-2">{current.notes}</p>}
               </div>
             </div>
             <button
@@ -269,11 +276,44 @@ const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignment
         )}
       </div>
 
+      {/* On the plan */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-900">
+          <MapIcon className="h-4 w-4 text-gray-500" /> En el plano
+        </h3>
+        {placed.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Sin colocar en ningún plano.{' '}
+            {current && (
+              <button onClick={() => navigate(`/areas/${current.organizational_area_id}?tab=layout`)} className="font-medium text-blue-700 hover:underline">
+                Colocar en el plano de {current.area_name}
+              </button>
+            )}
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {placed.map((plan, index) => (
+              <li key={index} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-gray-700">
+                  {plan.area_name ? `Plano de ${plan.area_name}` : 'Plano de la planta'} · {floorLabel(plan.floor_level)}
+                </span>
+                <button
+                  onClick={() => navigate(plan.area_id ? `/areas/${plan.area_id}?tab=layout&floor=${plan.floor_level}` : `/plants/${equipment.plant_id}/layout?floor=${plan.floor_level}`)}
+                  className="flex-shrink-0 text-xs font-medium text-blue-700 hover:underline"
+                >
+                  Ver en el plano
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {/* History */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <History className="h-5 w-5 text-gray-500" />
-          <h3 className="text-lg font-medium text-gray-900">Historial de Ubicaciones</h3>
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="mb-2 flex items-center gap-2">
+          <History className="h-4 w-4 text-gray-500" />
+          <h3 className="text-sm font-semibold text-gray-900">Historial de ubicaciones</h3>
         </div>
 
         {history.length === 0 ? (

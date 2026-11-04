@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthStore } from '../../store/authStore';
+import { MANAGERS } from '../plants/plantTabs';
 import { Plus, Pencil, Trash2, Wrench, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -13,6 +15,7 @@ import {
   type EquipmentStatus,
   EQUIPMENT_TYPE_LABELS,
   EQUIPMENT_STATUS_LABELS,
+  ASSIGNMENT_TYPE_LABELS,
 } from '../../api/equipment';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
@@ -47,11 +50,25 @@ const AreaChips = ({ item }: { item: Equipment }) =>
     <span className="text-xs text-amber-700">Sin área</span>
   );
 
-const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
+/** Inside an area: since when the item is there, and whether it is only temporary */
+const InArea = ({ item, areaId }: { item: Equipment; areaId: string }) => {
+  const assignment = item.areas?.find((a) => a.id === areaId);
+  return (
+    <span className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+      {assignment?.start_date && `Desde ${new Date(assignment.start_date).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}`}
+      {assignment?.assignment_type === 'temporary' && <Badge variant="warning">{ASSIGNMENT_TYPE_LABELS.temporary}</Badge>}
+    </span>
+  );
+};
+
+const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const queryClient = useQueryClient();
+  const role = useAuthStore((state) => state.user?.role?.name) || '';
+  // Inside an area page other roles can read the list; editing and the detail page are for these
+  const canManage = !area || MANAGERS.includes(role);
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
   const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
@@ -75,11 +92,12 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   });
 
   // Every item of the plant (or organization): the summary counts all of them, filters run here
-  const { data: equipment = [], isLoading } = useQuery({
+  const { data: allEquipment = [], isLoading } = useQuery({
     queryKey: ['equipment', selectedOrg, selectedPlant],
     queryFn: () => getEquipment({ organization_id: selectedOrg || undefined, plant_id: selectedPlant || undefined }),
     enabled: !!selectedOrg,
   });
+  const equipment = useMemo(() => (area ? allEquipment.filter((e) => e.areas?.some((a) => a.id === area.id)) : allEquipment), [allEquipment, area]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteEquipment,
@@ -130,7 +148,7 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
     setEditingEquipment(null);
   };
 
-  const openDetails = (id: string) => navigate(`/equipment/${id}`);
+  const openDetails = (id: string) => canManage && navigate(`/equipment/${id}`);
   const filtersActive = !!(searchQuery || selectedType || selectedStatus || selectedArea);
   const clearFilters = () => {
     setSearchQuery('');
@@ -152,9 +170,10 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
     <div className="space-y-4">
       <SectionHeader
         title={embedded ? 'Equipos' : 'Herramientas y Maquinaria'}
-        description="Herramientas y maquinaria de la planta, con su estado y el área donde están."
+        description={area ? `Herramientas y maquinaria ubicadas actualmente en "${area.name}".` : 'Herramientas y maquinaria de la planta, con su estado y el área donde están.'}
         actions={
-          selectedOrg && (
+          selectedOrg &&
+          canManage && (
             <Button onClick={handleCreateNew} className="gap-2">
               <Plus className="h-4 w-4" />
               Nuevo Equipo
@@ -233,7 +252,8 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                 </option>
               ))}
             </select>
-            <select aria-label="Área" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)} className="text-sm">
+{!area && (
+                        <select aria-label="Área" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)} className="text-sm">
               <option value="">Área: todas</option>
               {areas.map(([id, name]) => (
                 <option key={id} value={id}>
@@ -242,6 +262,7 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
               ))}
               <option value={NO_AREA}>Sin área</option>
             </select>
+            )}
             <select aria-label="Estado" value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value as EquipmentStatus | '')} className="text-sm">
               <option value="">Estado: todos</option>
               {Object.entries(EQUIPMENT_STATUS_LABELS).map(([value, label]) => (
@@ -266,12 +287,26 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
       ) : equipment.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
           <Wrench className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-          <h3 className="mb-2 text-lg font-medium text-gray-900">No hay equipos registrados</h3>
-          <p className="mb-4 text-gray-600">Comienza agregando tu primer equipo</p>
-          <Button onClick={handleCreateNew} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar Primer Equipo
-          </Button>
+          <h3 className="mb-2 text-lg font-medium text-gray-900">{area ? 'No hay equipos en esta área' : 'No hay equipos registrados'}</h3>
+          {area ? (
+            <>
+              <p className="mb-4 text-gray-600">Crea uno aquí y queda asignado a esta área, o asígnalo desde la pestaña "Asignaciones" de cada equipo.</p>
+              {canManage && (
+                <Button onClick={handleCreateNew} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Nuevo Equipo
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="mb-4 text-gray-600">Comienza agregando tu primer equipo</p>
+              <Button onClick={handleCreateNew} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Agregar Primer Equipo
+              </Button>
+            </>
+          )}
         </div>
       ) : visible.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-10 text-center text-sm text-gray-600">
@@ -289,7 +324,7 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Equipo', 'Código', 'Tipo', 'Área', 'Estado'].map((h) => (
+                  {['Equipo', 'Código', 'Tipo', area ? 'En el área' : 'Área', 'Estado'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       {h}
                     </th>
@@ -299,7 +334,7 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {visible.map((item) => (
-                  <tr key={item.id} className="cursor-pointer transition-colors hover:bg-gray-50" onClick={() => openDetails(item.id)}>
+                  <tr key={item.id} className={`transition-colors hover:bg-gray-50 ${canManage ? 'cursor-pointer' : ''}`} onClick={() => openDetails(item.id)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {item.primary_image_url ? (
@@ -321,14 +356,12 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                     <td className="px-4 py-3">
                       <Badge variant="default">{EQUIPMENT_TYPE_LABELS[item.equipment_type]}</Badge>
                     </td>
-                    <td className="px-4 py-3">
-                      <AreaChips item={item} />
-                    </td>
+                    <td className="px-4 py-3">{area ? <InArea item={item} areaId={area.id} /> : <AreaChips item={item} />}</td>
                     <td className="px-4 py-3">
                       <Badge variant={STATUS_BADGE[item.status]}>{EQUIPMENT_STATUS_LABELS[item.status]}</Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <div className={`flex items-center justify-end gap-2 ${canManage ? '' : 'hidden'}`} onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => handleEdit(item)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" title="Editar" aria-label={`Editar ${item.name}`}>
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -366,8 +399,8 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   <Badge variant={STATUS_BADGE[item.status]}>{EQUIPMENT_STATUS_LABELS[item.status]}</Badge>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <AreaChips item={item} />
-                  <span className="flex flex-shrink-0 gap-1">
+                  {area ? <InArea item={item} areaId={area.id} /> : <AreaChips item={item} />}
+                  <span className={`flex flex-shrink-0 gap-1 ${canManage ? '' : 'hidden'}`}>
                     <button onClick={() => handleEdit(item)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar ${item.name}`}>
                       <Pencil className="h-4 w-4" />
                     </button>
@@ -383,7 +416,7 @@ const EquipmentPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
       )}
 
       {isModalOpen && (
-        <EquipmentModal isOpen={isModalOpen} onClose={handleCloseModal} equipment={editingEquipment} organizationId={selectedOrg} plantId={selectedPlant} />
+        <EquipmentModal isOpen={isModalOpen} onClose={handleCloseModal} equipment={editingEquipment} organizationId={selectedOrg} plantId={selectedPlant} areaId={area?.id} onCreated={(created) => openDetails(created.id)} />
       )}
     </div>
   );

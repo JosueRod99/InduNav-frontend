@@ -30,11 +30,12 @@ const STATUS_EN: Record<EquipmentStatus, string> = {
   retired: 'Retired',
 };
 
-const SEVERITY_STYLES: Record<string, string> = {
-  low: 'bg-green-100 text-green-800',
-  medium: 'bg-yellow-100 text-yellow-800',
-  high: 'bg-orange-100 text-orange-800',
-  critical: 'bg-red-100 text-red-800',
+// Risk level: restrained on purpose (a darker tag means more risk, no traffic-light colors)
+const SEVERITY: Record<string, { es: string; en: string; className: string }> = {
+  low: { es: 'Bajo', en: 'Low', className: 'bg-slate-100 text-slate-600' },
+  medium: { es: 'Medio', en: 'Medium', className: 'bg-slate-100 text-slate-700' },
+  high: { es: 'Alto', en: 'High', className: 'bg-slate-300 text-slate-900' },
+  critical: { es: 'Crítico', en: 'Critical', className: 'bg-slate-800 text-white' },
 };
 
 const Paragraphs = ({ text }: { text: string }) => (
@@ -248,15 +249,6 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
   const s = stop.live.safety!;
   return (
     <div className="space-y-5">
-      {s.days_without_accident !== null && s.days_without_accident !== undefined && (
-        <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
-          <ShieldCheck className="h-8 w-8 text-green-600" />
-          <div>
-            <p className="text-2xl font-bold text-green-700">{s.days_without_accident}</p>
-            <p className="text-xs font-medium text-green-800">{t(language, 'días sin accidentes', 'days without accidents')}</p>
-          </div>
-        </div>
-      )}
       {s.required_ppe.length > 0 && (
         <div>
           <h4 className="mb-2 text-sm font-semibold text-slate-900">
@@ -266,9 +258,9 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
             {s.required_ppe.map((ppe) => (
               <span
                 key={ppe}
-                className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900"
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700"
               >
-                <HardHat className="h-3.5 w-3.5" />
+                <HardHat className="h-3.5 w-3.5 text-slate-500" />
                 {ppe}
               </span>
             ))}
@@ -282,13 +274,11 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
             {s.hazards.map((h, i) => (
               <li key={i} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm">
                 <span className="flex items-center gap-2 text-slate-800">
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                  <AlertTriangle className="h-4 w-4 text-slate-400" />
                   {h.name}
                 </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${SEVERITY_STYLES[h.severity] || 'bg-slate-100 text-slate-700'}`}
-                >
-                  {h.severity}
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${SEVERITY[h.severity]?.className || 'bg-slate-100 text-slate-700'}`}>
+                  {SEVERITY[h.severity]?.[language] || h.severity}
                 </span>
               </li>
             ))}
@@ -297,14 +287,14 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
       )}
       {s.emergency_assembly_point && (
         <p className="flex items-start gap-2 text-sm text-slate-700">
-          <MapPin className="mt-0.5 h-4 w-4 text-red-500" />
+          <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
           <span>
             <strong>{t(language, 'Punto de reunión', 'Assembly point')}:</strong> {s.emergency_assembly_point}
           </span>
         </p>
       )}
       {(s.restricted_access || s.access_requirements) && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+        <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm text-slate-800">
           <strong>{t(language, 'Acceso restringido', 'Restricted access')}</strong>
           {s.access_requirements && <p className="mt-1">{s.access_requirements}</p>}
         </div>

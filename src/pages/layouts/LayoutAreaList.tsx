@@ -5,8 +5,9 @@ import { areaTypeLabel } from '../../constants/areaTypes';
 import { zonesOf } from '../../utils/areaGeometry';
 import { floorLabel, sortFloors } from '../../utils/floors';
 
-// Side list of the plant layout: the areas drawn on this floor (one line each), how many areas of the
-// plant are drawn, areas drawn only on other floors, and the ones not drawn yet (with "Dibujar").
+// Side list of a layout: the areas drawn on this floor (one line each), how many are drawn, those
+// drawn only on other floors, and the ones not drawn yet (with "Dibujar"). For the plant's plans, or
+// for an area's internal plan (`insideAreaId`: then `coverage` has its subareas).
 
 interface Props {
   drawn: AreaPhysicalRepresentation[]; // on this floor
@@ -19,14 +20,17 @@ interface Props {
   onDraw?: (area: AreaCoverage) => void; // editors, when the floor has a plan
   onGoToFloor: (floor: number) => void;
   rowRef: (id: string, el: HTMLElement | null) => void;
+  insideAreaId?: string;
 }
 
-const LayoutAreaList = ({ drawn, coverage, floor, selectedId, hoveredId, onSelect, onHover, onDraw, onGoToFloor, rowRef }: Props) => {
+const LayoutAreaList = ({ drawn, coverage, floor, selectedId, hoveredId, onSelect, onHover, onDraw, onGoToFloor, rowRef, insideAreaId }: Props) => {
   const drawnHere = new Set(drawn.map((r) => r.organizational_area_id));
-  const plantFloors = (area: AreaCoverage) => sortFloors(area.drawn.filter((d) => !d.inside_area_id).map((d) => d.floor_level));
+  const noun = insideAreaId ? 'subáreas' : 'áreas';
+  // Floors of the plans this list is about
+  const plantFloors = (area: AreaCoverage) => sortFloors(area.drawn.filter((d) => (insideAreaId ? d.inside_area_id === insideAreaId : !d.inside_area_id)).map((d) => d.floor_level));
   const otherFloors = coverage.filter((a) => !drawnHere.has(a.id) && plantFloors(a).length > 0);
   // Not on any plant floor nor inside another area's internal layout
-  const notDrawn = coverage.filter((a) => a.drawn.length === 0);
+  const notDrawn = coverage.filter((a) => (insideAreaId ? plantFloors(a).length === 0 : a.drawn.length === 0));
   const drawnCount = coverage.length - notDrawn.length;
   const percent = coverage.length ? Math.round((drawnCount / coverage.length) * 100) : 0;
   const typeOf = (rep: AreaPhysicalRepresentation) => coverage.find((a) => a.id === rep.organizational_area_id)?.area_type;
@@ -36,7 +40,7 @@ const LayoutAreaList = ({ drawn, coverage, floor, selectedId, hoveredId, onSelec
       {coverage.length > 0 && (
         <div>
           <p className="text-sm text-gray-700">
-            <strong className="text-gray-900">{drawnCount}</strong> de {coverage.length} áreas dibujadas
+            <strong className="text-gray-900">{drawnCount}</strong> de {coverage.length} {noun} dibujadas
           </p>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100" aria-hidden>
             <div className="h-full rounded-full bg-blue-600" style={{ width: `${percent}%` }} />
@@ -47,7 +51,7 @@ const LayoutAreaList = ({ drawn, coverage, floor, selectedId, hoveredId, onSelec
       <section>
         <h3 className="mb-1.5 text-sm font-semibold text-gray-900">En {floorLabel(floor)} ({drawn.length})</h3>
         {drawn.length === 0 ? (
-          <p className="rounded-md border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">Aún no hay áreas dibujadas en este piso.</p>
+          <p className="rounded-md border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500">Aún no hay {noun} dibujadas en este piso.</p>
         ) : (
           <ul className="space-y-0.5">
             {drawn.map((rep) => {
@@ -105,14 +109,14 @@ const LayoutAreaList = ({ drawn, coverage, floor, selectedId, hoveredId, onSelec
       {notDrawn.length > 0 && (
         <section>
           <h3 className="mb-0.5 text-sm font-semibold text-gray-900">Sin dibujar ({notDrawn.length})</h3>
-          <p className="mb-1.5 text-xs text-gray-500">No aparecen en ningún plano todavía.</p>
+          <p className="mb-1.5 text-xs text-gray-500">{insideAreaId ? 'No aparecen en el plano de esta área todavía.' : 'No aparecen en ningún plano todavía.'}</p>
           <ul className="space-y-0.5">
             {notDrawn.map((area) => (
               <li key={area.id} className="flex items-center gap-2 px-2 py-1 text-sm">
                 <span className="h-3 w-3 flex-shrink-0 rounded-sm border border-dashed border-gray-400" />
                 <span className="min-w-0 flex-1 truncate text-gray-700">
                   {area.name}
-                  {area.parent_name && <span className="text-xs text-gray-500"> · en {area.parent_name}</span>}
+                  {area.parent_name && !insideAreaId && <span className="text-xs text-gray-500"> · en {area.parent_name}</span>}
                 </span>
                 {onDraw && (
                   <button

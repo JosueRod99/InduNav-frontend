@@ -16,10 +16,22 @@ interface Draft {
   obtained_date: string;
 }
 
-const HoldersModal = ({ typeId, plantId, onClose, readOnly = false }: { typeId: string | null; plantId: string; onClose: () => void; readOnly?: boolean }) => {
+const HoldersModal = ({
+  typeId,
+  plantId,
+  onClose,
+  readOnly = false,
+  initialArea = '',
+}: {
+  typeId: string | null;
+  plantId: string;
+  onClose: () => void;
+  readOnly?: boolean;
+  initialArea?: string; // opened from an area: starts filtered to its people
+}) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [area, setArea] = useState('');
+  const [area, setArea] = useState(initialArea);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   const { data, isLoading } = useQuery({ queryKey: ['cert-roster', typeId, plantId], queryFn: () => getRoster(typeId!, plantId), enabled: !!typeId });

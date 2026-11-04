@@ -1,24 +1,26 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
-import { getArea } from '../../api/areas';
+import { ArrowLeft, Award, FileText, GitBranch, Image, LayoutDashboard, LayoutGrid, Package, Shield, Users, Wrench } from 'lucide-react';
+import { getArea, getPlantAreasOverview } from '../../api/areas';
+// The same sections as the plant, scoped to this area
+import EquipmentPage from '../equipment/EquipmentPage';
+import ProductsPage from '../products/ProductsPage';
+import ProcessesTab from '../processes/ProcessesTab';
+import PlantCertificationsTab from '../certifications/PlantCertificationsTab';
+import PlantDocumentsTab from '../documents/PlantDocumentsTab';
+import EmployeesPage from '../employees/EmployeesPage';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 
 // Tab components
 import GeneralTab from './tabs/GeneralTab';
-import PersonalTab from './tabs/PersonalTab';
 import SafetyTab from './tabs/SafetyTab';
-import CertificationsTab from './tabs/CertificationsTab';
-import DocumentsTab from './tabs/DocumentsTab';
 import GalleryTab from './tabs/GalleryTab';
-import ProductsTab from './tabs/ProductsTab';
-import EquipmentTab from './tabs/EquipmentTab';
 import AreaLayoutTab from './tabs/AreaLayoutTab';
 import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
-import AreaProcessesTab from './tabs/AreaProcessesTab';
 import { areaTypeLabel } from '../../constants/areaTypes';
 import { personName } from '../../utils/personName';
+import ScrollTabs from '../../components/ui/ScrollTabs';
 
 type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery' | 'products' | 'processes' | 'equipment' | 'layout';
 
@@ -36,6 +38,15 @@ const AreaDetailPage = () => {
     queryFn: () => getArea(areaId!, true),
     enabled: !!areaId,
   });
+
+  // Real figures of the area, for the tab counts (only managers can read them: without them no counts)
+  const { data: overview } = useQuery({
+    queryKey: ['plant-areas-overview', area?.plant_id],
+    queryFn: () => getPlantAreasOverview(area!.plant_id),
+    enabled: !!area?.plant_id,
+    retry: false,
+  });
+  const figures = overview?.find((a) => a.id === areaId);
 
   if (isLoading) {
     return (
@@ -57,39 +68,41 @@ const AreaDetailPage = () => {
     );
   }
 
-  const tabs: Array<{ id: TabType; label: string; icon?: string }> = [
-    { id: 'general', label: 'General' },
-    { id: 'personal', label: 'Personal' },
-    { id: 'products', label: 'Productos' },
-    { id: 'processes', label: 'Procesos' },
-    { id: 'equipment', label: 'Equipos' },
-    { id: 'layout', label: 'Layout' },
-    { id: 'safety', label: 'Seguridad' },
-    { id: 'certifications', label: 'Certificaciones' },
-    { id: 'documents', label: 'Documentos' },
-    { id: 'gallery', label: 'Galería' },
+  // Same order as the plant's tabs
+  const tabs: { id: TabType; label: string; Icon: typeof Users; count?: number }[] = [
+    { id: 'general', label: 'Resumen', Icon: LayoutDashboard },
+    { id: 'layout', label: 'Layout', Icon: LayoutGrid },
+    { id: 'equipment', label: 'Equipos', Icon: Wrench, count: figures?.equipment },
+    { id: 'products', label: 'Productos', Icon: Package, count: figures?.products },
+    { id: 'processes', label: 'Procesos', Icon: GitBranch },
+    { id: 'certifications', label: 'Certificaciones', Icon: Award },
+    { id: 'documents', label: 'Documentos', Icon: FileText, count: figures?.documents },
+    { id: 'personal', label: 'Personal', Icon: Users, count: figures ? figures.employees + figures.headcount : undefined },
+    { id: 'safety', label: 'Seguridad', Icon: Shield },
+    { id: 'gallery', label: 'Galería', Icon: Image },
   ];
 
+  const scope = { plantId: area.plant_id, organizationId: area.organization_id, area: { id: area.id, name: area.name } };
   const renderTabContent = () => {
     switch (activeTab) {
       case 'general':
         return <GeneralTab area={area} />;
       case 'personal':
-        return <PersonalTab areaId={areaId!} area={area} />;
+        return <EmployeesPage {...scope} />;
       case 'products':
-        return <ProductsTab areaId={areaId!} area={area} />;
+        return <ProductsPage {...scope} />;
       case 'processes':
-        return <AreaProcessesTab areaId={areaId!} plantId={area.plant_id} />;
+        return <ProcessesTab plantId={area.plant_id} organizationId={area.organization_id} area={scope.area} />;
       case 'equipment':
-        return <EquipmentTab areaId={areaId!} area={area} />;
+        return <EquipmentPage {...scope} />;
       case 'layout':
         return <AreaLayoutTab areaId={areaId!} area={area} />;
       case 'safety':
-        return <SafetyTab areaId={areaId!} />;
+        return <SafetyTab areaId={areaId!} area={area} />;
       case 'certifications':
-        return <CertificationsTab areaId={areaId!} plantId={area.plant_id} />;
+        return <PlantCertificationsTab plant={{ id: area.plant_id, organization_id: area.organization_id }} area={scope.area} />;
       case 'documents':
-        return <DocumentsTab areaId={areaId!} area={area} />;
+        return <PlantDocumentsTab plant={{ id: area.plant_id, organization_id: area.organization_id }} area={scope.area} />;
       case 'gallery':
         return <GalleryTab areaId={areaId!} area={area} />;
       default:
@@ -98,71 +111,54 @@ const AreaDetailPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <PlantBreadcrumb plantId={area.plant_id} tab="areas" current={area.name} />
-          <div className="flex flex-wrap items-center gap-3 mb-2">
+      <div className="min-w-0">
+        <PlantBreadcrumb plantId={area.plant_id} tab="areas" current={area.name} />
+        <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-bold text-gray-900">
+          {/* Dot and name stay together when the code and type wrap */}
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="inline-block h-3 w-3 flex-shrink-0 rounded-full" style={{ backgroundColor: area.color || '#94A3B8' }} aria-hidden />
+            <span className="min-w-0">{area.name}</span>
+          </span>
+          <span className="flex flex-wrap items-center gap-1.5">
             {area.code && (
               <Badge variant="secondary" className="font-mono">
                 {area.code}
               </Badge>
             )}
-            <Badge
-              variant={area.area_type === 'production' ? 'success' : 'default'}
-            >
-              {areaTypeLabel(area.area_type)}
-            </Badge>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">{area.name}</h1>
-          {area.description && (
-            <p className="mt-2 text-gray-600">{area.description}</p>
-          )}
-          {area.supervisor && (
-            <div className="mt-3 flex items-center gap-2 text-sm">
-              <span className="text-gray-500">Supervisor:</span>
-              <span className="font-semibold text-gray-900">
-                {personName(area.supervisor)}
-              </span>
-              {area.supervisor.position && (
-                <span className="text-gray-500">• {area.supervisor.position}</span>
-              )}
-            </div>
-          )}
-        </div>
+            <Badge variant={area.area_type === 'production' ? 'success' : 'default'}>{areaTypeLabel(area.area_type)}</Badge>
+          </span>
+        </h2>
+        {area.description && <p className="mt-1 line-clamp-2 text-sm text-gray-600">{area.description}</p>}
+        {area.supervisor && personName(area.supervisor).trim() && (
+          <p className="mt-1 text-sm text-gray-600">
+            Supervisor: <span className="font-medium text-gray-900">{personName(area.supervisor)}</span>
+            {area.supervisor.position && <span className="text-gray-500"> · {area.supervisor.position}</span>}
+          </p>
+        )}
       </div>
 
-      {/* Tabs Navigation */}
-      {/* Scrolls sideways on small screens instead of widening the page */}
-      <div className="overflow-x-auto border-b border-gray-200">
-        <nav className="-mb-px flex space-x-6 sm:space-x-8" aria-label="Tabs">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                  ${
-                    isActive
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }
-                `}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      {/* Tabs (scroll sideways when they do not fit) */}
+      <ScrollTabs label="Secciones del área">
+        {tabs.map(({ id, label, Icon, count }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            aria-current={activeTab === id ? 'page' : undefined}
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+              activeTab === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+            {count ? <span className={`rounded-full px-1.5 text-xs ${activeTab === id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{count}</span> : null}
+          </button>
+        ))}
+      </ScrollTabs>
 
       {/* Tab Content */}
-      <div className="bg-white rounded-lg shadow p-6">
-        {renderTabContent()}
-      </div>
+      {renderTabContent()}
     </div>
   );
 };

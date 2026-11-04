@@ -1,7 +1,7 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Factory, Loader2, MapPin, Settings } from 'lucide-react';
+import { ChevronRight, Factory, Loader2, MapPin, Settings } from 'lucide-react';
 import { getPlant, getPlants } from '../../api/plants';
 import PlantSummaryTab from './PlantSummaryTab';
 import PlantSettingsTab from './PlantSettingsTab';
@@ -10,6 +10,7 @@ import { IN_HEADER, MANAGERS, PLANT_TABS, type PlantTab } from './plantTabs';
 import { useAuthStore } from '../../store/authStore';
 import { useBackTarget } from '../../hooks/useBackNavigation';
 import { avatarUrl } from '../../utils/avatarUrl';
+import ScrollTabs from '../../components/ui/ScrollTabs';
 
 // Plant workspace: everything about one plant behind tabs (/plants/:plantId/:tab). The module
 // pages render here with the plant fixed, so there are no repeated organization/plant filters.
@@ -76,24 +77,6 @@ const PlantWorkspacePage = () => {
   useEffect(() => {
     activeTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [tab, plant?.id]);
-
-  // When the tabs do not fit: a fade and an arrow on the side that has more
-  const barRef = useRef<HTMLDivElement>(null);
-  const [more, setMore] = useState({ left: false, right: false });
-  const measure = useCallback(() => {
-    const el = barRef.current;
-    if (!el) return;
-    setMore({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
-  }, []);
-  useEffect(() => {
-    const el = barRef.current;
-    if (!el) return;
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [measure, plant?.id]);
-  const scrollTabs = (direction: 1 | -1) => barRef.current?.scrollBy({ left: direction * 240, behavior: 'smooth' });
 
   const activeTab = tabs.find((t) => t.id === tab)?.id;
   if (!activeTab) return <Navigate to={`/plants/${plantId}/resumen`} replace />;
@@ -185,10 +168,8 @@ const PlantWorkspacePage = () => {
         </div>
       </div>
 
-      {/* Tabs (scroll sideways when they do not fit, with a fade and arrows on the side that has more) */}
-      <div className="relative border-b border-gray-200">
-      <div ref={barRef} onScroll={measure} className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <nav className="-mb-px flex gap-1" aria-label="Secciones de la planta">
+      {/* Tabs (scroll sideways when they do not fit) */}
+      <ScrollTabs label="Secciones de la planta">
           {tabs.filter((t) => !IN_HEADER.includes(t.id)).map(({ id, label, Icon }) => (
             <Link
               key={id}
@@ -207,27 +188,7 @@ const PlantWorkspacePage = () => {
               {label}
             </Link>
           ))}
-        </nav>
-      </div>
-      {(['left', 'right'] as const).map(
-        (side) =>
-          more[side] && (
-            <div
-              key={side}
-              className={`pointer-events-none absolute inset-y-0 flex items-center ${side === 'left' ? 'left-0 bg-gradient-to-r pr-6' : 'right-0 justify-end bg-gradient-to-l pl-6'} from-gray-50 via-gray-50/90 to-transparent`}
-            >
-              <button
-                type="button"
-                onClick={() => scrollTabs(side === 'left' ? -1 : 1)}
-                className="pointer-events-auto rounded-full border border-gray-200 bg-white p-1 text-gray-600 shadow-sm hover:text-gray-900"
-                aria-label={side === 'left' ? 'Ver secciones anteriores' : 'Ver más secciones'}
-              >
-                {side === 'left' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </button>
-            </div>
-          )
-      )}
-      </div>
+      </ScrollTabs>
 
       {/* Content: key = plant, so switching plants starts each tab fresh */}
       <Suspense

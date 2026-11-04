@@ -35,7 +35,8 @@ export interface Equipment {
 
   // Media
   primary_image_url: string | null;
-  areas?: { id: string; name: string; color: string | null }[]; // current area assignments (list endpoint)
+  placed_on?: { floor_level: number; area_id: string | null; area_name: string | null }[]; // plans it is drawn on (detail endpoint)
+  areas?: { id: string; name: string; color: string | null; assignment_type?: string; start_date?: string }[]; // current area assignments (list endpoint)
 
   // Audit Trail
   created_at: Date;
@@ -55,23 +56,6 @@ export interface EquipmentImage {
   mime_type: string | null;
   width: number | null;
   height: number | null;
-  created_at: Date;
-  updated_at: Date;
-  created_by: string | null;
-  updated_by: string | null;
-}
-
-export interface EquipmentDocument {
-  id: string;
-  equipment_id: string;
-  document_name: string;
-  document_url: string;
-  document_type: string | null;
-  description: string | null;
-  file_size: number | null;
-  mime_type: string | null;
-  display_order: number;
-  uploaded_date: Date | null;
   created_at: Date;
   updated_at: Date;
   created_by: string | null;
@@ -150,28 +134,6 @@ export interface UpdateEquipmentImageRequest {
   caption?: string;
   display_order?: number;
   is_primary?: boolean;
-}
-
-export interface CreateEquipmentDocumentRequest {
-  document_name: string;
-  document_url: string;
-  document_type?: string;
-  description?: string;
-  file_size?: number;
-  mime_type?: string;
-  display_order?: number;
-  uploaded_date?: Date;
-}
-
-export interface UpdateEquipmentDocumentRequest {
-  document_name?: string;
-  document_url?: string;
-  document_type?: string;
-  description?: string;
-  file_size?: number;
-  mime_type?: string;
-  display_order?: number;
-  uploaded_date?: Date;
 }
 
 export interface CreateEquipmentAreaAssignmentRequest {
@@ -357,65 +319,6 @@ export const reorderEquipmentImages = async (
   imageOrders: { id: string; display_order: number }[]
 ): Promise<void> => {
   await apiClient.post(`/equipment/${equipmentId}/images/reorder`, { imageOrders });
-};
-
-// ============================================================
-// API FUNCTIONS - EQUIPMENT DOCUMENTS
-// ============================================================
-
-/**
- * Get all documents for equipment
- */
-export const getEquipmentDocuments = async (equipmentId: string): Promise<EquipmentDocument[]> => {
-  const { data } = await apiClient.get(`/equipment/${equipmentId}/documents`);
-  return data.documents || [];
-};
-
-/**
- * Get document by ID
- */
-export const getEquipmentDocument = async (documentId: string): Promise<EquipmentDocument> => {
-  const { data } = await apiClient.get(`/equipment/documents/${documentId}`);
-  return data.document;
-};
-
-/**
- * Create equipment document
- */
-export const createEquipmentDocument = async (
-  equipmentId: string,
-  payload: CreateEquipmentDocumentRequest
-): Promise<EquipmentDocument> => {
-  const { data } = await apiClient.post(`/equipment/${equipmentId}/documents`, payload);
-  return data.document;
-};
-
-/**
- * Update equipment document
- */
-export const updateEquipmentDocument = async (
-  documentId: string,
-  payload: UpdateEquipmentDocumentRequest
-): Promise<EquipmentDocument> => {
-  const { data } = await apiClient.patch(`/equipment/documents/${documentId}`, payload);
-  return data.document;
-};
-
-/**
- * Delete equipment document
- */
-export const deleteEquipmentDocument = async (documentId: string): Promise<void> => {
-  await apiClient.delete(`/equipment/documents/${documentId}`);
-};
-
-/**
- * Reorder equipment documents
- */
-export const reorderEquipmentDocuments = async (
-  equipmentId: string,
-  documentOrders: { id: string; display_order: number }[]
-): Promise<void> => {
-  await apiClient.post(`/equipment/${equipmentId}/documents/reorder`, { documentOrders });
 };
 
 // ============================================================

@@ -6,11 +6,11 @@ import {
   Trash2,
   Square,
   Wrench,
-  ImageIcon,
   LayoutGrid,
   ExternalLink,
   MapPin,
   Plus,
+  Upload,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../../components/ui/Button';
@@ -18,14 +18,17 @@ import Modal from '../../../components/ui/Modal';
 import LabelModeToggle, { useLabelMode } from '../../layouts/LabelModeToggle';
 import LayoutMap, { type EditableShape, type MapFootprint } from '../../layouts/LayoutMap';
 import LinkAreaModal from '../../layouts/LinkAreaModal';
+import LayoutAreaList from '../../layouts/LayoutAreaList';
+import SectionHeader from '../../../components/ui/SectionHeader';
 import AreaLayoutBackgroundModal from '../modals/AreaLayoutBackgroundModal';
 import PlaceEquipmentModal from '../modals/PlaceEquipmentModal';
 import { useAuthStore } from '../../../store/authStore';
-import { getAreaLayouts, recropAreaLayout } from '../../../api/layouts';
+import { getAreaLayouts, getPlantCoverage, recropAreaLayout, type AreaCoverage } from '../../../api/layouts';
 import { floorLabel, sortFloors } from '../../../utils/floors';
 import {
   getAreasByLayout,
   getRepresentationsByArea,
+  createRepresentation,
   updateRepresentation,
   deleteRepresentation,
   leafletToGeoJSON,
@@ -35,10 +38,12 @@ import {
 import {
   getAreaEquipment,
   getLayoutFootprints,
+  createFootprint,
   updateFootprint,
   deleteFootprint,
   EQUIPMENT_STATUS_COLORS,
   EQUIPMENT_STATUS_LABELS,
+  type EquipmentAreaAssignment,
   type EquipmentFootprint,
 } from '../../../api/equipment';
 import { computePlantCrop, cropMissesZones, liveOutlines, plantImageBoundsForCrop, type AreaLayoutData } from '../../../utils/areaLayout';
@@ -52,6 +57,8 @@ interface AreaLayoutTabProps {
 
 // Same roles that can manage equipment (footprint endpoints require them)
 const EDITOR_ROLES = ['platform_admin', 'org_owner'];
+// Floors offered by "+ Piso" (those without a plan yet)
+const FLOOR_CHOICES = [-2, -1, 0, 1, 2, 3, 4, 5];
 
 type Selection =
   | { kind: 'area'; item: AreaPhysicalRepresentation; zoneIndex: number }
@@ -67,6 +74,10 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
   const [selection, setSelection] = useState<Selection>(null);
   const [drawMode, setDrawMode] = useState(false);
   const [addingZone, setAddingZone] = useState(false); // drawing another zone of the selected subarea
+  // Drawing for what was chosen in the side list: it is saved directly, without asking what it is
+  const [drawingFor, setDrawingFor] = useState<{ kind: 'area'; area: AreaCoverage } | { kind: 'equipment'; item: EquipmentAreaAssignment } | null>(null);
+  const [addingFloor, setAddingFloor] = useState(false);
+  const [extraFloor, setExtraFloor] = useState<number | null>(null); // chosen with "+ Piso", no plan yet
   const [editMode, setEditMode] = useState(false);
   const [drawnCoordinates, setDrawnCoordinates] = useState<number[][] | null>(null);
   const [drawnKind, setDrawnKind] = useState<'choose' | 'area' | 'equipment' | null>(null);
@@ -102,7 +113,7 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
     queryFn: () => getRepresentationsByArea(areaId),
   });
   const plantRepresentations = representations.filter((r) => r.layout && !r.layout.organizational_area_id);
-  const floors = sortFloors([...plantRepresentations.map((r) => r.floor_level), ...areaLayouts.map((l) => l.floor_level)]);
+  const floors = sortFloors([...plantRepresentations.map((r) => r.floor_level), ...areaLayouts.map((l) => l.floor_level), ...(extraFloor !== null ? [extraFloor] : [])]);
   // ?floor=N (from the plant layout of that floor) opens that floor's internal layout
   const [searchParams] = useSearchParams();
   const [chosenFloor, setChosenFloor] = useState<number | null>(() => {
@@ -118,8 +129,17 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
     setDrawMode(false);
     setEditMode(false);
     setAddingZone(false);
+    setDrawingFor(null);
     setChosenFloor(level);
   };
+
+  // Subareas of this area and where they are drawn
+  const { data: coverage = [] } = useQuery({
+    queryKey: ['layout-coverage', area?.plant_id],
+    queryFn: () => getPlantCoverage(area.plant_id),
+    enabled: !!area?.plant_id,
+  });
+  const childAreas = useMemo(() => coverage.filter((a) => a.parent_area_id === areaId), [coverage, areaId]);
 
   const { data: subAreas = [] } = useQuery({
     queryKey: ['layout-areas', layout?.id],
@@ -171,7 +191,23 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
   const invalidateDrawings = () => {
     queryClient.invalidateQueries({ queryKey: ['layout-areas', layout?.id] });
     queryClient.invalidateQueries({ queryKey: ['layout-footprints', layout?.id] });
+    queryClient.invalidateQueries({ queryKey: ['layout-coverage'] });
+    queryClient.invalidateQueries({ queryKey: ['plant-areas-overview'] });
   };
+
+  // Drawn from the side list: linked straight to that subarea or piece of equipment
+  const drawForMutation = useMutation({
+    mutationFn: async ({ target, coordinates }: { target: NonNullable<typeof drawingFor>; coordinates: number[][] }) => {
+      const geometry = leafletToGeoJSON(coordinates);
+      if (target.kind === 'area') await createRepresentation(target.area.id, { layout_id: layout!.id, geometry, floor_level: floor });
+      else await createFootprint(target.item.equipment_id, { layout_id: layout!.id, geometry, display_color: '#334155' });
+    },
+    onSuccess: (_, { target }) => {
+      toast.success(target.kind === 'area' ? `${target.area.name} dibujada en el plano` : `${target.item.equipment_name} colocado en el plano`);
+      invalidateDrawings();
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo guardar el dibujo'),
+  });
 
   const updateGeometryMutation = useMutation({
     mutationFn: async ({ sel, coordinates }: { sel: NonNullable<Selection>; coordinates: number[][] }) => {
@@ -221,16 +257,18 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
   });
 
   // ---------- Handlers ----------
-  const startDrawing = () => {
+  const startDrawing = (target: typeof drawingFor = null) => {
     setSelection(null);
     setEditMode(false);
     setAddingZone(false);
+    setDrawingFor(target);
     setDrawMode(true);
   };
 
   const cancelDrawing = () => {
     setDrawMode(false);
     setAddingZone(false);
+    setDrawingFor(null);
   };
 
   const zoneMutation = useMutation({
@@ -256,6 +294,12 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
     if (addingZone && selection?.kind === 'area') {
       cancelDrawing();
       zoneMutation.mutate({ id: selection.item.id, geometry: addZone(selection.item.geometry, ringFromLeaflet(coordinates)), message: 'Zona agregada' });
+      return;
+    }
+    if (drawingFor) {
+      const target = drawingFor;
+      cancelDrawing();
+      drawForMutation.mutate({ target, coordinates });
       return;
     }
     setDrawMode(false);
@@ -323,29 +367,65 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
     />
   );
 
-  // Areas on several floors: one internal layout per floor
-  const floorTabs = floors.length > 1 && (
-    <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Piso">
-      <span className="text-sm text-gray-600">Piso:</span>
-      {floors.map((level) => (
+  // One internal plan per floor, plus "+ Piso"
+  const shownFloors = floors.length ? floors : [floor];
+  const withPlan = areaLayouts.map((l) => l.floor_level);
+  const floorTabs = (
+    <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Piso">
+      {shownFloors.map((level) => (
         <button
           key={level}
           role="tab"
           aria-selected={level === floor}
           onClick={() => changeFloor(level)}
           className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
-            level === floor ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            level === floor ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
           }`}
         >
           {floorLabel(level)}
+          {!withPlan.includes(level) && <span className="ml-1 text-xs opacity-80">(sin plano)</span>}
         </button>
       ))}
+      {canEdit &&
+        (addingFloor ? (
+          <select
+            autoFocus
+            aria-label="Piso a agregar"
+            defaultValue=""
+            onChange={(e) => {
+              setAddingFloor(false);
+              if (e.target.value === '') return;
+              const level = Number(e.target.value);
+              setExtraFloor(level);
+              changeFloor(level);
+              setIsBackgroundModalOpen(true);
+            }}
+            onBlur={() => setAddingFloor(false)}
+            className="w-40 text-sm"
+          >
+            <option value="">Elige el piso…</option>
+            {FLOOR_CHOICES.filter((level) => !withPlan.includes(level)).map((level) => (
+              <option key={level} value={level}>
+                {floorLabel(level)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <button
+            onClick={() => setAddingFloor(true)}
+            disabled={drawMode || editMode}
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-400 px-3 py-1 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700 disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" /> Piso
+          </button>
+        ))}
     </div>
   );
 
   if (!layout) {
     return (
       <div className="space-y-4">
+        <SectionHeader title="Layout" description="Plano interno del área con sus subáreas y equipos." />
         {floorTabs}
         <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
           <LayoutGrid className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -373,68 +453,57 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
   const selectedZoneCount = selection?.kind === 'area' ? zonesOf(selection.item.geometry).length : 0;
 
   return (
-    <div className="space-y-4">
-      {floorTabs}
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-medium text-gray-900">Layout de {area?.name}</h3>
-          <p className="text-sm text-gray-600">
-            {subAreas.length} subárea{subAreas.length !== 1 && 's'} · {footprints.length} equipo
-            {footprints.length !== 1 && 's'} colocado{footprints.length !== 1 && 's'}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {(subAreas.length > 0 || footprints.length > 0) && (
-            <LabelModeToggle value={labelMode} onChange={changeLabelMode} />
-          )}
-          {footprints.length > 0 && (
-            <div className="flex items-center rounded-lg border border-gray-300 p-0.5 text-xs font-medium">
-              {[
-                { value: true, label: 'Por estado' },
-                { value: false, label: 'Personalizado' },
-              ].map((opt) => (
-                <button
-                  key={opt.label}
-                  onClick={() => setColorByStatus(opt.value)}
-                  className={`px-2.5 py-1.5 rounded-md transition-colors ${
-                    colorByStatus === opt.value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                  title="Color de los equipos en el mapa"
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-        {canEdit && (
-          <div className="flex gap-2">
-            {isBusy ? (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setDrawMode(false);
-                  setEditMode(false);
-                }}
-              >
-                Cancelar
-              </Button>
-            ) : (
-              <>
-                <Button variant="outline" onClick={() => setIsBackgroundModalOpen(true)} className="gap-2">
-                  <ImageIcon className="h-4 w-4" />
-                  Fondo
-                </Button>
-                <Button onClick={startDrawing} className="gap-2">
-                  <PenTool className="h-4 w-4" />
-                  Dibujar
-                </Button>
-              </>
+    <div className="flex flex-col gap-4 lg:h-[calc(100vh-20rem)] lg:min-h-[32rem]">
+      <SectionHeader
+        title="Layout"
+        description="Plano interno del área con sus subáreas y equipos."
+        actions={
+          <>
+            {(subAreas.length > 0 || footprints.length > 0) && <LabelModeToggle value={labelMode} onChange={changeLabelMode} />}
+            {footprints.length > 0 && (
+              <div className="flex items-center rounded-lg border border-gray-300 p-0.5 text-xs font-medium">
+                {[
+                  { value: true, label: 'Por estado' },
+                  { value: false, label: 'Personalizado' },
+                ].map((opt) => (
+                  <button
+                    key={opt.label}
+                    onClick={() => setColorByStatus(opt.value)}
+                    className={`rounded-md px-2.5 py-1.5 transition-colors ${colorByStatus === opt.value ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    title="Color de los equipos en el mapa"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             )}
-          </div>
-        )}
-        </div>
-      </div>
+            {canEdit &&
+              (isBusy ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    cancelDrawing();
+                    setEditMode(false);
+                  }}
+                >
+                  Cancelar
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => setIsBackgroundModalOpen(true)} className="gap-2">
+                    <Upload className="h-4 w-4" />
+                    Cambiar plano
+                  </Button>
+                  <Button onClick={() => startDrawing()} className="gap-2">
+                    <PenTool className="h-4 w-4" />
+                    Dibujar
+                  </Button>
+                </>
+              ))}
+          </>
+        }
+      />
+      {floorTabs}
 
       {cropMissesZones(layoutData, plantRepresentation?.geometry) && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
@@ -450,10 +519,9 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* Map */}
-        {/* Fixed height when stacked (flex-1 alone would collapse it to 0 in the column layout) */}
-        <div className="h-[420px] w-full min-w-0 bg-white rounded-lg border border-gray-200 overflow-hidden sm:h-[520px] lg:h-[600px] lg:flex-1">
+      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row">
+        {/* Map (fixed height when stacked on small screens; fills the page from lg up) */}
+        <div className="h-[420px] w-full min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white sm:h-[520px] lg:h-auto lg:flex-1">
           <LayoutMap
             imageUrl={background.imageUrl}
             imageBounds={background.imageBounds}
@@ -479,7 +547,9 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
             drawTitle={
               addingZone && selection?.kind === 'area'
                 ? `Nueva zona de ${selection.item.organizational_area?.name || 'la subárea'}`
-                : 'Dibujando subárea o equipo'
+                : drawingFor
+                  ? `Dibujando: ${drawingFor.kind === 'area' ? drawingFor.area.name : drawingFor.item.equipment_name}`
+                  : 'Dibujando subárea o equipo'
             }
             editMode={editMode}
             editingArea={editingShape}
@@ -491,7 +561,7 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
         </div>
 
         {/* Sidebar */}
-        <div className="w-full lg:w-80 bg-white rounded-lg border border-gray-200 p-4 overflow-y-auto lg:h-[600px] space-y-6">
+        <div className="w-full space-y-6 overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 lg:h-full lg:w-80">
           {/* Selection actions */}
           {selection && !isBusy && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
@@ -575,44 +645,23 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
             </div>
           )}
 
-          {/* Sub-areas */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-2">Subáreas ({subAreas.length})</h4>
-            {subAreas.length === 0 ? (
-              <div className="text-center py-4">
-                <Square className="mx-auto h-6 w-6 text-gray-300" />
-                <p className="text-xs text-gray-500 mt-1">Sin subáreas dibujadas</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {subAreas.map((rep) => (
-                  <button
-                    key={rep.id}
-                    {...rowHover(rep.id)}
-                    onClick={() => !isBusy && setSelection({ kind: 'area', item: rep, zoneIndex: 0 })}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm transition-colors ${
-                      selection?.kind === 'area' && selection.item.id === rep.id
-                        ? 'bg-blue-50 text-blue-900'
-                        : hovered?.id === rep.id
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'hover:bg-gray-50 text-gray-800'
-                    }`}
-                  >
-                    <span
-                      className="w-3 h-3 rounded flex-shrink-0"
-                      style={{
-                        backgroundColor: rep.display_color || rep.organizational_area?.color || '#3B82F6',
-                      }}
-                    />
-                    <span className="truncate">{rep.display_name || rep.organizational_area?.name}</span>
-                    {zonesOf(rep.geometry).length > 1 && (
-                      <span className="ml-auto flex-shrink-0 text-xs text-gray-500">{zonesOf(rep.geometry).length} zonas</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Sub-areas: same list as the plant's plan */}
+          <LayoutAreaList
+            insideAreaId={areaId}
+            drawn={subAreas}
+            coverage={childAreas}
+            floor={floor}
+            selectedId={selection?.kind === 'area' ? selection.item.id : null}
+            hoveredId={hovered?.id ?? null}
+            onSelect={(rep) => !isBusy && setSelection({ kind: 'area', item: rep, zoneIndex: 0 })}
+            onHover={(id) => setHovered(id ? { id, from: 'list' } : null)}
+            onDraw={canEdit && !isBusy ? (target) => startDrawing({ kind: 'area', area: target }) : undefined}
+            onGoToFloor={changeFloor}
+            rowRef={(id, el) => {
+              if (el) listRows.current.set(id, el as HTMLButtonElement);
+              else listRows.current.delete(id);
+            }}
+          />
 
           {/* Equipment */}
           <div>
@@ -660,23 +709,26 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
 
             {unplacedEquipment.length > 0 && (
               <div className="mt-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Por colocar ({unplacedEquipment.length})
-                </h4>
-                <div className="space-y-1">
+                <h4 className="mb-1.5 text-sm font-semibold text-gray-900">Sin colocar ({unplacedEquipment.length})</h4>
+                <ul className="space-y-0.5">
                   {unplacedEquipment.map((a) => (
-                    <div key={a.equipment_id} className="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600">
-                      <MapPin className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
-                      <span className="font-mono text-xs text-gray-500">{a.equipment_code}</span>
-                      <span className="truncate">{a.equipment_name}</span>
-                    </div>
+                    <li key={a.equipment_id} className="flex items-center gap-2 px-2 py-1 text-sm">
+                      <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+                      <span className="min-w-0 flex-1 truncate text-gray-700">
+                        <span className="font-mono text-xs text-gray-500">{a.equipment_code}</span> {a.equipment_name}
+                      </span>
+                      {canEdit && !isBusy && (
+                        <button
+                          onClick={() => startDrawing({ kind: 'equipment', item: a })}
+                          className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:border-blue-400 hover:text-blue-700"
+                          aria-label={`Colocar ${a.equipment_name}`}
+                        >
+                          <PenTool className="h-3 w-3" /> Colocar
+                        </button>
+                      )}
+                    </li>
                   ))}
-                </div>
-                {canEdit && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Usa "Dibujar" y elige "Equipo" para marcar el espacio que ocupa.
-                  </p>
-                )}
+                </ul>
               </div>
             )}
           </div>

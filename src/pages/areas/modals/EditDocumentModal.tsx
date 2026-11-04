@@ -63,6 +63,8 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
         scope: document.scope || 'area',
         areaId: document.organizational_area_id,
         sharedAreaIds: (document.shared_areas || []).map((a) => a.id),
+        sharedProductIds: (document.shared_products || []).map((p) => p.id),
+        sharedEquipmentIds: (document.shared_equipment || []).map((e) => e.id),
       });
     } else if (!isOpen) {
       // Reset when modal closes
@@ -93,6 +95,14 @@ const EditDocumentModal = ({ isOpen, onClose, document, organizationId, plantId 
     const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     if (scope.scope === 'area' && !scope.areaId) {
       toast.error('Elige el área a la que aplica');
+      return;
+    }
+    if (scope.scope === 'equipment' && !scope.sharedEquipmentIds?.length) {
+      toast.error('Elige al menos un equipo al que aplica');
+      return;
+    }
+    if (scope.scope === 'products' && !scope.sharedProductIds?.length) {
+      toast.error('Elige al menos un producto al que aplica');
       return;
     }
     if (scope.scope === 'areas' && scope.sharedAreaIds.length === 0) {
