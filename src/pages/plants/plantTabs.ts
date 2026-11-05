@@ -13,7 +13,7 @@ export const PLANT_TABS = [
   { id: 'procesos', label: 'Procesos', Icon: GitBranch, roles: [...MANAGERS, 'plant_manager'] }, // across areas
   { id: 'certificaciones', label: 'Certificaciones', Icon: Award, roles: [...MANAGERS, 'plant_manager'] },
   { id: 'documentos', label: 'Documentos', Icon: FileText, roles: [...MANAGERS, 'plant_manager'] }, // areas, plant and company
-  { id: 'personal', label: 'Personal', Icon: Users, roles: undefined }, // the employee list: managers only
+  { id: 'personal', label: 'Personal', Icon: Users, roles: [...MANAGERS, 'plant_manager'] }, // the employee list: managers only
   { id: 'tours', label: 'Tours', Icon: Map, roles: undefined },
   // Not in the tab bar: a button in the plant header (it is the plant's settings, not a section)
   { id: 'configuracion', label: 'Configuración', Icon: Settings, roles: undefined }, // read-only for non-managers
