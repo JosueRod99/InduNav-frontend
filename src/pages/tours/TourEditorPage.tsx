@@ -125,9 +125,10 @@ const TourEditorPage = () => {
 
   useEffect(() => {
     if (stopAutosave.status === 'error' || settingsAutosave.status === 'error') {
-      toast.error('No se pudieron guardar los últimos cambios. Revisa tu conexión.');
+      const refused = stopAutosave.status === 'error' ? stopAutosave.errorMessage : settingsAutosave.errorMessage;
+      toast.error(refused || 'No se pudieron guardar los últimos cambios. Revisa tu conexión.');
     }
-  }, [stopAutosave.status, settingsAutosave.status]);
+  }, [stopAutosave.status, stopAutosave.errorMessage, settingsAutosave.status, settingsAutosave.errorMessage]);
 
   // Warn before leaving the page with unsaved edits
   useEffect(() => {

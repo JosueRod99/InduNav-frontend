@@ -8,6 +8,8 @@ export type AutosaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
  */
 export function useAutosave<T extends object>(save: (payload: T) => Promise<unknown>, delay = 700) {
   const [status, setStatus] = useState<AutosaveStatus>('idle');
+  // What the server said when it refused the change (none: it did not answer)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const pending = useRef<Partial<T> | null>(null);
   const timer = useRef<number | null>(null);
   const saveRef = useRef(save);
@@ -25,7 +27,8 @@ export function useAutosave<T extends object>(save: (payload: T) => Promise<unkn
     try {
       await saveRef.current(payload as T);
       setStatus(pending.current ? 'pending' : 'saved');
-    } catch {
+    } catch (error: any) {
+      setErrorMessage(error?.response?.data?.message || null);
       setStatus('error');
     }
   }, []);
@@ -43,5 +46,5 @@ export function useAutosave<T extends object>(save: (payload: T) => Promise<unkn
   // Save whatever is pending when the component goes away
   useEffect(() => () => void flush(), [flush]);
 
-  return { schedule, flush, status };
+  return { schedule, flush, status, errorMessage };
 }
