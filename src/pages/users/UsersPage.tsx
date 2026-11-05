@@ -152,6 +152,11 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
                       <Shield className="h-4 w-4 text-gray-400" />
                       <span className="text-sm text-gray-900">{user.role?.display_name}</span>
                     </div>
+                    {user.role?.scope === 'plant' && (
+                      <p className={`mt-0.5 pl-6 text-xs ${user.plant_ids?.length ? 'text-gray-500' : 'text-amber-700'}`}>
+                        {!user.plant_ids?.length ? 'Sin plantas: no ve datos' : user.plant_ids.length === 1 ? '1 planta' : `${user.plant_ids.length} plantas`}
+                      </p>
+                    )}
                   </td>
                   {!embedded && (
                     <td className="px-6 py-4 whitespace-nowrap">

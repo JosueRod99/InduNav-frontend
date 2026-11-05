@@ -15,6 +15,7 @@ export interface User {
   updated_at: Date;
   role: Role;
   permissions?: string[]; // Array of permission strings (e.g., "organizations.create")
+  plant_ids?: string[]; // Plants of a role with plant scope
 }
 
 export interface Role {
@@ -23,6 +24,7 @@ export interface Role {
   display_name: string;
   description: string | null;
   is_system: boolean;
+  scope?: 'platform' | 'organization' | 'plant';
   created_at: Date;
   updated_at: Date;
 }

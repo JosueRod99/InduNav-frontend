@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import { createUser, updateUser, getRoles } from '../../api/users';
 import { getOrganizations } from '../../api/organizations';
+import { getPlants } from '../../api/plants';
 import type { User } from '../../types';
 
 interface UserModalProps {
@@ -25,6 +26,7 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
     last_name: '',
     role_id: '',
     organization_id: '',
+    plant_ids: [] as string[],
     is_active: true,
   });
 
@@ -51,6 +53,7 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
         last_name: user.last_name || '',
         role_id: user.role_id,
         organization_id: user.organization_id || '',
+        plant_ids: user.plant_ids || [],
         is_active: user.is_active,
       });
     } else {
@@ -61,6 +64,7 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
         last_name: '',
         role_id: '',
         organization_id: defaultOrganizationId || '',
+        plant_ids: [],
         is_active: true,
       });
     }
@@ -91,7 +95,24 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
   });
 
   // Same rules as the backend (validators/userValidators.ts)
-  const isPlatformAdminRole = rolesData?.find((r) => r.id === formData.role_id)?.name === 'platform_admin';
+  const selectedRole = rolesData?.find((r) => r.id === formData.role_id);
+  const isPlatformAdminRole = selectedRole?.name === 'platform_admin';
+  const needsPlants = selectedRole?.scope === 'plant';
+
+  const { data: plantsData, isLoading: loadingPlants } = useQuery({
+    queryKey: ['plants', 'user-form', formData.organization_id],
+    queryFn: () => getPlants({ organization_id: formData.organization_id, limit: 100 }),
+    enabled: isOpen && needsPlants && !!formData.organization_id,
+  });
+
+  const togglePlant = (plantId: string) =>
+    setFormData((current) => ({
+      ...current,
+      plant_ids: current.plant_ids.includes(plantId)
+        ? current.plant_ids.filter((id) => id !== plantId)
+        : [...current.plant_ids, plantId],
+    }));
+
   const passwordRules = [
     { ok: formData.password.length >= 8, text: '8 caracteres' },
     { ok: /[A-Z]/.test(formData.password), text: 'una mayúscula' },
@@ -122,10 +143,16 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
       return;
     }
 
+    if (needsPlants && formData.plant_ids.length === 0) {
+      toast.error('Selecciona al menos una planta para este rol');
+      return;
+    }
+
     const payload = {
       ...formData,
       email: formData.email.trim().toLowerCase(),
       organization_id: isPlatformAdminRole ? null : formData.organization_id || null,
+      plant_ids: needsPlants ? formData.plant_ids : [],
     };
 
     // Don't send password if it's empty (for updates)
@@ -254,7 +281,7 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
               </label>
               <select
                 value={isPlatformAdminRole ? '' : formData.organization_id}
-                onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, organization_id: e.target.value, plant_ids: [] })}
                 disabled={isPlatformAdminRole}
                 required={!isPlatformAdminRole}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
@@ -267,6 +294,34 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
                 ))}
               </select>
             </div>
+
+            {needsPlants && (
+              <fieldset>
+                <legend className="block text-sm font-medium text-gray-700 mb-1">Plantas *</legend>
+                <p className="mb-2 text-xs text-gray-500">Este rol solo tiene acceso a las plantas que marques.</p>
+                {!formData.organization_id ? (
+                  <p className="text-sm text-gray-500">Selecciona primero la organización.</p>
+                ) : loadingPlants ? (
+                  <p className="text-sm text-gray-500">Cargando plantas…</p>
+                ) : !plantsData?.plants.length ? (
+                  <p className="text-sm text-gray-500">Esta organización todavía no tiene plantas.</p>
+                ) : (
+                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-gray-300 p-2">
+                    {plantsData.plants.map((plant) => (
+                      <label key={plant.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm text-gray-700 hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={formData.plant_ids.includes(plant.id)}
+                          onChange={() => togglePlant(plant.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        {plant.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
+            )}
 
             <div className="flex items-center gap-2">
               <input

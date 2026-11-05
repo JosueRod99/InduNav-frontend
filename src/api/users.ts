@@ -8,6 +8,7 @@ export interface CreateUserRequest {
   last_name: string;
   role_id: string;
   organization_id?: string | null;
+  plant_ids?: string[];
   is_active?: boolean;
 }
 
@@ -18,6 +19,7 @@ export interface UpdateUserRequest {
   last_name?: string;
   role_id?: string;
   organization_id?: string | null;
+  plant_ids?: string[];
   is_active?: boolean;
 }
 
