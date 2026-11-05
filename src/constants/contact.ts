@@ -1,14 +1,8 @@
-import { formatPhoneInternational } from '../utils/phone';
+import apiClient from '../api/client';
+
 export const CONTACT_EMAIL = 'erickaguirre@inau.mx';
 
 export const DEFAULT_CONTACT_SUBJECT = 'Contacto desde INAU';
-
-// FormSubmit reenvía el formulario a CONTACT_EMAIL. Se usa el alias que FormSubmit
-// generó al activar el formulario para no exponer el correo en las peticiones.
-const FORMSUBMIT_ALIAS = '71aa9469a602d07c3a716836391c387b';
-
-export const CONTACT_FORM_ENDPOINT =
-  import.meta.env.VITE_CONTACT_FORM_ENDPOINT || `https://formsubmit.co/ajax/${FORMSUBMIT_ALIAS}`;
 
 export interface ContactFormData {
   name: string;
@@ -18,26 +12,9 @@ export interface ContactFormData {
   message: string;
 }
 
+// El backend envía el correo a CONTACT_EMAIL con Resend; la llave nunca llega al navegador
 export const sendContactForm = async (data: ContactFormData, subject: string) => {
-  const response = await fetch(CONTACT_FORM_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      Nombre: data.name,
-      email: data.email, // FormSubmit lo usa como Reply-To
-      Teléfono: data.phone ? formatPhoneInternational(data.phone) : '—',
-      Empresa: data.company || '—',
-      Mensaje: data.message,
-      _subject: `${subject} - ${data.name}`,
-      _template: 'table',
-      _captcha: 'false',
-    }),
-  });
-
-  const result = await response.json().catch(() => null);
-  if (!response.ok || String(result?.success) !== 'true') {
-    throw new Error(result?.message || 'No se pudo enviar el mensaje');
-  }
+  await apiClient.post('/public/contact', { ...data, subject });
 };
 
 // Alternativa para quien prefiera escribir desde su propio correo

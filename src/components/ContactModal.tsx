@@ -132,6 +132,7 @@ const ContactModal = ({ isOpen, onClose, subject = DEFAULT_CONTACT_SUBJECT }: Co
           <textarea
             className={`${inputClass} min-h-[110px] resize-y`}
             required
+            maxLength={5000}
             placeholder="¿En qué podemos ayudarte?"
             value={form.message}
             onChange={update('message')}
