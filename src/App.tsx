@@ -63,7 +63,7 @@ function App() {
       <Router>
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
 
           <Route
             path="/login"
@@ -258,18 +258,8 @@ function App() {
             />
           </Route>
 
-          {/* 404 - Redirect to dashboard or login */}
-          {/* 
-          <Route
-            path="*"
-            element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />}
-          />
-          */}
-
-          <Route
-            path="*"
-            element={<Navigate to={isAuthenticated ? '/dashboard' : '/tour'} replace />}
-          />
+          {/* 404: with a session to the dashboard, without one to the landing */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </>

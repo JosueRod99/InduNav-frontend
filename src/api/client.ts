@@ -28,7 +28,10 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // The session check on load and the login answer for themselves: an old token must still reach
+    // the landing, and a wrong password must not reload the page
+    const isSessionCall = /\/auth\/(me|login|logout)$/.test(error.config?.url || '');
+    if (error.response?.status === 401 && !isSessionCall) {
       // Token expired or invalid
       localStorage.removeItem('token');
       localStorage.removeItem('user');

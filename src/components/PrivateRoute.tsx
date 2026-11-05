@@ -20,10 +20,7 @@ const PrivateRoute = ({ children }: PrivateRouteProps) => {
 
   // Check if user is authenticated
   if (!isAuthenticated || !token) {
-    // Redirect to login page, but save the location they were trying to access
-    // return <Navigate to="/login" state={{ from: location }} replace />;
-    return <Navigate to="/tour" state={{ from: location }} replace />;
-
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
