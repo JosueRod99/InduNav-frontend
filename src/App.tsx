@@ -15,6 +15,8 @@ import PlantsPage from './pages/plants/PlantsPage';
 import ToursPage from './pages/tours/ToursPage';
 import TourEditorPage from './pages/tours/TourEditorPage';
 import NarrationUsagePage from './pages/admin/NarrationUsagePage';
+import RolesPage from './pages/admin/RolesPage';
+import RoleEditorPage from './pages/admin/RoleEditorPage';
 import AuditLogPage from './pages/admin/AuditLogPage';
 import TourStatsPage from './pages/tours/TourStatsPage';
 import PlantWorkspacePage from './pages/plants/PlantWorkspacePage';
@@ -143,10 +145,19 @@ function App() {
             <Route
               path="plants"
               element={
-                <PlantsPage />
+                <PermissionRoute anyOf={['plants.read']}>
+                  <PlantsPage />
+                </PermissionRoute>
               }
             />
-            <Route path="tours" element={<ToursPage />} />
+            <Route
+              path="tours"
+              element={
+                <PermissionRoute anyOf={['tours.read', 'tours.read_published']}>
+                  <ToursPage />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="admin/audit"
               element={
@@ -155,6 +166,13 @@ function App() {
                 </PermissionRoute>
               }
             />
+            {['admin/roles', 'admin/roles/nuevo', 'admin/roles/:roleId'].map((path, index) => (
+              <Route
+                key={path}
+                path={path}
+                element={<PermissionRoute anyOf={['roles.manage']}>{index === 0 ? <RolesPage /> : <RoleEditorPage />}</PermissionRoute>}
+              />
+            ))}
             <Route
               path="admin/narration-usage"
               element={
@@ -180,8 +198,17 @@ function App() {
               }
             />
             {/* Plant workspace: all sections of one plant behind tabs */}
-            <Route path="plants/:plantId" element={<PlantWorkspacePage />} />
-            <Route path="plants/:plantId/:tab" element={<PlantWorkspacePage />} />
+            {['plants/:plantId', 'plants/:plantId/:tab'].map((path) => (
+              <Route
+                key={path}
+                path={path}
+                element={
+                  <PermissionRoute anyOf={['plants.read']}>
+                    <PlantWorkspacePage />
+                  </PermissionRoute>
+                }
+              />
+            ))}
             <Route
               path="stops"
               element={

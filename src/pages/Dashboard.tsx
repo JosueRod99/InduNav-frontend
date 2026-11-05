@@ -30,8 +30,12 @@ const Dashboard = () => {
         <OrganizationSummaryTab organizationId={organizationId} showHeader={false} />
       ) : can('plants.update') ? (
         <PlantManagerHome organizationId={organizationId} />
-      ) : (
+      ) : can('tours.read', 'tours.read_published') ? (
         <ToursHome organizationId={organizationId} readOnly={!can('tours.create')} />
+      ) : (
+        <p className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-600">
+          Usa el menú para ir a las secciones que tienes disponibles.
+        </p>
       )}
     </div>
   );

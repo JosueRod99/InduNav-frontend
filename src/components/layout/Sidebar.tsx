@@ -14,6 +14,7 @@ import {
   X,
   ChevronsLeft,
   ChevronsRight,
+  Shield,
 } from 'lucide-react';
 import { useSidebarStore } from '../../store/sidebarStore';
 import { useAuthStore } from '../../store/authStore';
@@ -32,14 +33,15 @@ interface NavItem {
 // personal, tours) and each organization has its own page with tabs.
 const generalItems: NavItem[] = [
   { to: '/dashboard', icon: BarChart3, label: 'Inicio' },
-  { to: '/plants', icon: Factory, label: 'Plantas', activePrefix: '/plants' },
-  { to: '/tours', icon: Map, label: 'Tours' },
+  { to: '/plants', icon: Factory, label: 'Plantas', activePrefix: '/plants', anyOf: ['plants.read'] },
+  { to: '/tours', icon: Map, label: 'Tours', anyOf: ['tours.read', 'tours.read_published'] },
   { to: '/reports', icon: FileText, label: 'Reportes', anyOf: ['reports.documents', 'reports.certifications', 'reports.personnel', 'reports.visits'] },
 ];
 
 const adminItems: NavItem[] = [
   { to: '/organizations', icon: Building2, label: 'Organizaciones', activePrefix: '/organizations', anyOf: ['organizations.create'] },
   { to: '/users', icon: Users, label: 'Usuarios', anyOf: ['users.read'] },
+  { to: '/admin/roles', icon: Shield, label: 'Roles y permisos', activePrefix: '/admin/roles', anyOf: ['roles.manage'] },
   { to: '/admin/audit', icon: ScrollText, label: 'Auditoría', anyOf: ['system.audit'] },
   { to: '/admin/narration-usage', icon: AudioLines, label: 'Consumo de narración', anyOf: ['system.narration'] },
 ];
@@ -56,7 +58,7 @@ const Sidebar = () => {
   const { data: plantsData } = useQuery({
     queryKey: ['plants', 'mine'],
     queryFn: () => getPlants({ limit: 100 }),
-    enabled: !!user && !isPlatformAdmin,
+    enabled: !!user && !isPlatformAdmin && can('plants.read'),
     staleTime: 5 * 60 * 1000,
   });
   const onlyPlant = !isPlatformAdmin && plantsData?.plants.length === 1 ? plantsData.plants[0] : null;
