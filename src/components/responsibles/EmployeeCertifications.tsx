@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useCan } from '../../hooks/usePermissions';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -127,7 +128,7 @@ const EmployeeCertifications = ({ employeeId, plantId }: { employeeId: string; p
                 {canEdit && (
                   <button
                     type="button"
-                    onClick={() => window.confirm(`¿Quitar "${c.name}" a esta persona?`) && save.mutate({ type: c.type_id, holds: false })}
+                    onClick={async () => (await confirmar({ title: 'Quitar certificación', message: `Se quitará "${c.name}" a esta persona.`, confirmLabel: 'Quitar' })) && save.mutate({ type: c.type_id, holds: false })}
                     className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                     aria-label={`Quitar ${c.name}`}
                     title="Quitar"

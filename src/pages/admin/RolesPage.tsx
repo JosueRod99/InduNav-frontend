@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -60,7 +61,7 @@ const RolesTab = () => {
         <button
           type="button"
           disabled={!!blocked || remove.isPending}
-          onClick={() => window.confirm(`¿Eliminar el rol "${role.display_name}"?`) && remove.mutate(role.id)}
+          onClick={async () => (await confirmar({ title: 'Eliminar rol', message: `Se eliminará el rol "${role.display_name}".` })) && remove.mutate(role.id)}
           className="rounded p-1.5 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
           title={blocked || 'Eliminar'}
           aria-label={`Eliminar ${role.display_name}`}

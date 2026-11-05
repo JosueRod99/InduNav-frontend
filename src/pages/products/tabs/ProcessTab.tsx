@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useCan } from '../../../hooks/usePermissions';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -62,8 +63,8 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
     },
   });
 
-  const handleUnlink = (link: ProductStepEquipment) => {
-    if (window.confirm(`¿Quitar "${link.equipment_name}" del paso "${link.step_name}"?`)) {
+  const handleUnlink = async (link: ProductStepEquipment) => {
+    if (await confirmar({ title: 'Quitar equipo del paso', message: `Se quitará "${link.equipment_name}" del paso "${link.step_name}".`, confirmLabel: 'Quitar' })) {
       unlinkMutation.mutate(link.id);
     }
   };
@@ -131,8 +132,8 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (step: ProductProcessStep) => {
-    if (window.confirm(`¿Estás seguro de eliminar el paso "${step.step_name}"?`)) {
+  const handleDelete = async (step: ProductProcessStep) => {
+    if (await confirmar({ title: 'Eliminar paso', message: `Se eliminará el paso "${step.step_name}".` })) {
       deleteMutation.mutate(step.id);
     }
   };

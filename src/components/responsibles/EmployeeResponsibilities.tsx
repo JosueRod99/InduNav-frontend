@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -125,7 +126,7 @@ const EmployeeResponsibilities = ({ employee }: { employee: Employee }) => {
               {canEdit && (
                 <button
                   type="button"
-                  onClick={() => window.confirm(`¿Quitar la responsabilidad de ${r.area_name}?`) && remove.mutate(r.id)}
+                  onClick={async () => (await confirmar({ title: 'Quitar responsabilidad', message: `Esta persona dejará de ser responsable de ${r.area_name}.`, confirmLabel: 'Quitar' })) && remove.mutate(r.id)}
                   className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                   aria-label={`Quitar responsabilidad de ${r.area_name}`}
                 >

@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Map, Globe, Lock, LayoutList, Eye, MapPin, Clock, Share2, BarChart3 } from 'lucide-react';
@@ -143,8 +144,8 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (tour: TourCard) => {
-    if (window.confirm(`¿Eliminar el tour "${tour.title}"?`)) {
+  const handleDelete = async (tour: TourCard) => {
+    if (await confirmar({ title: 'Eliminar tour', message: `Se eliminará "${tour.title}".` })) {
       deleteMutation.mutate(tour.id);
     }
   };

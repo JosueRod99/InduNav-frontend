@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -184,7 +185,7 @@ const PhotoGallery = ({ organizationId, plantId = null, canEdit, emptyText }: Ph
                       </button>
                       <button
                         type="button"
-                        onClick={() => window.confirm('¿Eliminar esta foto?') && remove.mutate(photo.id)}
+                        onClick={async () => (await confirmar({ title: 'Eliminar foto', message: 'Esta foto se eliminará de forma permanente.' })) && remove.mutate(photo.id)}
                         className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"
                         aria-label="Eliminar foto"
                       >

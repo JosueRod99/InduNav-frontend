@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Factory, MapPin } from 'lucide-react';
@@ -81,8 +82,8 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('¿Estás seguro de eliminar esta planta?')) {
+  const handleDelete = async (id: string) => {
+    if (await confirmar({ title: 'Eliminar planta', message: 'Se eliminará esta planta.' })) {
       deleteMutation.mutate(id);
     }
   };

@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -207,13 +208,13 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
     setSelectedZone(zoneIndex);
   };
 
-  const handleDeleteArea = () => {
+  const handleDeleteArea = async () => {
     if (!selectedArea) return;
     const message =
       selectedZoneCount > 1
-        ? `¿Quitar ${selectedAreaName} del plano? Se borran sus ${selectedZoneCount} zonas; el área sigue existiendo.`
-        : `¿Quitar ${selectedAreaName} del plano? El área sigue existiendo, solo se borra su dibujo.`;
-    if (window.confirm(message)) deleteMutation.mutate(selectedArea.id);
+        ? `Se quitará ${selectedAreaName} y se borrarán sus ${selectedZoneCount} zonas. El área sigue existiendo.`
+        : `Se quitará ${selectedAreaName}. El área sigue existiendo, solo se borra su dibujo.`;
+    if (await confirmar({ title: 'Quitar del plano', message: message, confirmLabel: 'Quitar' })) deleteMutation.mutate(selectedArea.id);
   };
 
   const handleStartDrawing = () => {
@@ -236,9 +237,9 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
     setDrawMode(true);
   };
 
-  const handleDeleteZone = () => {
+  const handleDeleteZone = async () => {
     if (!selectedArea) return;
-    if (!window.confirm(`¿Eliminar la zona ${zone + 1} de ${selectedAreaName}? Las demás zonas del área se conservan.`)) return;
+    if (!(await confirmar({ title: 'Eliminar zona', message: `Se eliminará la zona ${zone + 1} de ${selectedAreaName}. Las demás zonas del área se conservan.` }))) return;
     updateMutation.mutate({ id: selectedArea.id, geometry: removeZone(selectedArea.geometry, zone), message: 'Zona eliminada', zone: 0 });
   };
 

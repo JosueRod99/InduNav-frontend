@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, QrCode, Image as ImageIcon, Video, Music } from 'lucide-react';
@@ -57,8 +58,8 @@ const StopsPage = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este stop?')) {
+  const handleDelete = async (id: string) => {
+    if (await confirmar({ title: 'Eliminar parada', message: 'Se eliminará esta parada.' })) {
       deleteMutation.mutate(id);
     }
   };

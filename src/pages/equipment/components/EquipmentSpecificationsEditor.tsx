@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useCan } from '../../../hooks/usePermissions';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -71,8 +72,8 @@ const EquipmentSpecificationsEditor = ({ equipmentId, specifications }: Equipmen
     setEditingValue('');
   };
 
-  const handleDeleteSpec = (key: string) => {
-    if (window.confirm(`¿Eliminar la especificación "${key}"?`)) {
+  const handleDeleteSpec = async (key: string) => {
+    if (await confirmar({ title: 'Eliminar especificación', message: `Se eliminará la especificación "${key}".` })) {
       const newSpecs = { ...specs };
       delete newSpecs[key];
       setSpecs(newSpecs);

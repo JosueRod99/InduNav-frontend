@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
+import ConfirmDialog from './components/ui/ConfirmDialog';
 import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/auth/LoginPage';
 import Dashboard from './pages/Dashboard';
@@ -262,6 +263,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
+      <ConfirmDialog />
     </>
   );
 }

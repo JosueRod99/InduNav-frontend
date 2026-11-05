@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -282,10 +283,10 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
     },
   });
 
-  const handleDeleteZone = () => {
+  const handleDeleteZone = async () => {
     if (selection?.kind !== 'area') return;
     const name = selection.item.organizational_area?.name || 'la subárea';
-    if (!window.confirm(`¿Eliminar la zona ${selection.zoneIndex + 1} de ${name}? Las demás zonas se conservan.`)) return;
+    if (!(await confirmar({ title: 'Eliminar zona', message: `Se eliminará la zona ${selection.zoneIndex + 1} de ${name}. Las demás zonas se conservan.` }))) return;
     zoneMutation.mutate({ id: selection.item.id, geometry: removeZone(selection.item.geometry, selection.zoneIndex), message: 'Zona eliminada' });
   };
 
@@ -316,13 +317,13 @@ const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
     if (selection) updateGeometryMutation.mutate({ sel: selection, coordinates });
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selection) return;
     const message =
       selection.kind === 'area'
-        ? '¿Quitar esta subárea del layout? El área sigue existiendo, solo se borra su dibujo.'
-        : '¿Quitar este equipo del layout? Seguirá asignado al área como "Por colocar".';
-    if (window.confirm(message)) deleteMutation.mutate(selection);
+        ? 'El área sigue existiendo, solo se borra su dibujo.'
+        : 'Seguirá asignado al área como "Por colocar".';
+    if (await confirmar({ title: selection.kind === 'area' ? 'Quitar subárea del layout' : 'Quitar equipo del layout', message: message, confirmLabel: 'Quitar' })) deleteMutation.mutate(selection);
   };
 
   const editingShape: EditableShape | null =

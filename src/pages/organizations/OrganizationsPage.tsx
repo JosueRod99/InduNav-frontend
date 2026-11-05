@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Power, Search, Trash2, Building2 } from 'lucide-react';
@@ -127,9 +128,9 @@ const OrganizationsPage = () => {
     setSelectedOrganization(organization);
     setIsModalOpen(true);
   };
-  const toggleActive = (org: Organization) => {
+  const toggleActive = async (org: Organization) => {
     if (!org.is_active) setActive.mutate({ org, active: true });
-    else if (window.confirm(`¿Desactivar "${org.name}"? No se borra nada y puedes reactivarla cuando quieras.`)) setActive.mutate({ org, active: false });
+    else if (await confirmar({ title: 'Desactivar empresa', message: `"${org.name}" quedará inactiva. No se borra nada y puedes reactivarla cuando quieras.`, confirmLabel: 'Desactivar' })) setActive.mutate({ org, active: false });
   };
 
   const counts = {

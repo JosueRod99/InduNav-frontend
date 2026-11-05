@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Map as MapIcon, Plus, Calendar, ArrowRight, History, Trash2, StopCircle } from 'lucide-react';
@@ -132,14 +133,14 @@ const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignment
     createMutation.mutate();
   };
 
-  const handleEnd = (assignment: EquipmentAreaAssignment) => {
-    if (window.confirm(`¿Retirar el equipo de "${assignment.area_name}"? Quedará sin área asignada.`)) {
+  const handleEnd = async (assignment: EquipmentAreaAssignment) => {
+    if (await confirmar({ title: 'Retirar equipo', message: `Se retirará de "${assignment.area_name}" y quedará sin área asignada.`, confirmLabel: 'Retirar' })) {
       endMutation.mutate(assignment.id);
     }
   };
 
-  const handleDelete = (assignment: EquipmentAreaAssignment) => {
-    if (window.confirm('¿Eliminar este registro del historial? Esta acción no se puede deshacer.')) {
+  const handleDelete = async (assignment: EquipmentAreaAssignment) => {
+    if (await confirmar({ title: 'Eliminar registro', message: 'Este registro se eliminará del historial. Esta acción no se puede deshacer.' })) {
       deleteMutation.mutate(assignment.id);
     }
   };

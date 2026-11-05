@@ -42,6 +42,9 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'md' }: ModalP
 
         {/* Modal */}
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
           className={`relative w-full ${sizeClasses[size]} transform rounded-lg bg-white shadow-xl transition-all z-[10000]`}
         >
           {/* Header */}

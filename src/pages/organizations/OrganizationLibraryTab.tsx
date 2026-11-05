@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -41,7 +42,7 @@ const OrganizationLibraryTab = ({ organization }: { organization: { id: string; 
         <button onClick={() => setModal({ open: true, certification: c })} className="text-gray-600 hover:text-gray-900" title="Editar" aria-label={`Editar ${c.name}`}>
           <Pencil className="h-4 w-4" />
         </button>
-        <button onClick={() => window.confirm(`¿Quitar "${c.name}"?`) && remove.mutate(c.id)} className="text-red-600 hover:text-red-900" title="Quitar" aria-label={`Quitar ${c.name}`}>
+        <button onClick={async () => (await confirmar({ title: 'Quitar certificación', message: `Se quitará "${c.name}" de la empresa.`, confirmLabel: 'Quitar' })) && remove.mutate(c.id)} className="text-red-600 hover:text-red-900" title="Quitar" aria-label={`Quitar ${c.name}`}>
           <Trash2 className="h-4 w-4" />
         </button>
       </div>

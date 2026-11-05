@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -145,7 +146,7 @@ const AreaResponsiblesSection = ({ area, onOpenEmployee }: Props) => {
                           {canEdit && (
                             <button
                               type="button"
-                              onClick={() => window.confirm(`¿Quitar a ${personName(r)} como ${roleLabel(role).toLowerCase()} de ${area.name}?`) && remove.mutate(r)}
+                              onClick={async () => (await confirmar({ title: 'Quitar responsable', message: `${personName(r)} dejará de ser ${roleLabel(role).toLowerCase()} de ${area.name}.`, confirmLabel: 'Quitar' })) && remove.mutate(r)}
                               className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                               aria-label={`Quitar a ${personName(r)}`}
                             >

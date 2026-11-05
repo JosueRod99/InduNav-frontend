@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Lock, Plus, Pencil, Trash2, Package, Search } from 'lucide-react';
@@ -136,8 +137,8 @@ const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) 
     setIsModalOpen(true);
   };
 
-  const handleDelete = (product: Product) => {
-    if (window.confirm(`¿Estás seguro de eliminar el producto "${product.name}"?`)) deleteMutation.mutate(product.id);
+  const handleDelete = async (product: Product) => {
+    if (await confirmar({ title: 'Eliminar producto', message: `Se eliminará "${product.name}".` })) deleteMutation.mutate(product.id);
   };
 
   const handleCreateNew = () => {

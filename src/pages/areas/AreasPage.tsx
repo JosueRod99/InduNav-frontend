@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Building2 } from 'lucide-react';
@@ -114,10 +115,10 @@ const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedArea) return;
     const warning = selectedArea.children ? ` Tiene ${selectedArea.children} subárea${selectedArea.children === 1 ? '' : 's'}.` : '';
-    if (window.confirm(`¿Eliminar el área "${selectedArea.name}"?${warning}`)) deleteMutation.mutate(selectedArea.id);
+    if (await confirmar({ title: 'Eliminar área', message: `Se eliminará "${selectedArea.name}".${warning}` })) deleteMutation.mutate(selectedArea.id);
   };
 
   const openCreate = (parentId: string | null) => {

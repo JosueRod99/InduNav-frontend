@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -138,7 +139,7 @@ const EquipmentModal = ({
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
@@ -158,9 +159,7 @@ const EquipmentModal = ({
 
     if (
       plantChanged &&
-      !window.confirm(
-        'Al cambiar de planta, el equipo se retirará de su área actual, se borrará su dibujo en el layout y se quitará de los pasos de producto donde se usa. ¿Continuar?'
-      )
+      !(await confirmar({ title: 'Cambiar de planta', message: 'El equipo se retirará de su área actual, se borrará su dibujo en el layout y se quitará de los pasos de producto donde se usa.', confirmLabel: 'Continuar' }))
     ) {
       return;
     }

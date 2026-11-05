@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Users, Building2, FileSpreadsheet, Search, Eye, UserMinus, UserPlus } from 'lucide-react';
@@ -134,8 +135,8 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScope
     setIsModalOpen(true);
   };
 
-  const handleDelete = (employee: Employee) => {
-    if (window.confirm(`¿Estás seguro de eliminar a ${personName(employee)}?`)) deleteMutation.mutate(employee.id);
+  const handleDelete = async (employee: Employee) => {
+    if (await confirmar({ title: 'Eliminar empleado', message: `Se eliminará a ${personName(employee)}.` })) deleteMutation.mutate(employee.id);
   };
 
   const handleCreate = () => {
@@ -287,7 +288,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScope
       {/* Only leaves this area; the person stays in the company */}
       {area && canAssign && assignmentOf.get(employee.id) && (
         <button
-          onClick={() => window.confirm(`¿Quitar a ${personName(employee)} de "${area.name}"? Sigue siendo empleado de la empresa.`) && endMutation.mutate(assignmentOf.get(employee.id)!.id)}
+          onClick={async () => (await confirmar({ title: 'Quitar del área', message: `${personName(employee)} saldrá de "${area.name}". Sigue siendo empleado de la empresa.`, confirmLabel: 'Quitar' })) && endMutation.mutate(assignmentOf.get(employee.id)!.id)}
           disabled={endMutation.isPending}
           className="rounded p-1.5 text-amber-600 hover:bg-amber-50"
           aria-label={`Quitar a ${personName(employee)} del área`}

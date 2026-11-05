@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -83,7 +84,7 @@ const ShareTourModal = ({ isOpen, onClose, tourId, tourTitle, onUnpublished }: S
   };
 
   const handleUnpublish = async () => {
-    if (!window.confirm('¿Despublicar el tour? El link y los QR dejarán de funcionar hasta que lo publiques de nuevo (se conservarán los mismos).')) return;
+    if (!(await confirmar({ title: 'Despublicar tour', message: 'El link y los QR dejarán de funcionar hasta que lo publiques de nuevo. Se conservarán los mismos.', confirmLabel: 'Despublicar' }))) return;
     setIsUnpublishing(true);
     try {
       await unpublishTour(tourId);

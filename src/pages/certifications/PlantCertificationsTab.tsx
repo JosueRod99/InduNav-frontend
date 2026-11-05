@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -206,7 +207,7 @@ const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organiza
         </button>
         <button
           type="button"
-          onClick={() => window.confirm(`¿Quitar ${c.name} (${scopeLabel(c)})?`) && removeSystem.mutate(c.id)}
+          onClick={async () => (await confirmar({ title: 'Quitar certificación', message: `Se quitará ${c.name} (${scopeLabel(c)}).`, confirmLabel: 'Quitar' })) && removeSystem.mutate(c.id)}
           className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"
           aria-label={`Quitar ${c.name}`}
         >
@@ -223,7 +224,7 @@ const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organiza
         </button>
         <button
           type="button"
-          onClick={() => window.confirm(`¿Eliminar "${t.name}"? Se quita de todo el personal de la empresa.`) && removeType.mutate(t.id)}
+          onClick={async () => (await confirmar({ title: 'Eliminar certificación', message: `Se eliminará "${t.name}" y se quitará de todo el personal de la empresa.` })) && removeType.mutate(t.id)}
           className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"
           aria-label={`Eliminar ${t.name}`}
         >

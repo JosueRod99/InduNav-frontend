@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { ChartColumn, Plus, Trash2, Type } from 'lucide-react';
 import SortableList, { moveItem } from '../../../components/ui/SortableList';
 import { newBlockId, type SectionBlock, type TourLanguage } from '../../../api/tourBuilder';
@@ -16,9 +17,9 @@ interface BlocksEditorProps {
 const BlocksEditor = ({ blocks, language, onChange }: BlocksEditorProps) => {
   const update = (index: number, block: SectionBlock) => onChange(blocks.map((b, i) => (i === index ? block : b)));
 
-  const remove = (index: number) => {
+  const remove = async (index: number) => {
     const what = blocks[index].type === 'chart' ? 'esta gráfica' : 'este bloque de texto';
-    if (window.confirm(`¿Quitar ${what}?`)) onChange(blocks.filter((_, i) => i !== index));
+    if (await confirmar({ title: 'Quitar bloque', message: `Se quitará ${what}.`, confirmLabel: 'Quitar' })) onChange(blocks.filter((_, i) => i !== index));
   };
 
   const add = (type: SectionBlock['type']) =>

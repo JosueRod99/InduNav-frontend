@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -520,8 +521,8 @@ const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Pr
                     </button>)
 ) : (
  canDelete && !(isPlantScope && doc.scope === "organization") && (                    <button
-                      onClick={() =>
-                        window.confirm(`¿Archivar "${doc.title}"?`) &&
+                      onClick={async () =>
+                        (await confirmar({ title: 'Archivar documento', message: `Se archivará "${doc.title}". Puedes restaurarlo después.`, confirmLabel: 'Archivar' })) &&
                         archive.mutate(doc.id)
                       }
                       disabled={archive.isPending}

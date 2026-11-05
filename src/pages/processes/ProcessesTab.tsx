@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -128,7 +129,7 @@ const ProcessesTab = ({ plantId, organizationId, area }: { plantId: string; orga
                 variant="outline"
                 size="sm"
                 className="gap-1.5 text-red-600 hover:bg-red-50"
-                onClick={() => window.confirm(`¿Eliminar el proceso "${process.name}"? Se borran también sus pasos.`) && remove.mutate(process.id)}
+                onClick={async () => (await confirmar({ title: 'Eliminar proceso', message: `Se eliminará "${process.name}" con todos sus pasos.` })) && remove.mutate(process.id)}
               >
                 <Trash2 className="h-4 w-4" /> Eliminar
               </Button>

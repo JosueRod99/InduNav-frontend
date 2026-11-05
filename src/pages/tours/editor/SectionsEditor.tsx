@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import {
   AlertTriangle,
@@ -106,8 +107,8 @@ const SectionsEditor = ({
     setExpandedId(`custom:${id}`);
   };
 
-  const removeOwnSection = (index: number) => {
-    if (window.confirm('¿Eliminar esta sección propia y todo su contenido?')) {
+  const removeOwnSection = async (index: number) => {
+    if (await confirmar({ title: 'Eliminar sección', message: 'Se eliminará esta sección propia y todo su contenido.' })) {
       onChange(sections.filter((_, i) => i !== index));
     }
   };

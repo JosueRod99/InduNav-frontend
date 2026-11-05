@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -189,7 +190,12 @@ const TourEditorPage = () => {
 
   const handleDelete = async (stop: BuilderStop) => {
     const name = stop.title_translations.es || stop.area_name;
-    if (!window.confirm(`¿Quitar "${name}" del tour? Su texto y secciones en el tour se perderán (el área no se borra).`)) return;
+    const confirmed = await confirmar({
+      title: 'Quitar área del tour',
+      message: `Se quitará "${name}" del tour y se perderán su texto y secciones. El área no se borra.`,
+      confirmLabel: 'Quitar',
+    });
+    if (!confirmed) return;
     try {
       await stopAutosave.flush();
       await deleteTourStop(stop.id);
@@ -205,7 +211,13 @@ const TourEditorPage = () => {
   /** Show or hide one built-in section in every stop (and in the structure for new stops) */
   const applySectionToAll = async (key: TourSectionKey, visible: boolean) => {
     const label = SECTION_LABELS[key];
-    if (!window.confirm(`¿${visible ? 'Mostrar' : 'Ocultar'} "${label}" en las ${stops.length} áreas del tour?\n\nDespués puedes cambiarlo en cada área.`)) return;
+    const confirmed = await confirmar({
+      title: `${visible ? 'Mostrar' : 'Ocultar'} sección`,
+      message: `Se va a ${visible ? 'mostrar' : 'ocultar'} "${label}" en las ${stops.length} áreas del tour.\n\nDespués puedes cambiarlo en cada área.`,
+      confirmLabel: visible ? 'Mostrar' : 'Ocultar',
+      danger: false,
+    });
+    if (!confirmed) return;
     const withVisibility = (sections: TourSection[]) =>
       sections.some((s) => s.key === key) ? sections.map((s) => (s.key === key ? { ...s, visible } : s)) : [...sections, { key, visible }];
     try {
@@ -228,12 +240,13 @@ const TourEditorPage = () => {
 
   const applyToAllStops = async () => {
     if (!selectedStop) return;
-    if (
-      !window.confirm(
-        `¿Aplicar el orden y la visibilidad de las secciones de "${selectedStop.title_translations.es}" a todas las áreas?\n\nLas secciones propias de cada área se conservan. También se guardará como estructura por defecto para áreas nuevas.`
-      )
-    )
-      return;
+    const confirmed = await confirmar({
+      title: 'Aplicar a todas las áreas',
+      message: `Se aplicarán el orden y la visibilidad de las secciones de "${selectedStop.title_translations.es}" a todas las áreas.\n\nLas secciones propias de cada área se conservan. También se guardará como estructura por defecto para áreas nuevas.`,
+      confirmLabel: 'Aplicar',
+      danger: false,
+    });
+    if (!confirmed) return;
     try {
       await stopAutosave.flush();
       const others = stops.filter((s) => s.id !== selectedStop.id);

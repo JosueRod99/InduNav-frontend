@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Wrench, Search } from 'lucide-react';
@@ -134,8 +135,8 @@ const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {})
     setIsModalOpen(true);
   };
 
-  const handleDelete = (item: Equipment) => {
-    if (window.confirm(`¿Estás seguro de eliminar "${item.name}"?`)) deleteMutation.mutate(item.id);
+  const handleDelete = async (item: Equipment) => {
+    if (await confirmar({ title: 'Eliminar equipo', message: `Se eliminará "${item.name}".` })) deleteMutation.mutate(item.id);
   };
 
   const handleCreateNew = () => {

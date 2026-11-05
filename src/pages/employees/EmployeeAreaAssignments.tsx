@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, Calendar, User } from 'lucide-react';
@@ -124,8 +125,8 @@ const EmployeeAreaAssignments = ({
     });
   };
 
-  const handleRemoveSecondary = (assignment: EmployeeAreaAssignment) => {
-    if (window.confirm('¿Estás seguro de eliminar esta asignación?')) {
+  const handleRemoveSecondary = async (assignment: EmployeeAreaAssignment) => {
+    if (await confirmar({ title: 'Eliminar asignación', message: 'Se eliminará esta asignación.' })) {
       deleteMutation.mutate(assignment.id);
     }
   };

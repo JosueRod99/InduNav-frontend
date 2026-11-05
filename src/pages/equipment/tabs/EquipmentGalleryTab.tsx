@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Image as ImageIcon, Upload, Star, Trash2, Edit2 } from 'lucide-react';
@@ -63,14 +64,14 @@ const EquipmentGalleryTab = ({ equipmentId, equipment }: EquipmentGalleryTabProp
     setIsViewModalOpen(true);
   };
 
-  const handleSetPrimary = (imageId: string) => {
-    if (confirm('¿Establecer como imagen principal?')) {
+  const handleSetPrimary = async (imageId: string) => {
+    if (await confirmar({ title: 'Imagen principal', message: 'Esta será la imagen principal del equipo.', confirmLabel: 'Establecer', danger: false })) {
       setPrimaryMutation.mutate(imageId);
     }
   };
 
-  const handleDelete = (imageId: string) => {
-    if (confirm('¿Estás seguro de que quieres eliminar esta imagen?')) {
+  const handleDelete = async (imageId: string) => {
+    if (await confirmar({ title: 'Eliminar imagen', message: 'Esta imagen se eliminará de forma permanente.' })) {
       deleteImageMutation.mutate(imageId);
     }
   };

@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -92,7 +93,7 @@ const AreaHeadcountSection = ({ areaId, namedCount }: { areaId: string; namedCou
               {canEdit && (
                 <button
                   type="button"
-                  onClick={() => window.confirm(`¿Quitar "${row.position}" de la plantilla?`) && remove.mutate(row)}
+                  onClick={async () => (await confirmar({ title: 'Quitar de la plantilla', message: `Se quitará "${row.position}" de la plantilla del área.`, confirmLabel: 'Quitar' })) && remove.mutate(row)}
                   className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                   aria-label={`Quitar ${row.position}`}
                 >

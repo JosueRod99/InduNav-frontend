@@ -1,3 +1,4 @@
+import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Image as ImageIcon, Upload, Grid3x3, List, Trash2 } from 'lucide-react';
@@ -251,8 +252,8 @@ const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     {canEdit && (
                       <button
-                        onClick={() => {
-                          if (confirm('¿Estás seguro de que quieres eliminar esta foto?')) {
+                        onClick={async () => {
+                          if (await confirmar({ title: 'Eliminar foto', message: 'Esta foto se eliminará de forma permanente.' })) {
                             deletePhotoMutation.mutate(photo.id);
                           }
                         }}
