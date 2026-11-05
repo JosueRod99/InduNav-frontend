@@ -104,10 +104,6 @@ export interface UpdateEmployeeRequest {
   is_active?: boolean;
 }
 
-export interface AssignAreaRequest {
-  area_id: string;
-}
-
 export interface EmployeesResponse {
   employees: Employee[];
   total: number;
@@ -174,15 +170,6 @@ export const updateEmployee = async (id: string, payload: UpdateEmployeeRequest)
 // Delete employee
 export const deleteEmployee = async (id: string): Promise<void> => {
   await apiClient.delete(`/employees/${id}`);
-};
-
-// Assign area to employee
-export const assignArea = async (id: string, payload: AssignAreaRequest): Promise<Employee> => {
-  const { data } = await apiClient.post(`/employees/assign-area`, {
-    employee_id: id,
-    ...payload,
-  });
-  return data.employee || data;
 };
 
 // Check employee number availability
