@@ -51,6 +51,7 @@ import LocationSection from './sections/LocationSection';
 import { CompanySection, PlantSection } from './sections/CompanySections';
 import NarrationPlayer from './components/NarrationPlayer';
 import { useVisitTracking, type VisitSource } from './useVisitTracking';
+import { isPageReload, tourProgress } from './tourProgress';
 import { avatarUrl } from '../../utils/avatarUrl';
 
 // Viewer of REAL tours (separate from the demo at /tour/:slug, which is not touched).
@@ -117,11 +118,24 @@ interface TourExperienceProps {
 export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = null, source = 'link' }: TourExperienceProps) => {
   const validInitialStop =
     initialStopIndex !== null && initialStopIndex >= 0 && initialStopIndex < view.stops.length ? initialStopIndex : null;
-  const [stopIndex, setStopIndex] = useState(validInitialStop ?? 0);
-  const [language, setLanguage] = useState<TourLanguage>(view.tour.languages[0] || 'es');
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const progress = useMemo(() => tourProgress(view.tour.id, !!view.is_preview), [view.tour.id, view.is_preview]);
+  const canUseLanguage = (value?: string): value is TourLanguage => view.tour.languages.includes(value as TourLanguage);
+  // A QR code wins when arriving by it; its ?stop=N stays in the URL, so a reload does not count
+  const [arrivalStop] = useState(() => (isPageReload() ? null : validInitialStop));
+  // Reloading this tab keeps going; coming back later goes through the cover (see tourProgress)
+  const [restored] = useState(() => {
+    if (arrivalStop !== null || !progress.isThisTabInside()) return null;
+    const saved = progress.read();
+    const index = view.stops.findIndex((s) => s.id === saved?.stopId);
+    return saved && index >= 0 ? { ...saved, index } : null;
+  });
+  const [stopIndex, setStopIndex] = useState(arrivalStop ?? restored?.index ?? 0);
+  const [language, setLanguage] = useState<TourLanguage>(
+    canUseLanguage(restored?.language) ? restored.language : view.tour.languages[0] || 'es'
+  );
+  const [activeSection, setActiveSection] = useState<string | null>(restored?.section ?? null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [started, setStarted] = useState(validInitialStop !== null); // false = cover screen (step 0)
+  const [started, setStarted] = useState(arrivalStop !== null || restored !== null); // false = cover screen (step 0)
   const [finished, setFinished] = useState(false); // end-of-tour screen
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -182,6 +196,25 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
   };
 
   const goToArea = (areaId: string) => goTo(stops.findIndex((s) => s.area_id === areaId), true);
+
+  // Remember the place while inside the tour; finishing it forgets it
+  const currentSectionId = currentSection ? sectionId(currentSection) : null;
+  useEffect(() => {
+    if (finished) progress.clear();
+    else if (!started) progress.leaveThisTab();
+    else if (stop) progress.save({ stopId: stop.id, section: currentSectionId, language });
+  }, [progress, started, finished, stop, currentSectionId, language]);
+
+  // On the cover: the place to continue from. The first area needs no offer, starting is the same
+  const savedProgress = !started ? progress.read() : null;
+  const resumeIndex = savedProgress ? stops.findIndex((s) => s.id === savedProgress.stopId) : -1;
+  const resume = savedProgress && resumeIndex > 0 ? { ...savedProgress, index: resumeIndex } : null;
+  const continueTour = () => {
+    if (!resume) return;
+    if (canUseLanguage(resume.language)) setLanguage(resume.language);
+    setActiveSection(resume.section);
+    goTo(resume.index, true);
+  };
 
   const tourTitle = tr(view.tour.title, language);
   // Without narration in the selected language, visitors hear the Spanish one (same as texts)
@@ -378,7 +411,14 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
             {lang('Este tour todavía no tiene áreas.', 'This tour has no areas yet.')}
           </div>
         ) : !started ? (
-          <TourCover view={view} language={language} onStart={() => goTo(0)} onOpenStop={goTo} />
+          <TourCover
+            view={view}
+            language={language}
+            onStart={() => goTo(0)}
+            onOpenStop={goTo}
+            resume={resume && { title: tr(stops[resume.index].title, language) || stops[resume.index].area?.name || '', position: resume.index + 1 }}
+            onContinue={continueTour}
+          />
         ) : finished ? (
           <section className="rounded-xl border border-slate-200 bg-white p-6 text-center sm:p-10">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
@@ -554,11 +594,15 @@ const TourCover = ({
   language,
   onStart,
   onOpenStop,
+  resume,
+  onContinue,
 }: {
   view: TourView;
   language: TourLanguage;
   onStart: () => void;
   onOpenStop: (index: number) => void;
+  resume: { title: string; position: number } | null;
+  onContinue: () => void;
 }) => {
   const lang = (es: string, en: string) => (language === 'es' ? es : en);
   const company = view.tour.organization.profile;
@@ -598,13 +642,26 @@ const TourCover = ({
               </span>
             )}
           </div>
-          <div>
+          <div className="flex flex-wrap gap-2">
+            {resume && (
+              <button
+                onClick={onContinue}
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-base font-semibold text-blue-700 shadow-lg transition-transform hover:scale-[1.02] hover:bg-blue-50"
+              >
+                <Play className="h-5 w-5 flex-shrink-0" />
+                {lang('Continuar en', 'Continue at')} {resume.title} ({resume.position}/{view.stops.length})
+              </button>
+            )}
             <button
               onClick={onStart}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-base font-semibold text-blue-700 shadow-lg transition-transform hover:scale-[1.02] hover:bg-blue-50"
+              className={
+                resume
+                  ? 'inline-flex items-center gap-2 rounded-xl border border-white/60 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-white/10'
+                  : 'inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-base font-semibold text-blue-700 shadow-lg transition-transform hover:scale-[1.02] hover:bg-blue-50'
+              }
             >
-              <Play className="h-5 w-5" />
-              {lang('Iniciar recorrido', 'Start tour')}
+              {!resume && <Play className="h-5 w-5" />}
+              {resume ? lang('Empezar', 'Start over') : lang('Iniciar recorrido', 'Start tour')}
             </button>
           </div>
         </div>
