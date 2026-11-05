@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Upload, Image as ImageIcon, Check } from 'lucide-react';
@@ -125,7 +126,7 @@ const EditPhotoModal = ({ isOpen, onClose, photo, organizationId, plantId }: Edi
       await updatePhotoMutation.mutateAsync(updatePayload);
     } catch (error: any) {
       console.error('Error updating photo:', error);
-      alert('Error al actualizar la foto. Por favor intenta de nuevo.');
+      toast.error('Error al actualizar la foto. Por favor intenta de nuevo.');
       setUploading(false);
     }
   };

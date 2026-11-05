@@ -104,7 +104,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, product, equipment, orga
       ];
 
       if (!validTypes.includes(file.type)) {
-        alert('Tipo de archivo no válido. Solo se permiten PDFs, Word, Excel e imágenes.');
+        toast.error('Tipo de archivo no válido. Solo se permiten PDFs, Word, Excel e imágenes.');
         return;
       }
 
@@ -112,7 +112,7 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, product, equipment, orga
       const maxSize = file.type === 'application/pdf' ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
       if (file.size > maxSize) {
         const maxSizeMB = file.type === 'application/pdf' ? 10 : 5;
-        alert(`El archivo es demasiado grande. Tamaño máximo: ${maxSizeMB}MB`);
+        toast.error(`El archivo es demasiado grande. Tamaño máximo: ${maxSizeMB}MB`);
         return;
       }
 
@@ -161,60 +161,60 @@ const UploadDocumentModal = ({ isOpen, onClose, areaId, product, equipment, orga
       // No file now: it is uploaded later as version 2
     } else if (documentSource === 'uploaded') {
       if (!selectedFile) {
-        alert('Por favor selecciona un archivo.');
+        toast.error('Por favor selecciona un archivo.');
         return;
       }
     } else {
       if (!externalUrl.trim()) {
-        alert('Por favor ingresa la URL del documento.');
+        toast.error('Por favor ingresa la URL del documento.');
         return;
       }
       // Validate URL format
       try {
         new URL(externalUrl.trim());
       } catch {
-        alert('Por favor ingresa una URL válida.');
+        toast.error('Por favor ingresa una URL válida.');
         return;
       }
     }
 
     if (!title.trim()) {
-      alert('Por favor proporciona un título.');
+      toast.error('Por favor proporciona un título.');
       return;
     }
 
     if (!category) {
-      alert('Por favor selecciona una categoría.');
+      toast.error('Por favor selecciona una categoría.');
       return;
     }
 
     if (!status) {
-      alert('Por favor selecciona un estado inicial.');
+      toast.error('Por favor selecciona un estado inicial.');
       return;
     }
 
     if (codeValue.mode === 'manual' && !codeValue.code.trim()) {
-      alert('Escribe el código o elige "Sin código".');
+      toast.error('Escribe el código o elige "Sin código".');
       return;
     }
 
     if (scopeValue.scope === 'area' && !scopeValue.areaId) {
-      alert('Elige el área a la que aplica.');
+      toast.error('Elige el área a la que aplica.');
       return;
     }
 
     if (scopeValue.scope === 'areas' && scopeValue.sharedAreaIds.length === 0) {
-      alert('Elige al menos un área a la que aplica.');
+      toast.error('Elige al menos un área a la que aplica.');
       return;
     }
 
     if (scopeValue.scope === 'equipment' && !scopeValue.sharedEquipmentIds?.length) {
-      alert('Elige al menos un equipo al que aplica.');
+      toast.error('Elige al menos un equipo al que aplica.');
       return;
     }
 
     if (scopeValue.scope === 'products' && !scopeValue.sharedProductIds?.length) {
-      alert('Elige al menos un producto al que aplica.');
+      toast.error('Elige al menos un producto al que aplica.');
       return;
     }
 

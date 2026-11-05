@@ -45,6 +45,7 @@ const AreaResponsiblesSection = ({ area, onOpenEmployee }: Props) => {
   const [picked, setPicked] = useState<Employee | null>(null);
   const [shift, setShift] = useState('');
   const [prompt, setPrompt] = useState<ReportsPromptRequest | null>(null);
+  const [editingShift, setEditingShift] = useState<{ id: string; name: string; current: string; value: string } | null>(null);
 
   const queryKey = ['area-responsibles', area.id];
   const { data: responsibles = [] } = useQuery({ queryKey, queryFn: () => getResponsiblesByArea(area.id) });
@@ -160,10 +161,7 @@ const AreaResponsiblesSection = ({ area, onOpenEmployee }: Props) => {
                         {canEdit ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              const value = window.prompt('Turno (vacío para quitarlo)', r.shift || '');
-                              if (value !== null && value.trim() !== (r.shift || '')) update.mutate({ id: r.id, shift: value.trim() || null });
-                            }}
+                            onClick={() => setEditingShift({ id: r.id, name: personName(r), current: r.shift || '', value: r.shift || '' })}
                             className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-gray-700 hover:bg-gray-200"
                             title="Cambiar turno"
                           >
@@ -202,6 +200,46 @@ const AreaResponsiblesSection = ({ area, onOpenEmployee }: Props) => {
           );
         })}
       </div>
+
+      <Modal
+        isOpen={!!editingShift}
+        onClose={() => setEditingShift(null)}
+        title={editingShift ? `Turno de ${editingShift.name}` : ''}
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEditingShift(null)}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="shift-form">
+              Guardar
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="shift-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!editingShift) return;
+            const value = editingShift.value.trim();
+            if (value !== editingShift.current) update.mutate({ id: editingShift.id, shift: value || null });
+            setEditingShift(null);
+          }}
+        >
+          <label className="block text-sm font-medium text-gray-700">
+            Turno <span className="font-normal text-gray-500">(vacío para quitarlo)</span>
+            <input
+              autoFocus
+              value={editingShift?.value ?? ''}
+              onChange={(e) => setEditingShift((current) => current && { ...current, value: e.target.value })}
+              maxLength={50}
+              placeholder="Ej. Turno 1, Nocturno"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </label>
+        </form>
+      </Modal>
 
       <Modal
         isOpen={!!adding}

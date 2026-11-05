@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Upload, Image as ImageIcon, Check } from 'lucide-react';
@@ -92,7 +93,7 @@ const UploadPhotoModal = ({ isOpen, onClose, areaId, organizationId, plantId }: 
       });
     } catch (error: any) {
       console.error('Error uploading photo:', error);
-      alert('Error al subir la foto. Por favor intenta de nuevo.');
+      toast.error('Error al subir la foto. Por favor intenta de nuevo.');
       setUploading(false);
     }
   };

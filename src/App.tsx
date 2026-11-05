@@ -60,7 +60,8 @@ function App() {
 
   return (
     <>
-      <Toaster position="top-right" />
+      {/* Above the modals: many of these messages are shown from inside one */}
+      <Toaster position="top-right" containerStyle={{ zIndex: 10000 }} />
       <Router>
         <Routes>
           {/* Public Routes */}

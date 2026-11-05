@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Upload, Star } from 'lucide-react';
@@ -89,7 +90,7 @@ const UploadEquipmentImageModal = ({
       });
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      alert('Error al subir la imagen. Por favor intenta de nuevo.');
+      toast.error('Error al subir la imagen. Por favor intenta de nuevo.');
       setUploading(false);
     }
   };

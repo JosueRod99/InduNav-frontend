@@ -21,7 +21,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { getTourBySlug, getText } from '../../demo/tourData';
+import { getTourBySlug, getText, type DemoTour } from '../../demo/tourData';
 import { getEnhancedAreaData } from '../../demo/enhancedTourData';
 import ResumenTab from './components/ResumenTab';
 import UbicacionTab from './components/UbicacionTab';
@@ -34,8 +34,7 @@ import PredicionesTab from './components/PredicionesTab';
 
 type TabType = 'resumen' | 'ubicacion' | 'organigrama' | 'metricas' | 'especificaciones' | 'productos' | 'documentacion' | 'predicciones';
 
-const TourViewerPage = () => {
-  const { tourSlug } = useParams<{ tourSlug: string }>();
+const TourViewer = ({ tour }: { tour: DemoTour }) => {
   const navigate = useNavigate();
 
   const [language, setLanguage] = useState<'es' | 'en'>('es');
@@ -129,18 +128,6 @@ const TourViewerPage = () => {
       window.removeEventListener('keydown', onKey);
     };
   }, [areaMenuPosition]);
-
-  const tour = tourSlug ? getTourBySlug(tourSlug) : null;
-
-  useEffect(() => {
-    if (!tour) {
-      navigate('/tour');
-    }
-  }, [tour, navigate]);
-
-  if (!tour) {
-    return null;
-  }
 
   const currentArea = tour.areas[currentAreaIndex];
   const progress = ((currentAreaIndex + 1) / tour.areas.length) * 100;
@@ -804,6 +791,27 @@ const TourViewerPage = () => {
       </div>
     </div>
   );
+};
+
+// Looks the tour up apart from the viewer, whose hooks can then always run in the same order
+const TourViewerPage = () => {
+  const { tourSlug } = useParams<{ tourSlug: string }>();
+  const navigate = useNavigate();
+  const found = tourSlug ? getTourBySlug(tourSlug) : null;
+  // An inactive tour has no areas to show: same as one that does not exist
+  const tour = found?.isActive ? found : null;
+
+  useEffect(() => {
+    if (!tour) {
+      navigate('/tour');
+    }
+  }, [tour, navigate]);
+
+  if (!tour) {
+    return null;
+  }
+
+  return <TourViewer key={tour.slug} tour={tour} />;
 };
 
 export default TourViewerPage;

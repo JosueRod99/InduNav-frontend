@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Upload, FileText, Link, Check } from 'lucide-react';
@@ -65,7 +66,7 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
       ];
 
       if (!validTypes.includes(file.type)) {
-        alert('Tipo de archivo no válido. Solo se permiten PDFs, Word, Excel e imágenes.');
+        toast.error('Tipo de archivo no válido. Solo se permiten PDFs, Word, Excel e imágenes.');
         return;
       }
 
@@ -73,7 +74,7 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
       const maxSize = file.type === 'application/pdf' ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
       if (file.size > maxSize) {
         const maxSizeMB = file.type === 'application/pdf' ? 10 : 5;
-        alert(`El archivo es demasiado grande. Tamaño máximo: ${maxSizeMB}MB`);
+        toast.error(`El archivo es demasiado grande. Tamaño máximo: ${maxSizeMB}MB`);
         return;
       }
 
@@ -113,26 +114,26 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
 
   const handleUpload = async () => {
     if (!document) {
-      alert('Documento no encontrado.');
+      toast.error('Documento no encontrado.');
       return;
     }
 
     // Validation
     if (documentSource === 'uploaded') {
       if (!selectedFile) {
-        alert('Por favor selecciona un archivo.');
+        toast.error('Por favor selecciona un archivo.');
         return;
       }
     } else {
       if (!externalUrl.trim()) {
-        alert('Por favor ingresa la URL del documento.');
+        toast.error('Por favor ingresa la URL del documento.');
         return;
       }
       // Validate URL format
       try {
         new URL(externalUrl.trim());
       } catch {
-        alert('Por favor ingresa una URL válida.');
+        toast.error('Por favor ingresa una URL válida.');
         return;
       }
     }
@@ -181,7 +182,7 @@ const NewDocumentVersionModal = ({ isOpen, onClose, document, organizationId, pl
       }
     } catch (error: any) {
       console.error('Error creating document version:', error);
-      alert(error.response?.data?.message || 'Error al crear nueva versión. Por favor intenta de nuevo.');
+      toast.error(error.response?.data?.message || 'Error al crear nueva versión. Por favor intenta de nuevo.');
       setUploading(false);
     }
   };

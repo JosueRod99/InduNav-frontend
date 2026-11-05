@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { Play, Clock, MapPin, Lock, ArrowLeft } from 'lucide-react';
 import { DEMO_TOURS, getText } from '../../demo/tourData';
 
@@ -9,7 +10,7 @@ const TourCatalogPage = () => {
 
   const handleStartTour = (slug: string, isActive: boolean) => {
     if (!isActive) {
-      alert(language === 'es' ? 'Este tour no está disponible actualmente' : 'This tour is not currently available');
+      toast.error(language === 'es' ? 'Este tour no está disponible actualmente' : 'This tour is not currently available');
       return;
     }
     navigate(`/tour/${slug}`);
