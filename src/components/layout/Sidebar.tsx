@@ -117,26 +117,10 @@ const Sidebar = () => {
       >
         {/* Logo/Header */}
         <div className="flex h-16 items-center justify-between border-b border-gray-800 px-4">
-          {/* Logo - muestra según estado */}
+          {/* Light versions: the sidebar is always dark. On phones it opens at full width: never the small one */}
           <div className="flex items-center justify-center flex-1">
-            <h1
-              className={`
-                text-2xl font-bold transition-all duration-300
-                ${isOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}
-              `}
-            >
-              INAU
-            </h1>
-
-            {/* Logo colapsado (IN) */}
-            <span
-              className={`
-                text-xl font-bold transition-all duration-300
-                ${!isOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}
-              `}
-            >
-              IN
-            </span>
+            <img src="/inau_logo_light.png" alt="INAU" className={`h-12 w-auto ${isOpen ? '' : 'md:hidden'}`} />
+            <img src="/favicon_light.png" alt="INAU" className={`h-8 w-auto hidden ${isOpen ? '' : 'md:block'}`} />
           </div>
 
           {/* Close button - solo móvil */}
@@ -155,9 +139,8 @@ const Sidebar = () => {
             <div key={section.title ?? 'general'} className={section.title ? 'mt-6 border-t border-gray-800 pt-4' : ''}>
               {section.title && (
                 <p
-                  className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 transition-opacity ${
-                    isOpen ? 'opacity-100' : 'h-0 overflow-hidden opacity-0 md:h-0'
-                  }`}
+                  className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 transition-opacity ${isOpen ? 'opacity-100' : 'h-0 overflow-hidden opacity-0 md:h-0'
+                    }`}
                 >
                   {section.title}
                 </p>
@@ -223,16 +206,6 @@ const Sidebar = () => {
             </button>
           </div>
         </nav>
-
-        {/* Footer */}
-        <div
-          className={`
-            absolute bottom-0 w-full border-t border-gray-800 p-4 transition-opacity duration-300
-            ${isOpen ? 'opacity-100' : 'opacity-0 hidden'}
-          `}
-        >
-          <p className="text-xs text-gray-500">v0.1.0</p>
-        </div>
       </aside>
     </>
   );

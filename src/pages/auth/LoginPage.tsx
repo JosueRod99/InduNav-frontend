@@ -40,7 +40,9 @@ const LoginPage = () => {
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900">INAU</h1>
+          <h1>
+            <img src="/inau_logo_cropped.png" alt="INAU" className="mx-auto h-14 w-auto" />
+          </h1>
           <p className="mt-2 text-sm text-gray-600">
             Sistema de gestión de auditorías y visitas industriales
           </p>
@@ -174,11 +176,6 @@ const LoginPage = () => {
             </p>
           </div>
         </div>
-
-        {/* Version Info */}
-        <p className="text-center text-xs text-gray-500">
-          INAU v0.1.0 - Sistema de tours virtuales y auditorías industriales
-        </p>
       </div>
 
       <ContactModal
