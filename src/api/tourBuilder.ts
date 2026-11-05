@@ -269,6 +269,7 @@ export interface PublishEstimate {
   usage: PublicationUsage;
   limit_reached: boolean;
   counts_toward_limit: boolean;
+  areas_keeping_script?: string[]; // narrative edited, but a custom script keeps the audio
 }
 
 export const getPublishEstimate = async (tourId: string): Promise<PublishEstimate> => {

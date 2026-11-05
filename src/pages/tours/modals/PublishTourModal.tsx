@@ -21,7 +21,7 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
   const [isPublishing, setIsPublishing] = useState(false);
 
   // The preview tells which areas would show nothing; the estimate, what happens with the narration
-  const { data: checks, isLoading } = useQuery({
+  const { data, isFetching } = useQuery({
     queryKey: ['tour-publish-check', tour.id],
     queryFn: async () => {
       await beforePublish();
@@ -30,7 +30,10 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
     },
     enabled: isOpen,
     staleTime: 0,
+    refetchOnWindowFocus: false,
   });
+  // A result kept from the last time the dialog was open does not count: the draft may have changed
+  const checks = isFetching ? undefined : data;
   const preview = checks?.preview;
   const estimate = checks?.estimate;
   const keepPreviousAudio = !!estimate && estimate.limit_reached && estimate.to_generate > 0;
@@ -76,7 +79,7 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={handlePublish} isLoading={isPublishing} disabled={isLoading} className="gap-1.5">
+          <Button onClick={handlePublish} isLoading={isPublishing} disabled={isFetching} className="gap-1.5">
             <Rocket className="h-4 w-4" />
             {keepPreviousAudio ? 'Publicar sin narración nueva' : isRepublish ? 'Publicar cambios' : 'Publicar'}
           </Button>
@@ -118,11 +121,31 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
             <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">
               <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <p>
-                No hay narración nueva que generar{estimate.reused > 0 && <> ({estimate.reused} audios se reutilizan)</>}: esta publicación{' '}
-                <strong>no consume</strong> de tus {estimate.usage.limit} publicaciones con narración del mes.
+                {isRepublish && 'Tus cambios de texto se publicarán. '}
+                {estimate.reused > 0
+                  ? `El audio no cambia (${estimate.reused === 1 ? 'se reutiliza 1 audio' : `se reutilizan ${estimate.reused} audios`})`
+                  : 'No hay narración que generar'}
+                , así que <strong>no consume</strong> de tus {estimate.usage.limit} publicaciones con narración del mes.
               </p>
             </div>
           )
+        )}
+
+        {!!estimate?.areas_keeping_script?.length && (
+          <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <span>
+              Cambiaste la narrativa de <strong>{estimate.areas_keeping_script.join(', ')}</strong>, pero se escuchará su guion
+              personalizado con el audio actual. Para actualizarlo, edita el guion o vuelve al automático en la pestaña Narración.
+            </span>
+          </p>
+        )}
+
+        {estimate?.test_mode && estimate.to_generate === 0 && (
+          <p className="rounded-lg border border-purple-300 bg-purple-50 p-3 text-sm text-purple-900">
+            <strong>Modo prueba de narración activo:</strong> solo se compara la primera frase de cada guion. Un cambio después de
+            esa frase no genera audio.
+          </p>
         )}
 
         {estimate?.test_mode && estimate.to_generate > 0 && (
@@ -145,7 +168,7 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
           </p>
         )}
 
-        {isLoading ? (
+        {isFetching ? (
           <p className="flex items-center gap-2 text-sm text-gray-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Revisando el contenido…
           </p>

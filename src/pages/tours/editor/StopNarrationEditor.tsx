@@ -101,6 +101,12 @@ const StopNarrationEditor = ({ stop, language, item, isLoading, onChange }: Stop
           )}
         </div>
 
+        {isCustom && (
+          <p className="mb-1.5 text-xs text-amber-700">
+            Este guion no cambia con la narrativa: si la editas, actualízalo aquí o vuelve al guion automático.
+          </p>
+        )}
+
         {isCustom ? (
           <textarea
             value={custom || ''}
