@@ -163,7 +163,8 @@ const TourViewer = ({ tour }: { tour: DemoTour }) => {
     setNarrationText(text);
 
     // Buscar audio pre-generado en los datos del área
-    const savedAudioUrl = currentArea.audioFiles?.[language];
+    // Most areas have no audio in English on purpose: they play the Spanish one
+    const savedAudioUrl = currentArea.audioFiles?.[language] ?? currentArea.audioFiles?.es;
 
 
     if (savedAudioUrl) {
@@ -184,6 +185,8 @@ const TourViewer = ({ tour }: { tour: DemoTour }) => {
       });
 
       audio.addEventListener('error', (e) => {
+        // Emptying src when leaving the area also fires this: it is not a failure
+        if (!audio.getAttribute('src')) return;
         console.error('❌ Error cargando audio:', e);
         console.error('URL del audio:', savedAudioUrl);
       });
