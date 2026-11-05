@@ -1,9 +1,9 @@
+import { useCan } from '../../hooks/usePermissions';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Award, BadgeCheck, Plus, X } from 'lucide-react';
 import Button from '../ui/Button';
-import { useAuthStore } from '../../store/authStore';
 import {
   formatDate,
   getCertificationTypes,
@@ -18,7 +18,6 @@ import {
 // or remove here, one person at a time) and the system ones they are covered by (read only here:
 // they are managed in the plant "Certificaciones" tab).
 
-const EDITORS = ['platform_admin', 'org_owner', 'plant_manager'];
 const today = () => new Date().toISOString().slice(0, 10);
 
 const STATE = {
@@ -29,7 +28,8 @@ const STATE = {
 
 const EmployeeCertifications = ({ employeeId, plantId }: { employeeId: string; plantId?: string | null }) => {
   const queryClient = useQueryClient();
-  const canEdit = EDITORS.includes(useAuthStore((st) => st.user?.role?.name) || '') && !!plantId;
+  const can = useCan();
+  const canEdit = can('certifications.update') && !!plantId;
   const [adding, setAdding] = useState(false);
   const [typeId, setTypeId] = useState('');
   const [obtained, setObtained] = useState(today());

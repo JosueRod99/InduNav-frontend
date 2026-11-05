@@ -1,7 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../../store/authStore';
-import { MANAGERS } from '../plants/plantTabs';
 import { Plus, Pencil, Trash2, Wrench, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -23,6 +21,7 @@ import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 import SectionHeader from '../../components/ui/SectionHeader';
 import { matchesSearch } from '../../utils/search';
+import { useCan } from '../../hooks/usePermissions';
 
 // Equipment of the plant: summary by status (each one filters), one row of filters, and a table
 // with the area each item is in (cards on phones). The list is filtered in the browser.
@@ -66,9 +65,10 @@ const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {})
 
   const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const queryClient = useQueryClient();
-  const role = useAuthStore((state) => state.user?.role?.name) || '';
-  // Inside an area page other roles can read the list; editing and the detail page are for these
-  const canManage = !area || MANAGERS.includes(role);
+  const can = useCan();
+  const canCreate = can('equipment.create');
+  const canUpdate = can('equipment.update');
+  const canDelete = can('equipment.delete');
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
   const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
@@ -148,7 +148,7 @@ const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {})
     setEditingEquipment(null);
   };
 
-  const openDetails = (id: string) => canManage && navigate(`/equipment/${id}`);
+  const openDetails = (id: string) => navigate(`/equipment/${id}`);
   const filtersActive = !!(searchQuery || selectedType || selectedStatus || selectedArea);
   const clearFilters = () => {
     setSearchQuery('');
@@ -173,7 +173,7 @@ const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {})
         description={area ? `Herramientas y maquinaria ubicadas actualmente en "${area.name}".` : 'Herramientas y maquinaria de la planta, con su estado y el área donde están.'}
         actions={
           selectedOrg &&
-          canManage && (
+          canCreate && (
             <Button onClick={handleCreateNew} className="gap-2">
               <Plus className="h-4 w-4" />
               Nuevo Equipo
@@ -291,7 +291,7 @@ const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {})
           {area ? (
             <>
               <p className="mb-4 text-gray-600">Crea uno aquí y queda asignado a esta área, o asígnalo desde la pestaña "Asignaciones" de cada equipo.</p>
-              {canManage && (
+              {canCreate && (
                 <Button onClick={handleCreateNew} className="gap-2">
                   <Plus className="h-4 w-4" />
                   Nuevo Equipo
@@ -334,7 +334,7 @@ const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {})
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {visible.map((item) => (
-                  <tr key={item.id} className={`transition-colors hover:bg-gray-50 ${canManage ? 'cursor-pointer' : ''}`} onClick={() => openDetails(item.id)}>
+                  <tr key={item.id} className={`transition-colors hover:bg-gray-50 cursor-pointer`} onClick={() => openDetails(item.id)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {item.primary_image_url ? (
@@ -361,13 +361,17 @@ const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {})
                       <Badge variant={STATUS_BADGE[item.status]}>{EQUIPMENT_STATUS_LABELS[item.status]}</Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className={`flex items-center justify-end gap-2 ${canManage ? '' : 'hidden'}`} onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => handleEdit(item)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" title="Editar" aria-label={`Editar ${item.name}`}>
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => handleDelete(item)} className="rounded p-1.5 text-red-600 hover:bg-red-50" title="Eliminar" aria-label={`Eliminar ${item.name}`}>
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        {canUpdate && (
+                          <button onClick={() => handleEdit(item)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" title="Editar" aria-label={`Editar ${item.name}`}>
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => handleDelete(item)} className="rounded p-1.5 text-red-600 hover:bg-red-50" title="Eliminar" aria-label={`Eliminar ${item.name}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -400,13 +404,17 @@ const EquipmentPage = ({ plantId, organizationId, area }: PlantScopedProps = {})
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   {area ? <InArea item={item} areaId={area.id} /> : <AreaChips item={item} />}
-                  <span className={`flex flex-shrink-0 gap-1 ${canManage ? '' : 'hidden'}`}>
-                    <button onClick={() => handleEdit(item)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar ${item.name}`}>
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => handleDelete(item)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar ${item.name}`}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <span className="flex flex-shrink-0 gap-1">
+                    {canUpdate && (
+                      <button onClick={() => handleEdit(item)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar ${item.name}`}>
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => handleDelete(item)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar ${item.name}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </span>
                 </div>
               </li>

@@ -8,9 +8,12 @@ import UserModal from './UserModal';
 import { getUsers, deleteUser } from '../../api/users';
 import type { User } from '../../types';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useCan } from '../../hooks/usePermissions';
 
 const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
   const embedded = !!organizationId; // organization page tab: only its users
+  const can = useCan();
+  const canCreate = can('users.create');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
@@ -58,10 +61,12 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
           title="Usuarios"
           description="Quiénes entran a la plataforma por esta empresa."
           actions={
-            <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
-              <Plus className="h-4 w-4" />
-              Nuevo Usuario
-            </Button>
+            canCreate && (
+              <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
+                <Plus className="h-4 w-4" />
+                Nuevo Usuario
+              </Button>
+            )
           }
         />
       ) : (
@@ -72,10 +77,12 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
               Gestiona los usuarios del sistema
             </p>
           </div>
-          <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Usuario
-          </Button>
+          {canCreate && (
+            <Button onClick={handleCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo Usuario
+            </Button>
+          )}
         </div>
       )}
 
@@ -96,10 +103,12 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
             Comienza creando un nuevo usuario.
           </p>
           <div className="mt-6">
-            <Button onClick={handleCreate} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nuevo Usuario
-            </Button>
+            {canCreate && (
+              <Button onClick={handleCreate} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Nuevo Usuario
+              </Button>
+            )}
           </div>
         </div>
       ) : (
@@ -179,20 +188,24 @@ const UsersPage = ({ organizationId }: { organizationId?: string } = {}) => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleEdit(user)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                      title="Editar usuario"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(user.id)}
-                      className="text-red-600 hover:text-red-900"
-                      title="Eliminar usuario"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {can('users.update') && (
+                      <button
+                        onClick={() => handleEdit(user)}
+                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        title="Editar usuario"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                    {can('users.delete') && (
+                      <button
+                        onClick={() => handleDelete(user.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Eliminar usuario"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

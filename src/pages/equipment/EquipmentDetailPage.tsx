@@ -15,6 +15,7 @@ import { getEquipmentById, getEquipmentImages, EQUIPMENT_TYPE_LABELS, EQUIPMENT_
 import { getEquipmentProducts } from '../../api/productStepEquipment';
 import { getPlantDocuments } from '../../api/areaDocuments';
 import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
+import { useCan } from '../../hooks/usePermissions';
 
 type TabType = 'general' | 'location' | 'products' | 'documents' | 'gallery';
 
@@ -24,6 +25,8 @@ const EquipmentDetailPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') as TabType) || 'general';
   const setActiveTab = (tab: TabType) => setSearchParams({ tab }, { replace: true });
+  const can = useCan();
+  const canEdit = can('equipment.update');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: equipment, isLoading } = useQuery({
@@ -61,8 +64,8 @@ const EquipmentDetailPage = () => {
   const tabs: { id: TabType; label: string; Icon: typeof Wrench; count?: number }[] = [
     { id: 'general', label: 'Resumen', Icon: LayoutDashboard },
     { id: 'location', label: 'Ubicación', Icon: MapPin },
-    { id: 'products', label: 'Productos', Icon: Package, count: new Set(links.map((l) => l.product_id)).size },
-    { id: 'documents', label: 'Documentos', Icon: FileText, count: documentCount },
+    ...(can('products.read') ? [{ id: 'products' as TabType, label: 'Productos', Icon: Package, count: new Set(links.map((l) => l.product_id)).size }] : []),
+    ...(can('documents.read', 'documents.read_public') ? [{ id: 'documents' as TabType, label: 'Documentos', Icon: FileText, count: documentCount }] : []),
     { id: 'gallery', label: 'Galería', Icon: ImageIcon, count: images.length },
   ];
 
@@ -93,10 +96,12 @@ const EquipmentDetailPage = () => {
               </div>
             </div>
           </div>
-          <Button onClick={() => setIsEditModalOpen(true)} variant="outline" className="gap-2">
-            <Edit className="h-4 w-4" />
-            Editar equipo
-          </Button>
+          {canEdit && (
+            <Button onClick={() => setIsEditModalOpen(true)} variant="outline" className="gap-2">
+              <Edit className="h-4 w-4" />
+              Editar equipo
+            </Button>
+          )}
         </div>
       </div>
 
@@ -119,7 +124,7 @@ const EquipmentDetailPage = () => {
       </ScrollTabs>
 
       <div>
-        {activeTab === 'general' && <EquipmentSummaryTab equipment={equipment} onEdit={() => setIsEditModalOpen(true)} />}
+        {activeTab === 'general' && <EquipmentSummaryTab equipment={equipment} onEdit={canEdit ? () => setIsEditModalOpen(true) : undefined} />}
         {activeTab === 'location' && <EquipmentAssignmentsTab equipmentId={id!} equipment={equipment} />}
         {activeTab === 'products' && <EquipmentProductsTab equipmentId={id!} equipment={equipment} />}
         {activeTab === 'documents' && (

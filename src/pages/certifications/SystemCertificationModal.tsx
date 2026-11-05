@@ -17,6 +17,7 @@ import {
 import { getAreas } from '../../api/areas';
 import { getEmployees } from '../../api/employees';
 import { personName } from '../../utils/personName';
+import { useAuthStore } from '../../store/authStore';
 
 // System certification (ISO 9001, FSC…): which one, what it covers (whole company, this plant or
 // an area), status, certificate number, dates and responsible person.
@@ -40,6 +41,7 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, organizationId, cert
   const [typeId, setTypeId] = useState('');
   const [newName, setNewName] = useState('');
   const [newBody, setNewBody] = useState('');
+  const isPlantScope = useAuthStore((state) => state.user?.role?.scope) === 'plant';
   const [scope, setScope] = useState<CertificationScope>('organization');
   const [areaId, setAreaId] = useState('');
   const [status, setStatus] = useState<CertificationStatus>('active');
@@ -63,7 +65,7 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, organizationId, cert
     setTypeId(certification?.type_id || '');
     setNewName('');
     setNewBody('');
-    setScope(certification?.scope || (defaultAreaId ? 'area' : 'organization'));
+    setScope(certification?.scope || (defaultAreaId ? 'area' : isPlantScope ? 'plant' : 'organization'));
     setAreaId(certification?.area_id || defaultAreaId || '');
     setStatus(certification?.status || 'active');
     setNumber(certification?.certificate_number || '');
@@ -171,7 +173,7 @@ const SystemCertificationModal = ({ isOpen, onClose, plant, organizationId, cert
                 ['plant', `Esta planta (${plant?.name})`],
                 ['area', 'Un área'],
               ] as const
-            ).map(([value, label]) => (
+            ).filter(([value]) => !(isPlantScope && value === 'organization')).map(([value, label]) => (
               <label key={value} className="flex items-center gap-1.5">
                 <input type="radio" name="scope" checked={scope === value} onChange={() => setScope(value)} />
                 {label}

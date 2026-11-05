@@ -5,6 +5,7 @@ import { getPhotosByArea, deletePhoto, type AreaPhoto } from '../../../api/areaP
 import Badge from '../../../components/ui/Badge';
 import UploadPhotoModal from '../modals/UploadPhotoModal';
 import EditPhotoModal from '../modals/EditPhotoModal';
+import { useCan } from '../../../hooks/usePermissions';
 
 interface GalleryTabProps {
   areaId: string;
@@ -12,6 +13,8 @@ interface GalleryTabProps {
 }
 
 const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
+  const can = useCan();
+  const canEdit = can('areas.update');
   const queryClient = useQueryClient();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -48,13 +51,15 @@ const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
           <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Sin Fotos</h3>
           <p className="text-gray-600 mb-4">Aún no hay fotos en la galería de esta área.</p>
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            <Upload className="h-4 w-4" />
-            Subir Fotos
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <Upload className="h-4 w-4" />
+              Subir Fotos
+            </button>
+          )}
         </div>
 
         <UploadPhotoModal
@@ -121,13 +126,15 @@ const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
             </button>
           </div>
 
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            <Upload className="h-4 w-4" />
-            Subir Fotos
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <Upload className="h-4 w-4" />
+              Subir Fotos
+            </button>
+          )}
         </div>
       </div>
 
@@ -143,7 +150,7 @@ const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
                 {typePhotos.map((photo) => (
                   <div
                     key={photo.id}
-                    onClick={() => handlePhotoClick(photo)}
+                    onClick={canEdit ? () => handlePhotoClick(photo) : undefined}
                     className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-all hover:shadow-lg cursor-pointer"
                   >
                     <img
@@ -215,7 +222,7 @@ const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
                     <img
                       src={photo.thumbnail_url || photo.photo_url}
                       alt={photo.caption || 'Foto'}
-                      onClick={() => handlePhotoClick(photo)}
+                      onClick={canEdit ? () => handlePhotoClick(photo) : undefined}
                       className="h-16 w-16 object-cover rounded cursor-pointer hover:opacity-75 transition-opacity"
                     />
                   </td>
@@ -242,18 +249,20 @@ const GalleryTab = ({ areaId, area }: GalleryTabProps) => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => {
-                        if (confirm('¿Estás seguro de que quieres eliminar esta foto?')) {
-                          deletePhotoMutation.mutate(photo.id);
-                        }
-                      }}
-                      disabled={deletePhotoMutation.isPending}
-                      className="text-red-600 hover:text-red-900 transition-colors disabled:opacity-50"
-                      title="Eliminar foto"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => {
+                          if (confirm('¿Estás seguro de que quieres eliminar esta foto?')) {
+                            deletePhotoMutation.mutate(photo.id);
+                          }
+                        }}
+                        disabled={deletePhotoMutation.isPending}
+                        className="text-red-600 hover:text-red-900 transition-colors disabled:opacity-50"
+                        title="Eliminar foto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

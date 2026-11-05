@@ -6,11 +6,11 @@ import { getPlant, getPlants } from '../../api/plants';
 import PlantSummaryTab from './PlantSummaryTab';
 import PlantSettingsTab from './PlantSettingsTab';
 import ToursPage from '../tours/ToursPage'; // also a top-level page: no separate chunk
-import { IN_HEADER, MANAGERS, PLANT_TABS, type PlantTab } from './plantTabs';
-import { useAuthStore } from '../../store/authStore';
+import { IN_HEADER, PLANT_TABS, type PlantTab } from './plantTabs';
 import { useBackTarget } from '../../hooks/useBackNavigation';
 import { avatarUrl } from '../../utils/avatarUrl';
 import ScrollTabs from '../../components/ui/ScrollTabs';
+import { useCan } from '../../hooks/usePermissions';
 
 // Plant workspace: everything about one plant behind tabs (/plants/:plantId/:tab). The module
 // pages render here with the plant fixed, so there are no repeated organization/plant filters.
@@ -51,9 +51,9 @@ const PlantWorkspacePage = () => {
   const { plantId, tab } = useParams<{ plantId: string; tab?: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const role = useAuthStore((state) => state.user?.role?.name) || '';
-  const tabs = PLANT_TABS.filter((t) => !t.roles || (t.roles as readonly string[]).includes(role));
-  const canSeeEmployeeList = MANAGERS.includes(role);
+  const can = useCan();
+  const tabs = PLANT_TABS.filter((t) => !t.anyOf || can(...t.anyOf));
+  const canSeeEmployeeList = can('employees.read');
   // Opened from an organization's page: the breadcrumb leads back there instead of to all plants
   const origin = useBackTarget(plantId || '', { path: '/plants', label: 'Plantas' });
   const fromOrganization = origin.fromOrigin && origin.path.startsWith('/organizations/');

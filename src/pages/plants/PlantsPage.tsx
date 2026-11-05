@@ -10,9 +10,9 @@ import { getOrganizations } from '../../api/organizations';
 import type { Plant } from '../../types';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useBackState, useNavigateWithBack } from '../../hooks/useBackNavigation';
-import { useAuthStore } from '../../store/authStore';
 import { avatarUrl } from '../../utils/avatarUrl';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useCan } from '../../hooks/usePermissions';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -29,8 +29,11 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
   const embedded = !!organizationId; // organization page tab: fixed organization
   const navigate = useNavigateWithBack(); // the plant's breadcrumb returns here (e.g. to the organization)
   const backState = useBackState();
-  const { user } = useAuthStore();
-  const isPlatformAdmin = user?.role?.name === 'platform_admin';
+  const can = useCan();
+  const isPlatformAdmin = can('organizations.create');
+  const canCreate = can('plants.create');
+  const canUpdate = can('plants.update');
+  const canDelete = can('plants.delete');
   // Coming from an old section link (/equipment…): pick the plant to open that section
   const [searchParams] = useSearchParams();
   const section = SECTION_LABELS[searchParams.get('seccion') || ''] ? searchParams.get('seccion')! : null;
@@ -99,10 +102,12 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
           title="Plantas"
           description="Las plantas de esta empresa."
           actions={
-            <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
-              <Plus className="h-4 w-4" />
-              Nueva Planta
-            </Button>
+            canCreate && (
+              <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
+                <Plus className="h-4 w-4" />
+                Nueva Planta
+              </Button>
+            )
           }
         />
       ) : (
@@ -113,10 +118,12 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
               {section ? `Elige la planta para ver ${SECTION_LABELS[section]}` : 'Gestiona las plantas industriales'}
             </p>
           </div>
-          <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
-            <Plus className="h-4 w-4" />
-            Nueva Planta
-          </Button>
+          {canCreate && (
+            <Button onClick={handleCreate} className="gap-2 whitespace-nowrap">
+              <Plus className="h-4 w-4" />
+              Nueva Planta
+            </Button>
+          )}
         </div>
       )}
 
@@ -161,10 +168,12 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
             Comienza creando una nueva planta.
           </p>
           <div className="mt-6">
-            <Button onClick={handleCreate} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nueva Planta
-            </Button>
+            {canCreate && (
+              <Button onClick={handleCreate} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Nueva Planta
+              </Button>
+            )}
           </div>
         </div>
       ) : (
@@ -187,12 +196,16 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
                   </Link>
                   <p className="text-xs text-gray-500">{[plant.location, !embedded && getOrganizationName(plant.organization_id)].filter(Boolean).join(' · ') || plant.slug}</p>
                 </div>
-                <button onClick={() => handleEdit(plant)} className="text-blue-600 hover:text-blue-900" aria-label={`Editar ${plant.name}`}>
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button onClick={() => handleDelete(plant.id)} className="text-red-600 hover:text-red-900" aria-label={`Eliminar ${plant.name}`}>
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {canUpdate && (
+                  <button onClick={() => handleEdit(plant)} className="text-blue-600 hover:text-blue-900" aria-label={`Editar ${plant.name}`}>
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                {canDelete && (
+                  <button onClick={() => handleDelete(plant.id)} className="text-red-600 hover:text-red-900" aria-label={`Eliminar ${plant.name}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
                 <Badge variant={plant.is_active ? 'success' : 'error'}>{plant.is_active ? 'Activa' : 'Inactiva'}</Badge>
@@ -296,18 +309,22 @@ const PlantsPage = ({ organizationId }: { organizationId?: string } = {}) => {
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleEdit(plant)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(plant.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {canUpdate && (
+                      <button
+                        onClick={() => handleEdit(plant)}
+                        className="text-blue-600 hover:text-blue-900 mr-4"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDelete(plant.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

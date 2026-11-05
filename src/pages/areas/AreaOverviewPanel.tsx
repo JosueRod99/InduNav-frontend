@@ -32,9 +32,9 @@ interface Props {
   plantId: string;
   backState?: unknown;
   onSelect: (area: AreaOverview) => void;
-  onEdit: () => void;
-  onAddChild: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onAddChild?: () => void;
+  onDelete?: () => void;
   onClose: () => void;
   onMove?: (parentId: string | null) => void; // keyboard alternative to dragging in the tree
 }
@@ -99,9 +99,11 @@ const AreaOverviewPanel = ({ area, areas, plantId, backState, onSelect, onEdit, 
             <p className="text-xs text-gray-600">{[area.code, areaTypeLabel(area.area_type)].filter(Boolean).join(' · ')}</p>
           </div>
           <div className="flex flex-shrink-0 items-center gap-0.5">
-            <button onClick={onDelete} title="Eliminar área" aria-label="Eliminar área" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
-              <Trash2 className="h-4 w-4" />
-            </button>
+            {onDelete && (
+              <button onClick={onDelete} title="Eliminar área" aria-label="Eliminar área" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
             <button onClick={onClose} title="Cerrar" aria-label="Cerrar" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
               <X className="h-4 w-4" />
             </button>
@@ -116,12 +118,16 @@ const AreaOverviewPanel = ({ area, areas, plantId, backState, onSelect, onEdit, 
           >
             <ExternalLink className="h-4 w-4" /> Abrir área
           </Link>
-          <button onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            <Pencil className="h-4 w-4" /> Editar
-          </button>
-          <button onClick={onAddChild} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            <Plus className="h-4 w-4" /> Subárea
-          </button>
+          {onEdit && (
+            <button onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <Pencil className="h-4 w-4" /> Editar
+            </button>
+          )}
+          {onAddChild && (
+            <button onClick={onAddChild} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <Plus className="h-4 w-4" /> Subárea
+            </button>
+          )}
         </div>
       </div>
 

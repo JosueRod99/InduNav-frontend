@@ -14,6 +14,7 @@ import Button from '../../../components/ui/Button';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import UploadEquipmentImageModal from '../modals/UploadEquipmentImageModal';
 import ViewEquipmentImageModal from '../modals/ViewEquipmentImageModal';
+import { useCan } from '../../../hooks/usePermissions';
 
 interface EquipmentGalleryTabProps {
   equipmentId: string;
@@ -21,6 +22,7 @@ interface EquipmentGalleryTabProps {
 }
 
 const EquipmentGalleryTab = ({ equipmentId, equipment }: EquipmentGalleryTabProps) => {
+  const canEdit = useCan()('equipment.update');
   const queryClient = useQueryClient();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<EquipmentImage | null>(null);
@@ -91,10 +93,12 @@ const EquipmentGalleryTab = ({ equipmentId, equipment }: EquipmentGalleryTabProp
           <p className="text-gray-600 mb-4">
             Aún no hay imágenes en la galería de este equipo.
           </p>
-          <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Subir Imágenes
-          </Button>
+          {canEdit && (
+            <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Subir Imágenes
+            </Button>
+          )}
         </div>
 
         <UploadEquipmentImageModal
@@ -115,10 +119,12 @@ const EquipmentGalleryTab = ({ equipmentId, equipment }: EquipmentGalleryTabProp
         title={`Galería (${images.length})`}
         description="La imagen principal se muestra en los tours y en las listas de equipos."
         actions={
-          <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Subir Imágenes
-          </Button>
+          canEdit && (
+            <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Subir Imágenes
+            </Button>
+          )
         }
       />
 
@@ -135,7 +141,7 @@ const EquipmentGalleryTab = ({ equipmentId, equipment }: EquipmentGalleryTabProp
             <img
               src={image.image_url}
               alt={image.caption || 'Imagen del equipo'}
-              onClick={() => handleImageClick(image)}
+              onClick={canEdit ? () => handleImageClick(image) : undefined}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 cursor-pointer"
               loading="lazy"
             />
@@ -161,7 +167,7 @@ const EquipmentGalleryTab = ({ equipmentId, equipment }: EquipmentGalleryTabProp
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-between gap-2">
+                <div className={`flex items-center justify-between gap-2 ${canEdit ? '' : 'hidden'}`}>
                   {!image.is_primary && (
                     <button
                       onClick={(e) => {

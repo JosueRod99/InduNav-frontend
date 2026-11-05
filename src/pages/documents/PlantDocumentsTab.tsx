@@ -35,6 +35,8 @@ import EditDocumentModal from "../areas/modals/EditDocumentModal";
 import NewDocumentVersionModal from "../areas/modals/NewDocumentVersionModal";
 import SectionHeader from "../../components/ui/SectionHeader";
 import { matchesSearch } from "../../utils/search";
+import { useCan } from '../../hooks/usePermissions';
+import { useAuthStore } from '../../store/authStore';
 
 // Plant document library: everything that applies to its areas, to the whole plant or to the
 // whole company, with who each document applies to.
@@ -57,6 +59,12 @@ const SCOPE_BADGE: Record<DocumentScope, string> = {
 };
 
 const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Props) => {
+  const can = useCan();
+  const canCreate = can('documents.create');
+  const canDelete = can('documents.delete');
+  // Plant scope: what is of the whole company is read, not changed
+  const isPlantScope = useAuthStore((state) => state.user?.role?.scope) === 'plant';
+  const canChange = (doc: { scope: string }) => can('documents.update') && !(isPlantScope && doc.scope === 'organization');
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<"" | DocumentScope>("");
@@ -202,9 +210,11 @@ const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Pr
                 : "Todos los documentos de la planta y de la empresa, y a quién aplica cada uno."
         }
         actions={
-          <Button onClick={() => setCreating(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Nuevo documento
-          </Button>
+          canCreate && (
+            <Button onClick={() => setCreating(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Nuevo documento
+            </Button>
+          )
         }
       />
 
@@ -401,12 +411,16 @@ const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Pr
                         {doc.document_code}
                       </div>
                     )}
-                    <button
-                      onClick={() => setEditing(doc)}
-                      className="text-left text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline"
-                    >
-                      {doc.title}
-                    </button>
+                    {canChange(doc) ? (
+                      <button
+                        onClick={() => setEditing(doc)}
+                        className="text-left text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline"
+                      >
+                        {doc.title}
+                      </button>
+                    ) : (
+                      <span className="text-sm font-medium text-gray-900">{doc.title}</span>
+                    )}
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${SCOPE_BADGE[doc.scope]}`}
@@ -452,12 +466,14 @@ const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Pr
                   {doc.document_type === "pending" &&
                   doc.status === "archived" ? null : doc.document_type ===
                     "pending" ? (
-                    <button
-                      onClick={() => setVersioning(doc)}
-                      className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
-                    >
-                      <Upload className="h-3.5 w-3.5" /> Subir archivo
-                    </button>
+                    canChange(doc) && (
+                      <button
+                        onClick={() => setVersioning(doc)}
+                        className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-200"
+                      >
+                        <Upload className="h-3.5 w-3.5" /> Subir archivo
+                      </button>
+                    )
                   ) : (
                     <>
                       <a
@@ -470,7 +486,7 @@ const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Pr
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
-                      {doc.status !== "archived" && (
+                      {doc.status !== "archived" && canChange(doc) && (
                         <button
                           onClick={() => setVersioning(doc)}
                           className="text-purple-600 hover:text-purple-900"
@@ -482,16 +498,18 @@ const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Pr
                       )}
                     </>
                   )}
-                  <button
-                    onClick={() => setEditing(doc)}
-                    className="text-gray-600 hover:text-gray-900"
-                    title="Ver y editar detalles"
-                    aria-label={`Detalles de ${doc.title}`}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-                  {doc.status === "archived" ? (
+                  {canChange(doc) && (
                     <button
+                      onClick={() => setEditing(doc)}
+                      className="text-gray-600 hover:text-gray-900"
+                      title="Ver y editar detalles"
+                      aria-label={`Detalles de ${doc.title}`}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  )}
+                  {doc.status === "archived" ? (
+ canChange(doc) && (                    <button
                       onClick={() => restore.mutate(doc.id)}
                       disabled={restore.isPending}
                       className="text-green-700 hover:text-green-900 disabled:opacity-50"
@@ -499,9 +517,9 @@ const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Pr
                       aria-label={`Restaurar ${doc.title}`}
                     >
                       <ArchiveRestore className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <button
+                    </button>)
+) : (
+ canDelete && !(isPlantScope && doc.scope === "organization") && (                    <button
                       onClick={() =>
                         window.confirm(`¿Archivar "${doc.title}"?`) &&
                         archive.mutate(doc.id)
@@ -512,8 +530,8 @@ const PlantDocumentsTab = ({ plant, organization, area, product, equipment }: Pr
                       aria-label={`Archivar ${doc.title}`}
                     >
                       <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                    </button>)
+)}
                 </div>
               </li>
             ))}

@@ -13,7 +13,7 @@ import EquipmentSpecificationsEditor from '../components/EquipmentSpecifications
 const WARRANTY_ALERT_DAYS = 30;
 const niceDate = (value: Date | string) => new Date(String(value).length <= 10 ? `${value}T12:00:00` : value).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' });
 
-const EquipmentSummaryTab = ({ equipment, onEdit }: { equipment: Equipment; onEdit: () => void }) => {
+const EquipmentSummaryTab = ({ equipment, onEdit }: { equipment: Equipment; onEdit?: () => void }) => {
   const { pathname } = useLocation();
   const tab = (name: string) => `${pathname}?tab=${name}`;
   const { data: links = [] } = useQuery({ queryKey: ['equipment-products', equipment.id], queryFn: () => getEquipmentProducts(equipment.id) });
@@ -157,9 +157,11 @@ const EquipmentSummaryTab = ({ equipment, onEdit }: { equipment: Equipment; onEd
         {missing.length > 0 && (
           <p className={`text-sm text-gray-500 ${captured.length ? 'mt-3 border-t border-gray-100 pt-3' : ''}`}>
             Sin capturar: {missing.join(', ')}.{' '}
-            <button onClick={onEdit} className="font-medium text-blue-700 hover:underline">
-              Completar datos
-            </button>
+            {onEdit && (
+              <button onClick={onEdit} className="font-medium text-blue-700 hover:underline">
+                Completar datos
+              </button>
+            )}
           </p>
         )}
       </section>

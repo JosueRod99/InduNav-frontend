@@ -22,7 +22,6 @@ import LayoutAreaList from '../../layouts/LayoutAreaList';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import AreaLayoutBackgroundModal from '../modals/AreaLayoutBackgroundModal';
 import PlaceEquipmentModal from '../modals/PlaceEquipmentModal';
-import { useAuthStore } from '../../../store/authStore';
 import { getAreaLayouts, getPlantCoverage, recropAreaLayout, type AreaCoverage } from '../../../api/layouts';
 import { floorLabel, sortFloors } from '../../../utils/floors';
 import {
@@ -49,6 +48,7 @@ import {
 import { computePlantCrop, cropMissesZones, liveOutlines, plantImageBoundsForCrop, type AreaLayoutData } from '../../../utils/areaLayout';
 import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 import { addZone, removeZone, replaceZone, ringFromLeaflet, zoneAsPolygon, zonesOf } from '../../../utils/areaGeometry';
+import { useCan } from '../../../hooks/usePermissions';
 
 interface AreaLayoutTabProps {
   areaId: string;
@@ -56,7 +56,6 @@ interface AreaLayoutTabProps {
 }
 
 // Same roles that can manage equipment (footprint endpoints require them)
-const EDITOR_ROLES = ['platform_admin', 'org_owner'];
 // Floors offered by "+ Piso" (those without a plan yet)
 const FLOOR_CHOICES = [-2, -1, 0, 1, 2, 3, 4, 5];
 
@@ -68,8 +67,8 @@ type Selection =
 const AreaLayoutTab = ({ areaId, area }: AreaLayoutTabProps) => {
   const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
-  const canEdit = !!user?.role && EDITOR_ROLES.includes(user.role.name);
+  const can = useCan();
+  const canEdit = can('layouts.update');
 
   const [selection, setSelection] = useState<Selection>(null);
   const [drawMode, setDrawMode] = useState(false);

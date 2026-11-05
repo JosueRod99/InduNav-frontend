@@ -18,6 +18,7 @@ import ProcessTab from './tabs/ProcessTab';
 import GalleryTab from './tabs/GalleryTab';
 import ProductEquipmentTab from './tabs/ProductEquipmentTab';
 import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
+import { useCan } from '../../hooks/usePermissions';
 
 type TabType = 'general' | 'process' | 'equipment' | 'documents' | 'gallery';
 
@@ -28,6 +29,7 @@ const ProductDetailPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') as TabType) || 'general';
   const setActiveTab = (tab: TabType) => setSearchParams({ tab }, { replace: true });
+  const can = useCan();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Fetch product details
@@ -125,10 +127,12 @@ const ProductDetailPage = () => {
               </div>
             </div>
           </div>
-          <Button onClick={() => setIsEditModalOpen(true)} variant="outline" className="gap-2">
-            <Edit className="h-4 w-4" />
-            Editar producto
-          </Button>
+          {can('products.update') && (
+            <Button onClick={() => setIsEditModalOpen(true)} variant="outline" className="gap-2">
+              <Edit className="h-4 w-4" />
+              Editar producto
+            </Button>
+          )}
         </div>
       </div>
 

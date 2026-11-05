@@ -10,6 +10,7 @@ import { AttentionList, FigureCards, plural, PlantCards, type Figure } from '../
 // "Inicio" of whoever works with the tours (creator) or only looks at them (read-only).
 
 interface HomeTour {
+  public_code?: string | null;
   id: string;
   title: string;
   title_translations?: Record<string, string> | null;
@@ -71,7 +72,8 @@ const ToursHome = ({ organizationId, readOnly = false }: { organizationId?: stri
     ...tours.filter((t) => t.status !== 'published' && Number(t.stops_count ?? 0) === 0).map((t) => ({ text: `${titleOf(t)}: sin paradas`, to: `/tours/${t.id}/edit` })),
   ];
 
-  const tourLink = (tour: HomeTour) => (readOnly ? `/preview/tours/${tour.id}` : `/tours/${tour.id}/edit`);
+  // Read-only opens what visitors see: the preview shows drafts too
+  const tourLink = (tour: HomeTour) => (readOnly ? `/t/${tour.public_code}` : `/tours/${tour.id}/edit`);
 
   return (
     <div className="space-y-4">

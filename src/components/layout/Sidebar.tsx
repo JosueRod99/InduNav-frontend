@@ -17,12 +17,14 @@ import {
 } from 'lucide-react';
 import { useSidebarStore } from '../../store/sidebarStore';
 import { useAuthStore } from '../../store/authStore';
+import { useCan } from '../../hooks/usePermissions';
+import type { PermissionName } from '../../utils/permissions';
 
 interface NavItem {
   to: string;
   icon: React.ComponentType<any>;
   label: string;
-  allowedRoles?: string[]; // If undefined, accessible to all authenticated users
+  anyOf?: PermissionName[]; // If undefined, accessible to all authenticated users
   activePrefix?: string; // highlighted on any page under this path (e.g. a plant's tabs)
 }
 
@@ -32,22 +34,23 @@ const generalItems: NavItem[] = [
   { to: '/dashboard', icon: BarChart3, label: 'Inicio' },
   { to: '/plants', icon: Factory, label: 'Plantas', activePrefix: '/plants' },
   { to: '/tours', icon: Map, label: 'Tours' },
-  { to: '/reports', icon: FileText, label: 'Reportes', allowedRoles: ['platform_admin', 'org_owner', 'plant_manager'] },
+  { to: '/reports', icon: FileText, label: 'Reportes', anyOf: ['reports.documents', 'reports.certifications', 'reports.personnel', 'reports.visits'] },
 ];
 
 const adminItems: NavItem[] = [
-  { to: '/organizations', icon: Building2, label: 'Organizaciones', activePrefix: '/organizations' },
-  { to: '/users', icon: Users, label: 'Usuarios' },
-  { to: '/admin/audit', icon: ScrollText, label: 'Auditoría' },
-  { to: '/admin/narration-usage', icon: AudioLines, label: 'Consumo de narración' },
+  { to: '/organizations', icon: Building2, label: 'Organizaciones', activePrefix: '/organizations', anyOf: ['organizations.create'] },
+  { to: '/users', icon: Users, label: 'Usuarios', anyOf: ['users.read'] },
+  { to: '/admin/audit', icon: ScrollText, label: 'Auditoría', anyOf: ['system.audit'] },
+  { to: '/admin/narration-usage', icon: AudioLines, label: 'Consumo de narración', anyOf: ['system.narration'] },
 ];
 
 const Sidebar = () => {
   const { isOpen, isMobileMenuOpen, toggleSidebar, closeMobileMenu } = useSidebarStore();
   const { user } = useAuthStore();
   const { pathname } = useLocation();
-  const role = user?.role?.name;
-  const isPlatformAdmin = role === 'platform_admin';
+  const can = useCan();
+  // Who administers the platform: everyone else moves inside their company
+  const isPlatformAdmin = can('organizations.create');
 
   // A company with a single plant goes straight to it
   const { data: plantsData } = useQuery({
@@ -60,18 +63,18 @@ const Sidebar = () => {
 
   const sections = useMemo(() => {
     const general = generalItems
-      .filter((item) => !item.allowedRoles || (role && item.allowedRoles.includes(role)))
+      .filter((item) => !item.anyOf || can(...item.anyOf))
       .map((item) =>
         item.to === '/plants' && onlyPlant ? { ...item, to: `/plants/${onlyPlant.id}/resumen`, label: 'Mi planta' } : item
       );
-    if (role === 'org_owner' && user?.organization_id) {
+    if (!isPlatformAdmin && can('organizations.read') && user?.organization_id) {
       general.push({ to: `/organizations/${user.organization_id}/plantas`, icon: Building2, label: 'Mi empresa', activePrefix: '/organizations' });
     }
     return [
       { title: null, items: general },
-      ...(isPlatformAdmin ? [{ title: 'Administración', items: adminItems }] : []),
+      ...(isPlatformAdmin ? [{ title: 'Administración', items: adminItems.filter((item) => !item.anyOf || can(...item.anyOf)) }] : []),
     ];
-  }, [role, user?.organization_id, isPlatformAdmin, onlyPlant]);
+  }, [can, user?.organization_id, isPlatformAdmin, onlyPlant]);
 
   // Close mobile menu when route changes
   useEffect(() => {

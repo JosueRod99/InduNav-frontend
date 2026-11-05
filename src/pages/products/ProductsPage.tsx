@@ -1,7 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../../store/authStore';
-import { MANAGERS } from '../plants/plantTabs';
 import { ChevronRight, Lock, Plus, Pencil, Trash2, Package, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -22,6 +20,7 @@ import type { PlantScopedProps } from '../plants/plantScope';
 import { useNavigateWithBack } from '../../hooks/useBackNavigation';
 import SectionHeader from '../../components/ui/SectionHeader';
 import { matchesSearch } from '../../utils/search';
+import { useCan } from '../../hooks/usePermissions';
 
 // Products of the plant: summary (each card filters), one row of filters, and a table with the
 // route of each product through the areas (cards on phones). The list is filtered in the browser.
@@ -57,9 +56,10 @@ const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) 
 
   const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const queryClient = useQueryClient();
-  const role = useAuthStore((state) => state.user?.role?.name) || '';
-  // Inside an area page other roles can read the list; editing and the detail page are for these
-  const canManage = !area || MANAGERS.includes(role);
+  const can = useCan();
+  const canCreate = can('products.create');
+  const canUpdate = can('products.update');
+  const canDelete = can('products.delete');
 
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
   const [selectedPlant, setSelectedPlant] = useState<string>(plantId ?? '');
@@ -150,7 +150,7 @@ const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) 
     setEditingProduct(null);
   };
 
-  const openDetails = (id: string) => canManage && navigate(`/products/${id}`);
+  const openDetails = (id: string) => navigate(`/products/${id}`);
   const filtersActive = !!(searchQuery || selectedCategory || selectedStatus || selectedArea || quick);
   const clearFilters = () => {
     setSearchQuery('');
@@ -187,7 +187,7 @@ const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) 
         description={area ? `Productos que pasan por "${area.name}" en su proceso de fabricación.` : 'Catálogo de productos que se fabrican en la planta y sus pasos de proceso.'}
         actions={
           selectedOrg &&
-          canManage && (
+          canCreate && (
             <Button onClick={handleCreateNew} className="gap-2">
               <Plus className="h-4 w-4" />
               Nuevo Producto
@@ -305,7 +305,7 @@ const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) 
           {area ? (
             <>
               <p className="mb-4 text-gray-600">Esta área no participa en ningún proceso de fabricación actualmente.</p>
-              {canManage && (
+              {canCreate && (
                 <Button onClick={handleCreateNew} className="gap-2">
                   <Plus className="h-4 w-4" />
                   Nuevo Producto
@@ -348,7 +348,7 @@ const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) 
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {visible.map((product) => (
-                  <tr key={product.id} className={`transition-colors hover:bg-gray-50 ${canManage ? 'cursor-pointer' : ''}`} onClick={() => openDetails(product.id)}>
+                  <tr key={product.id} className={`transition-colors hover:bg-gray-50 cursor-pointer`} onClick={() => openDetails(product.id)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {product.primary_image_url ? (
@@ -372,13 +372,17 @@ const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) 
                       <Badge variant={STATUS_BADGE[product.status]}>{PRODUCT_STATUS_LABELS[product.status]}</Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className={`flex items-center justify-end gap-2 ${canManage ? '' : 'hidden'}`} onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => handleEdit(product)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" title="Editar" aria-label={`Editar ${product.name}`}>
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => handleDelete(product)} className="rounded p-1.5 text-red-600 hover:bg-red-50" title="Eliminar" aria-label={`Eliminar ${product.name}`}>
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        {canUpdate && (
+                          <button onClick={() => handleEdit(product)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" title="Editar" aria-label={`Editar ${product.name}`}>
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => handleDelete(product)} className="rounded p-1.5 text-red-600 hover:bg-red-50" title="Eliminar" aria-label={`Eliminar ${product.name}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -411,13 +415,17 @@ const ProductsPage = ({ plantId, organizationId, area }: PlantScopedProps = {}) 
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <Route product={product} highlight={area?.id} />
-                  <span className={`flex flex-shrink-0 gap-1 ${canManage ? '' : 'hidden'}`}>
-                    <button onClick={() => handleEdit(product)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar ${product.name}`}>
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => handleDelete(product)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar ${product.name}`}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <span className="flex flex-shrink-0 gap-1">
+                    {canUpdate && (
+                      <button onClick={() => handleEdit(product)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar ${product.name}`}>
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => handleDelete(product)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar ${product.name}`}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </span>
                 </div>
               </li>

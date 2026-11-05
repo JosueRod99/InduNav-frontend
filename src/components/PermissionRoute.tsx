@@ -1,25 +1,26 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useHasRole } from '../hooks/usePermissions';
+import { useCan } from '../hooks/usePermissions';
+import type { PermissionName } from '../utils/permissions';
 import { useAuthStore } from '../store/authStore';
 
-interface RoleProtectedRouteProps {
+interface PermissionRouteProps {
   children: ReactNode;
-  allowedRoles: string[];
+  anyOf: PermissionName[];
   redirectTo?: string;
 }
 
 /**
- * Component that protects routes based on user roles
- * Redirects to dashboard if user doesn't have required role
+ * Protects a route: any of these permissions opens it
+ * Redirects to dashboard without them
  */
-const RoleProtectedRoute = ({
+const PermissionRoute = ({
   children,
-  allowedRoles,
+  anyOf,
   redirectTo = '/dashboard'
-}: RoleProtectedRouteProps) => {
+}: PermissionRouteProps) => {
   const { user, isInitialized } = useAuthStore();
-  const hasRole = useHasRole(allowedRoles);
+  const can = useCan();
 
   // Wait for auth to initialize
   if (!isInitialized) {
@@ -30,12 +31,11 @@ const RoleProtectedRoute = ({
     );
   }
 
-  // User doesn't have required role
-  if (!user || !hasRole) {
+  if (!user || !can(...anyOf)) {
     return <Navigate to={redirectTo} replace />;
   }
 
   return <>{children}</>;
 };
 
-export default RoleProtectedRoute;
+export default PermissionRoute;

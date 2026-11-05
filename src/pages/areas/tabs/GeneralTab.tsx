@@ -9,6 +9,7 @@ import EditGeneralInfoModal from '../modals/EditGeneralInfoModal';
 import EmployeeDetailModal from '../../../components/employees/EmployeeDetailModal';
 import AreaResponsiblesSection from '../../../components/responsibles/AreaResponsiblesSection';
 import SectionHeader from '../../../components/ui/SectionHeader';
+import { useCan } from '../../../hooks/usePermissions';
 
 // Summary of an area, like the plant's: key figures that open their tab, what needs attention, who is
 // in charge, its subareas and its data.
@@ -18,6 +19,8 @@ interface GeneralTabProps {
 }
 
 const GeneralTab = ({ area }: GeneralTabProps) => {
+  const can = useCan();
+  const canEdit = can('areas.update');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
 
@@ -94,10 +97,12 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
           title="Resumen"
           description="Cómo está el área, quién está a cargo y sus datos."
           actions={
-            <Button onClick={() => setIsEditModalOpen(true)} variant="outline" size="sm" className="gap-2">
-              <Edit className="h-4 w-4" />
-              Editar
-            </Button>
+            canEdit && (
+              <Button onClick={() => setIsEditModalOpen(true)} variant="outline" size="sm" className="gap-2">
+                <Edit className="h-4 w-4" />
+                Editar
+              </Button>
+            )
           }
         />
 
@@ -159,7 +164,7 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
       </div>
 
       {/* Who is in charge (several people per role, assigned here or from the employee) */}
-      <AreaResponsiblesSection area={area} onOpenEmployee={setSelectedEmployeeId} />
+      <AreaResponsiblesSection area={area} onOpenEmployee={can('employees.read') ? setSelectedEmployeeId : undefined} />
 
       {/* Subareas */}
       {children.length > 0 && (
@@ -198,9 +203,11 @@ const GeneralTab = ({ area }: GeneralTabProps) => {
         {missing.length > 0 && (
           <p className={`text-sm text-gray-500 ${captured > 0 ? 'mt-3 border-t border-gray-100 pt-3' : ''}`}>
             Sin capturar: {missing.join(', ')}.{' '}
-            <button onClick={() => setIsEditModalOpen(true)} className="font-medium text-blue-700 hover:underline">
-              Completar datos
-            </button>
+            {canEdit && (
+              <button onClick={() => setIsEditModalOpen(true)} className="font-medium text-blue-700 hover:underline">
+                Completar datos
+              </button>
+            )}
           </p>
         )}
       </section>

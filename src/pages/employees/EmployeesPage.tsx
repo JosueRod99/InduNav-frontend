@@ -14,13 +14,12 @@ import ImportEmployeesModal from './import/ImportEmployeesModal';
 import EmployeeDetailModal from '../../components/employees/EmployeeDetailModal';
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar';
 import SectionHeader from '../../components/ui/SectionHeader';
-import { useAuthStore } from '../../store/authStore';
-import { MANAGERS } from '../plants/plantTabs';
 import { endAssignment, getEmployeesByArea, updateAssignment, type AssignmentType, type EmployeeAreaAssignment } from '../../api/areaAssignments';
 import AreaHeadcountSection from '../../components/headcount/AreaHeadcountSection';
 import ManageAssignmentsModal from '../areas/modals/ManageAssignmentsModal';
 import EditAssignmentModal from '../areas/modals/EditAssignmentModal';
 import { matchesSearch, normalizeSearch } from '../../utils/search';
+import { useCan } from '../../hooks/usePermissions';
 
 // Personnel of the plant: summary (each card filters), one row of filters, and a compact table
 // (name + number + email, position, area, who they report to); cards on phones.
@@ -57,10 +56,11 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScope
   // Plant name for the import (already cached by the plant workspace)
   const { data: plant } = useQuery({ queryKey: ['plant', plantId], queryFn: () => getPlant(plantId!), enabled: embedded });
   const queryClient = useQueryClient();
-  const role = useAuthStore((state) => state.user?.role?.name) || '';
-  // Inside an area page other roles can read the list: same limits as the API
-  const canManage = !area || MANAGERS.includes(role);
-  const canAssign = !!area && [...MANAGERS, 'plant_manager'].includes(role);
+  const can = useCan();
+  const canCreate = can('employees.create');
+  const canUpdate = can('employees.update');
+  const canDelete = can('employees.delete');
+  const canAssign = !!area && can('employees.assign');
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<EmployeeAreaAssignment | null>(null);
 
@@ -274,15 +274,15 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScope
       <button onClick={() => setDetailEmployeeId(employee.id)} className="rounded p-1.5 text-gray-600 hover:bg-gray-100" aria-label={`Ver ficha de ${personName(employee)}`} title="Ver ficha">
         <Eye className="h-4 w-4" />
       </button>
-      {canManage && (
-        <>
+      {canUpdate && (
           <button onClick={() => handleEdit(employee)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50" aria-label={`Editar a ${personName(employee)}`} title="Editar">
             <Pencil className="h-4 w-4" />
           </button>
+      )}
+      {canDelete && (
           <button onClick={() => handleDelete(employee)} className="rounded p-1.5 text-red-600 hover:bg-red-50" aria-label={`Eliminar a ${personName(employee)}`} title="Eliminar empleado">
             <Trash2 className="h-4 w-4" />
           </button>
-        </>
       )}
       {/* Only leaves this area; the person stays in the company */}
       {area && canAssign && assignmentOf.get(employee.id) && (
@@ -322,7 +322,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScope
                   Asignar Empleados
                 </Button>
               )}
-              {canManage && (
+              {canCreate && (
                 <Button onClick={handleCreate} className="gap-2">
                   <Plus className="h-4 w-4" />
                   Nuevo Empleado
@@ -332,16 +332,18 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScope
           ) : selectedOrg && (
             <>
               {/* Import works on one plant: available inside the plant workspace */}
-              {embedded && (
+              {embedded && can('employees.import') && (
                 <Button variant="outline" onClick={() => setIsImportOpen(true)} className="gap-2">
                   <FileSpreadsheet className="h-4 w-4" />
                   Importar Excel
                 </Button>
               )}
-              <Button onClick={handleCreate} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Nuevo Empleado
-              </Button>
+              {canCreate && (
+                <Button onClick={handleCreate} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Nuevo Empleado
+                </Button>
+              )}
             </>
           )
         }
@@ -458,7 +460,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScope
           <Users className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">{area ? 'Sin empleados con nombre asignados' : 'No hay empleados'}</h3>
           <p className="mt-1 text-sm text-gray-500">{area ? 'Aún no hay empleados asignados a esta área.' : 'Comienza agregando un nuevo empleado'}</p>
-          {(area ? canAssign : true) && (
+          {(area ? canAssign : canCreate) && (
             <div className="mt-6">
               <Button onClick={area ? () => setIsAssignOpen(true) : handleCreate} className="gap-2">
                 {area ? <UserPlus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -578,7 +580,7 @@ const EmployeesPage = ({ plantId, organizationId, viewSwitch, area }: PlantScope
         isOpen={!!detailEmployeeId}
         onClose={() => setDetailEmployeeId(null)}
         employeeId={detailEmployeeId}
-        onEdit={!canManage ? undefined : (employee) => {
+        onEdit={!canUpdate ? undefined : (employee) => {
           setDetailEmployeeId(null);
           setReturnToDetail(employee.id);
           handleEdit(employee);

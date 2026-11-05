@@ -34,16 +34,15 @@ import { appliesToArea, getCategoryLabel, getPlantDocuments } from '../../../api
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 import SectionHeader from '../../../components/ui/SectionHeader';
-import { useAuthStore } from '../../../store/authStore';
 import { personName } from '../../../utils/personName';
 import { formatPhone, phoneHref } from '../../../utils/phone';
+import { useCan } from '../../../hooks/usePermissions';
 
 // "Seguridad" of an area: what to know before going in. The form captures what is stored here; the
 // protocols come from the area's Documents and the emergency contacts from its Responsables, so they
 // are only shown, not captured twice. Protective equipment, hazards, access, instructions and meeting
 // point also show in the tours.
 
-const EDITORS = ['platform_admin', 'org_owner', 'plant_manager', 'supervisor'];
 const SAFETY_CATEGORIES = ['SAFETY_PROCEDURE', 'MSDS', 'RISK_ANALYSIS'];
 const ICON_FOR: Record<string, typeof Shield> = { hardhat: HardHat, glasses: Glasses, boots: Footprints, ears: Ear, gloves: Hand, vest: Shirt, mask: Wind, shield: Shield };
 const PPE_CATALOG = [
@@ -358,8 +357,8 @@ const SafetyModal = ({ area, info, onClose }: { area: any; info: AreaSafetyInfo 
 };
 
 const SafetyTab = ({ areaId, area }: { areaId: string; area: any }) => {
-  const role = useAuthStore((state) => state.user?.role?.name) || '';
-  const canEdit = EDITORS.includes(role);
+  const can = useCan();
+  const canEdit = can('safety.update');
   const [editing, setEditing] = useState(false);
 
   const { data: info, isLoading } = useQuery({ queryKey: ['area-safety', areaId], queryFn: () => getSafetyInfoByArea(areaId) });

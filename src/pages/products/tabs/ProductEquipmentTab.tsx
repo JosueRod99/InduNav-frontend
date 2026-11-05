@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Search, Wrench } from 'lucide-react';
 import Badge from '../../../components/ui/Badge';
-import { useAuthStore } from '../../../store/authStore';
 import {
   EQUIPMENT_STATUS_COLORS,
   EQUIPMENT_STATUS_LABELS,
@@ -17,20 +16,19 @@ import {
 import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import { matchesSearch } from '../../../utils/search';
+import { useCan } from '../../../hooks/usePermissions';
 
 interface ProductEquipmentTabProps {
   productId: string;
 }
 
 // Only these roles can open /equipment
-const EQUIPMENT_MODULE_ROLES = ['platform_admin', 'org_owner'];
 // The search only appears when the list is long enough to need it
 const FILTERS_FROM = 7;
 
 const ProductEquipmentTab = ({ productId }: ProductEquipmentTabProps) => {
   const navigate = useNavigateWithBack(); // detail pages opened from here return here
-  const { user } = useAuthStore();
-  const canOpenEquipment = !!user?.role && EQUIPMENT_MODULE_ROLES.includes(user.role.name);
+  const canOpenEquipment = useCan()('equipment.read');
   const [search, setSearch] = useState('');
 
   const { data: links = [], isLoading } = useQuery({

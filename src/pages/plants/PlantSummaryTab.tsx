@@ -20,8 +20,8 @@ import {
 import type { Plant } from '../../types';
 import { getPlantSummary, type PlantSummary } from '../../api/plants';
 import { PLANT_TABS, type PlantTab } from './plantTabs';
-import { useAuthStore } from '../../store/authStore';
 import { useBackState } from '../../hooks/useBackNavigation';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Resumen" tab of the plant workspace: key numbers (each one opens its tab, tour visits included),
 // what needs attention and recent changes. One request; sections the role cannot open are hidden.
@@ -127,11 +127,11 @@ const Card = ({
 );
 
 const PlantSummaryTab = ({ plant }: { plant: Plant }) => {
-  const role = useAuthStore((state) => state.user?.role?.name) || '';
+  const can = useCan();
   const backState = useBackState(); // detail pages opened from here return to the summary
   const allowed = (tab: PlantTab) => {
-    const roles = PLANT_TABS.find((t) => t.id === tab)?.roles as readonly string[] | undefined;
-    return !roles || roles.includes(role);
+    const anyOf = PLANT_TABS.find((t) => t.id === tab)?.anyOf;
+    return !anyOf || can(...anyOf);
   };
 
   const { data, isLoading, isError } = useQuery({

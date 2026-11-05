@@ -5,19 +5,19 @@ import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import SectionHeader from '../../components/ui/SectionHeader';
 import { deleteSystemCertification, formatDate, getOrganizationCertifications, STATUS_CLASSES, STATUS_LABELS, type SystemCertification } from '../../api/certifications';
-import { useAuthStore } from '../../store/authStore';
 import SystemCertificationModal from '../certifications/SystemCertificationModal';
 import PlantDocumentsTab from '../documents/PlantDocumentsTab';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Documentos y certificaciones" tab of the organization page: what applies to the whole company.
 // It works without plants; what belongs to one plant or area stays in that plant's own tabs.
 
-const EDITORS = ['platform_admin', 'org_owner', 'plant_manager'];
 const thClass = 'px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500';
 
 const OrganizationLibraryTab = ({ organization }: { organization: { id: string; name: string } }) => {
   const queryClient = useQueryClient();
-  const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
+  const can = useCan();
+  const canEdit = can('certifications.update');
   const [modal, setModal] = useState<{ open: boolean; certification: SystemCertification | null }>({ open: false, certification: null });
 
   const { data, isLoading } = useQuery({

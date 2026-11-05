@@ -6,7 +6,6 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import ScrollTabs from '../../components/ui/ScrollTabs';
 import { getOrganization } from '../../api/organizations';
-import { useAuthStore } from '../../store/authStore';
 import OrganizationModal from './OrganizationModal';
 
 // Organization page: its summary, plants, documents, users and settings behind tabs (/organizations/:orgId/:tab).
@@ -18,23 +17,24 @@ import UsersPage from '../users/UsersPage';
 import OrganizationProfileTab from './OrganizationProfileTab';
 import OrganizationSummaryTab from './OrganizationSummaryTab';
 import OrganizationLibraryTab from './OrganizationLibraryTab';
+import type { PermissionName } from '../../utils/permissions';
+import { useCan } from '../../hooks/usePermissions';
 
-const MANAGERS = ['platform_admin', 'org_owner'];
 const TABS = [
-  { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard, adminOnly: false, managersOnly: true },
-  { id: 'plantas', label: 'Plantas', Icon: Factory, adminOnly: false, managersOnly: false },
-  { id: 'perfil', label: 'Perfil', Icon: IdCard, adminOnly: false, managersOnly: false }, // company profile shown in the tours
-  { id: 'documentos', label: 'Documentos y certificaciones', Icon: FileText, adminOnly: false, managersOnly: true },
-  { id: 'usuarios', label: 'Usuarios', Icon: Users, adminOnly: true, managersOnly: false },
-  { id: 'configuracion', label: 'Configuración', Icon: Settings, adminOnly: false, managersOnly: false }, // button in the header
-] as const;
+  { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard, permission: 'organizations.read' },
+  { id: 'plantas', label: 'Plantas', Icon: Factory, permission: 'plants.read' },
+  { id: 'perfil', label: 'Perfil', Icon: IdCard, permission: 'company_profile.read' }, // company profile shown in the tours
+  { id: 'documentos', label: 'Documentos y certificaciones', Icon: FileText, permission: 'organizations.read' },
+  { id: 'usuarios', label: 'Usuarios', Icon: Users, permission: 'users.read' },
+  { id: 'configuracion', label: 'Configuración', Icon: Settings, permission: 'organizations.read' }, // button in the header
+] satisfies { id: string; label: string; Icon: unknown; permission: PermissionName }[];
 
 const PLAN_LABELS: Record<string, string> = { free: 'Gratis', pro: 'Pro', enterprise: 'Enterprise' };
 
 const OrganizationWorkspacePage = () => {
   const { orgId, tab } = useParams<{ orgId: string; tab?: string }>();
-  const { user } = useAuthStore();
-  const isPlatformAdmin = user?.role?.name === 'platform_admin';
+  const can = useCan();
+  const isPlatformAdmin = can('organizations.update');
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const { data: organization, isLoading, error } = useQuery({
@@ -44,8 +44,7 @@ const OrganizationWorkspacePage = () => {
     retry: (count, err: any) => ![403, 404].includes(err?.response?.status) && count < 2,
   });
 
-  const isManager = MANAGERS.includes(user?.role?.name || '');
-  const tabs = TABS.filter((t) => (!t.adminOnly || isPlatformAdmin) && (!t.managersOnly || isManager));
+  const tabs = TABS.filter((t) => can(t.permission));
   const activeTab = tabs.find((t) => t.id === tab)?.id;
   if (!activeTab) return <Navigate to={`/organizations/${orgId}/${tabs[0].id}`} replace />;
 
@@ -136,7 +135,7 @@ const OrganizationWorkspacePage = () => {
         {activeTab === 'plantas' && <PlantsPage organizationId={organization.id} />}
         {activeTab === 'documentos' && <OrganizationLibraryTab organization={organization} />}
         {activeTab === 'perfil' && (
-          <OrganizationProfileTab organizationId={organization.id} canEdit={isPlatformAdmin || user?.role?.name === 'org_owner'} />
+          <OrganizationProfileTab organizationId={organization.id} canEdit={can('company_profile.update')} />
         )}
         {activeTab === 'usuarios' && <UsersPage organizationId={organization.id} />}
         {activeTab === 'configuracion' && (

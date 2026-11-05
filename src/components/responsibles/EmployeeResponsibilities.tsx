@@ -18,17 +18,17 @@ import { getAreas } from '../../api/areas';
 import { getPlants } from '../../api/plants';
 import type { Employee } from '../../api/employees';
 import { personName } from '../../utils/personName';
-import { useAuthStore } from '../../store/authStore';
 import { matchesSearch } from '../../utils/search';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Responsabilidades" of an employee (their record): the areas they are in charge of, in any plant
 // of the company, unrelated to where they work. Several areas can be added at once.
 
-const EDITORS = ['platform_admin', 'org_owner', 'plant_manager'];
 
 const EmployeeResponsibilities = ({ employee }: { employee: Employee }) => {
   const queryClient = useQueryClient();
-  const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
+  const can = useCan();
+  const canEdit = can('areas.update');
   const [isAdding, setIsAdding] = useState(false);
   const [role, setRole] = useState<ResponsibleRole>('supervisor');
   const [plantId, setPlantId] = useState<string>(employee.plant_id || '');

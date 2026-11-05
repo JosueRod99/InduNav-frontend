@@ -5,7 +5,7 @@ import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/auth/LoginPage';
 import Dashboard from './pages/Dashboard';
 import PrivateRoute from './components/PrivateRoute';
-import RoleProtectedRoute from './components/RoleProtectedRoute';
+import PermissionRoute from './components/PermissionRoute';
 import AppLayout from './components/layout/AppLayout';
 
 // Placeholder pages (we'll create these next)
@@ -84,9 +84,9 @@ function App() {
             path="/tours/:tourId/qr-sheet"
             element={
               <PrivateRoute>
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                <PermissionRoute anyOf={['tours.share']}>
                   <TourQrSheetPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               </PrivateRoute>
             }
           />
@@ -96,9 +96,9 @@ function App() {
             path="/preview/tours/:tourId"
             element={
               <PrivateRoute>
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                <PermissionRoute anyOf={['tours.read']}>
                   <TourViewerRealPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               </PrivateRoute>
             }
           />
@@ -115,9 +115,9 @@ function App() {
             <Route
               path="organizations"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin']}>
+                <PermissionRoute anyOf={['organizations.create']}>
                   <OrganizationsPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             {/* Organization page (platform admins: any; organization owners: their own, "Mi empresa") */}
@@ -126,18 +126,18 @@ function App() {
                 key={path}
                 path={path}
                 element={
-                  <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                  <PermissionRoute anyOf={['organizations.read']}>
                     <OrganizationWorkspacePage />
-                  </RoleProtectedRoute>
+                  </PermissionRoute>
                 }
               />
             ))}
             <Route
               path="users"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin']}>
+                <PermissionRoute anyOf={['users.read']}>
                   <UsersPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             <Route
@@ -150,39 +150,46 @@ function App() {
             <Route
               path="admin/audit"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin']}>
+                <PermissionRoute anyOf={['system.audit']}>
                   <AuditLogPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             <Route
               path="admin/narration-usage"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin']}>
+                <PermissionRoute anyOf={['system.narration']}>
                   <NarrationUsagePage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             <Route
               path="tours/:tourId/edit"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                <PermissionRoute anyOf={['tours.update']}>
                   <TourEditorPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             <Route
               path="tours/:tourId/stats"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                <PermissionRoute anyOf={['tours.stats']}>
                   <TourStatsPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             {/* Plant workspace: all sections of one plant behind tabs */}
             <Route path="plants/:plantId" element={<PlantWorkspacePage />} />
             <Route path="plants/:plantId/:tab" element={<PlantWorkspacePage />} />
-            <Route path="stops" element={<StopsPage />} />
+            <Route
+              path="stops"
+              element={
+                <PermissionRoute anyOf={['tours.update']}>
+                  <StopsPage />
+                </PermissionRoute>
+              }
+            />
             {/* Old section pages: now tabs of each plant (redirect keeps old links working) */}
             <Route path="layouts" element={<LegacyPlantRedirect tab="layout" />} />
             <Route path="employees" element={<LegacyPlantRedirect tab="personal" />} />
@@ -190,36 +197,36 @@ function App() {
             <Route
               path="areas/:areaId"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner', 'plant_manager', 'supervisor']}>
+                <PermissionRoute anyOf={['areas.read']}>
                   <AreaDetailPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             <Route path="products" element={<LegacyPlantRedirect tab="productos" />} />
             <Route
               path="products/:productId"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                <PermissionRoute anyOf={['products.read']}>
                   <ProductDetailPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             <Route path="equipment" element={<LegacyPlantRedirect tab="equipos" />} />
             <Route
               path="equipment/:id"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner']}>
+                <PermissionRoute anyOf={['equipment.read']}>
                   <EquipmentDetailPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
             <Route path="org-chart" element={<LegacyPlantRedirect tab="personal" query="?vista=organigrama" />} />
             <Route
               path="reports"
               element={
-                <RoleProtectedRoute allowedRoles={['platform_admin', 'org_owner', 'plant_manager']}>
+                <PermissionRoute anyOf={['reports.documents', 'reports.certifications', 'reports.personnel', 'reports.visits']}>
                   <ReportsPage />
-                </RoleProtectedRoute>
+                </PermissionRoute>
               }
             />
           </Route>

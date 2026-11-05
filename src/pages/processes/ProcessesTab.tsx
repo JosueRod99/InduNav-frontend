@@ -7,14 +7,13 @@ import Button from '../../components/ui/Button';
 import { deleteProcess, getProcess, getProcesses, type ProcessSummary } from '../../api/processes';
 import ProcessStepsList from './ProcessStepsList';
 import ProcessEditorModal from './ProcessEditorModal';
-import { useAuthStore } from '../../store/authStore';
 import SectionHeader from '../../components/ui/SectionHeader';
 import { matchesSearch, normalizeSearch } from '../../utils/search';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Procesos" tab of a plant (PLAN_LAB_KRAFT.md point 5): processes that go across areas
 // ("Del pedido a la entrega"). The list and one process (?proceso=<id>) live in the same tab.
 
-const EDITORS = ['platform_admin', 'org_owner', 'plant_manager'];
 
 // Search and status filter only appear when the list is long enough to need them
 const FILTERS_FROM = 7;
@@ -31,7 +30,8 @@ const StatusBadge = ({ status }: { status: 'draft' | 'active' }) =>
 
 const ProcessesTab = ({ plantId, organizationId, area }: { plantId: string; organizationId: string; area?: { id: string; name: string } }) => {
   const queryClient = useQueryClient();
-  const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
+  const can = useCan();
+  const canEdit = can('processes.update');
   const [searchParams, setSearchParams] = useSearchParams();
   const processId = searchParams.get('proceso');
   const [editor, setEditor] = useState<'new' | 'edit' | null>(null);

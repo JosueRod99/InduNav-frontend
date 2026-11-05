@@ -11,22 +11,26 @@ import DocumentsReport from './DocumentsReport';
 import PersonnelReport from './PersonnelReport';
 import VisitsReport from './VisitsReport';
 import { selectClass } from './reportStyles';
+import type { PermissionName } from '../../utils/permissions';
+import { useCan } from '../../hooks/usePermissions';
 
 // Reports to take the information out of the platform: filter, review and download in Excel.
 // Platform admins pick the company; for everyone else it is their own. Tab in the URL (?tab=).
 
 const TABS = [
-  { id: 'documentos', label: 'Lista maestra de documentos', Icon: FileText },
-  { id: 'certificaciones', label: 'Certificaciones', Icon: Award },
-  { id: 'personal', label: 'Personal por área', Icon: Users },
-  { id: 'visitas', label: 'Visitas a tours', Icon: BarChart3 },
-] as const;
+  { id: 'documentos', label: 'Lista maestra de documentos', Icon: FileText, permission: 'reports.documents' },
+  { id: 'certificaciones', label: 'Certificaciones', Icon: Award, permission: 'reports.certifications' },
+  { id: 'personal', label: 'Personal por área', Icon: Users, permission: 'reports.personnel' },
+  { id: 'visitas', label: 'Visitas a tours', Icon: BarChart3, permission: 'reports.visits' },
+] satisfies { id: string; label: string; Icon: unknown; permission: PermissionName }[];
 
 const ReportsPage = () => {
   const { user } = useAuthStore();
-  const isPlatformAdmin = user?.role?.name === 'platform_admin';
+  const can = useCan();
+  const isPlatformAdmin = can('organizations.create');
+  const tabs = TABS.filter((t) => can(t.permission));
   const [searchParams] = useSearchParams();
-  const activeTab = TABS.find((t) => t.id === searchParams.get('tab'))?.id ?? TABS[0].id;
+  const activeTab = tabs.find((t) => t.id === searchParams.get('tab'))?.id ?? tabs[0]?.id;
   const [organizationId, setOrganizationId] = useState('');
   const [plantId, setPlantId] = useState('');
 
@@ -93,7 +97,7 @@ const ReportsPage = () => {
       </div>
 
       <ScrollTabs label="Reportes">
-        {TABS.map(({ id, label, Icon }) => (
+        {tabs.map(({ id, label, Icon }) => (
           <Link
             key={id}
             to={`?tab=${id}`}

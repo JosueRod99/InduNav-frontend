@@ -14,6 +14,7 @@ import Button from '../../../components/ui/Button';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import UploadProductImageModal from '../modals/UploadProductImageModal';
 import ViewImageModal from '../modals/ViewImageModal';
+import { useCan } from '../../../hooks/usePermissions';
 
 interface GalleryTabProps {
   productId: string;
@@ -21,6 +22,7 @@ interface GalleryTabProps {
 }
 
 const GalleryTab = ({ productId, product }: GalleryTabProps) => {
+  const canEdit = useCan()('products.update');
   const queryClient = useQueryClient();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ProductImage | null>(null);
@@ -91,10 +93,12 @@ const GalleryTab = ({ productId, product }: GalleryTabProps) => {
           <p className="text-gray-600 mb-4">
             Aún no hay imágenes en la galería de este producto.
           </p>
-          <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Subir Imágenes
-          </Button>
+          {canEdit && (
+            <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Subir Imágenes
+            </Button>
+          )}
         </div>
 
         <UploadProductImageModal
@@ -115,10 +119,12 @@ const GalleryTab = ({ productId, product }: GalleryTabProps) => {
         title={`Galería (${images.length})`}
         description="La imagen principal se muestra en los tours y en las listas de productos."
         actions={
-          <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Subir Imágenes
-          </Button>
+          canEdit && (
+            <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Subir Imágenes
+            </Button>
+          )
         }
       />
 
@@ -135,7 +141,7 @@ const GalleryTab = ({ productId, product }: GalleryTabProps) => {
             <img
               src={image.image_url}
               alt={image.caption || 'Imagen del producto'}
-              onClick={() => handleImageClick(image)}
+              onClick={canEdit ? () => handleImageClick(image) : undefined}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 cursor-pointer"
               loading="lazy"
             />
@@ -161,7 +167,7 @@ const GalleryTab = ({ productId, product }: GalleryTabProps) => {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-between gap-2">
+                <div className={`flex items-center justify-between gap-2 ${canEdit ? '' : 'hidden'}`}>
                   {!image.is_primary && (
                     <button
                       onClick={(e) => {

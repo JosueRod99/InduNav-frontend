@@ -49,6 +49,7 @@ import AddStopModal from './editor/AddStopModal';
 import PublishTourModal from './modals/PublishTourModal';
 import ShareTourModal from './modals/ShareTourModal';
 import { toursListPath } from './toursReturn';
+import { useCan } from '../../hooks/usePermissions';
 
 type EditorTab = 'content' | 'sections' | 'narration';
 
@@ -81,6 +82,7 @@ const TourEditorPage = () => {
   const [tab, setTab] = useState<EditorTab>('content');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const canPublish = useCan()('tours.publish');
   const [isShareOpen, setIsShareOpen] = useState(false);
 
   // While editing, the cache is the source of truth: no background refetch over typed text
@@ -383,29 +385,31 @@ const TourEditorPage = () => {
               Compartir
             </Button>
           )}
-          <Button
-            size="sm"
-            className="gap-1.5"
-            disabled={stops.length === 0 || (isPublished && !tour.has_unpublished_changes)}
-            title={
-              stops.length === 0
-                ? 'Agrega al menos un área para publicar'
-                : isPublished && !tour.has_unpublished_changes
-                ? 'No hay cambios por publicar'
-                : undefined
-            }
-            onClick={() => setIsPublishOpen(true)}
-          >
-            <Rocket className="h-4 w-4" />
-            {isPublished ? 'Publicar cambios' : 'Publicar'}
-            <span
-              className="inline-flex items-center gap-1 rounded bg-white/20 px-1.5 text-[11px]"
-              title={`Publicaciones con narración en audio de tu organización este mes: ${usage.used} de ${usage.limit} (compartidas entre todos los tours). Publicar sin audio nuevo no cuenta. Se renueva el ${new Date(`${String(usage.resets_on).slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}.`}
+          {canPublish && (
+            <Button
+              size="sm"
+              className="gap-1.5"
+              disabled={stops.length === 0 || (isPublished && !tour.has_unpublished_changes)}
+              title={
+                stops.length === 0
+                  ? 'Agrega al menos un área para publicar'
+                  : isPublished && !tour.has_unpublished_changes
+                  ? 'No hay cambios por publicar'
+                  : undefined
+              }
+              onClick={() => setIsPublishOpen(true)}
             >
-              <Volume2 className="h-3 w-3" />
-              {usage.used}/{usage.limit} con audio este mes
-            </span>
-          </Button>
+              <Rocket className="h-4 w-4" />
+              {isPublished ? 'Publicar cambios' : 'Publicar'}
+              <span
+                className="inline-flex items-center gap-1 rounded bg-white/20 px-1.5 text-[11px]"
+                title={`Publicaciones con narración en audio de tu organización este mes: ${usage.used} de ${usage.limit} (compartidas entre todos los tours). Publicar sin audio nuevo no cuenta. Se renueva el ${new Date(`${String(usage.resets_on).slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}.`}
+              >
+                <Volume2 className="h-3 w-3" />
+                {usage.used}/{usage.limit} con audio este mes
+              </span>
+            </Button>
+          )}
         </div>
       </div>
 

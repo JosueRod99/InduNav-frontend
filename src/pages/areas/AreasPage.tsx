@@ -12,12 +12,17 @@ import { getPlants } from '../../api/plants';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { useBackState } from '../../hooks/useBackNavigation';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Áreas" tab of the plant: tree with real figures and pending flags, and the selected area's panel
 // (beside the tree on wide screens, a bottom sheet on phones).
 
 const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
+  const can = useCan();
+  const canCreate = can('areas.create');
+  const canUpdate = can('areas.update');
+  const canDelete = can('areas.delete');
 
   const backState = useBackState(); // area pages opened from here return here
   const [selectedOrg, setSelectedOrg] = useState<string>(organizationId ?? '');
@@ -141,7 +146,8 @@ const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
         }
         actions={
           selectedOrg &&
-          selectedPlant && (
+          selectedPlant &&
+          canCreate && (
             <Button onClick={() => openCreate(null)} className="gap-2">
               <Plus className="h-4 w-4" />
               Nueva Área Raíz
@@ -201,13 +207,15 @@ const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
               <div className="py-12 text-center">
                 <Building2 className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900">No hay áreas</h3>
-                <p className="mt-1 text-sm text-gray-500">Crea la primera área para comenzar</p>
-                <Button onClick={() => openCreate(null)} className="mt-6 gap-2">
-                  <Plus className="h-4 w-4" /> Nueva Área
-                </Button>
+                {canCreate && <p className="mt-1 text-sm text-gray-500">Crea la primera área para comenzar</p>}
+                {canCreate && (
+                  <Button onClick={() => openCreate(null)} className="mt-6 gap-2">
+                    <Plus className="h-4 w-4" /> Nueva Área
+                  </Button>
+                )}
               </div>
             ) : (
-              <PlantAreaTree areas={areas} selectedId={selectedAreaId} onSelect={select} onMove={move} />
+              <PlantAreaTree areas={areas} selectedId={selectedAreaId} onSelect={select} onMove={canUpdate ? move : undefined} />
             )}
           </div>
 
@@ -226,11 +234,11 @@ const AreasPage = ({ plantId, organizationId }: PlantScopedProps = {}) => {
                   plantId={selectedPlant}
                   backState={backState}
                   onSelect={select}
-                  onEdit={handleEdit}
-                  onAddChild={() => openCreate(selectedArea.id)}
-                  onDelete={handleDelete}
+                  onEdit={canUpdate ? handleEdit : undefined}
+                  onAddChild={canCreate ? () => openCreate(selectedArea.id) : undefined}
+                  onDelete={canDelete ? handleDelete : undefined}
                   onClose={() => setSelectedAreaId(null)}
-                  onMove={(parentId) => move(selectedArea, parentId)}
+                  onMove={canUpdate ? (parentId) => move(selectedArea, parentId) : undefined}
                 />
               </aside>
             </>

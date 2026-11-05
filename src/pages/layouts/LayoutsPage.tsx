@@ -27,11 +27,16 @@ import type { PlantScopedProps } from '../plants/plantScope';
 import { useBackState, useNavigateWithBack } from '../../hooks/useBackNavigation';
 import { addZone, removeZone, replaceZone, ringFromLeaflet, zoneAsPolygon, zonesOf } from '../../utils/areaGeometry';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useCan } from '../../hooks/usePermissions';
 
 // Floors offered by "+ Piso" (those without a plan yet)
 const FLOOR_CHOICES = [-2, -1, 0, 1, 2, 3, 4, 5];
 
 const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
+  const can = useCan();
+  const canUpload = can('layouts.create');
+  const canDraw = can('layouts.create');
+  const canEdit = can('layouts.update');
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
 
   const [selectedPlantId, setSelectedPlantId] = useState<string>(plantId ?? '');
@@ -292,11 +297,13 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
             (!drawMode && !editMode ? (
               <>
                 {areaRepresentations.length > 0 && <LabelModeToggle value={labelMode} onChange={setLabelMode} />}
-                <Button onClick={() => setIsLayoutModalOpen(true)} className="gap-2" variant={currentLayout ? 'outline' : 'primary'}>
-                  <Upload className="h-4 w-4" />
-                  {currentLayout ? 'Cambiar plano' : 'Subir plano'}
-                </Button>
-                {currentLayout && (
+                {canUpload && (
+                  <Button onClick={() => setIsLayoutModalOpen(true)} className="gap-2" variant={currentLayout ? 'outline' : 'primary'}>
+                    <Upload className="h-4 w-4" />
+                    {currentLayout ? 'Cambiar plano' : 'Subir plano'}
+                  </Button>
+                )}
+                {currentLayout && canDraw && (
                   <Button onClick={handleStartDrawing} className="gap-2">
                     <PenTool className="h-4 w-4" />
                     Dibujar Área
@@ -379,13 +386,13 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                   ))}
                 </select>
               ) : (
-                <button
+ canUpload && (                <button
                   onClick={() => setAddingFloor(true)}
                   disabled={drawMode || editMode}
                   className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-400 px-3 py-1 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700 disabled:opacity-50"
                 >
                   <Plus className="h-3.5 w-3.5" /> Piso
-                </button>
+                </button>)
               )}
             </div>
           )}
@@ -440,9 +447,11 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
               <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-white/80">
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-900">{floorLabel(selectedFloor)} no tiene plano todavía</p>
-                  <Button onClick={() => setIsLayoutModalOpen(true)} className="mt-3 gap-2">
-                    <Upload className="h-4 w-4" /> Subir plano
-                  </Button>
+                  {canUpload && (
+                    <Button onClick={() => setIsLayoutModalOpen(true)} className="mt-3 gap-2">
+                      <Upload className="h-4 w-4" /> Subir plano
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -456,7 +465,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
                 zoneIndex={zone}
                 zoneCount={selectedZoneCount}
                 otherFloors={otherFloors}
-                canEdit
+                canEdit={canEdit}
                 backState={backState}
                 onSelectZone={setSelectedZone}
                 onGoToFloor={goToFloor}
@@ -479,7 +488,7 @@ const LayoutsPage = ({ plantId }: PlantScopedProps = {}) => {
               hoveredId={hovered?.id ?? null}
               onSelect={(rep) => handleAreaClick(rep, 0)}
               onHover={(id) => setHovered(id ? { id, from: 'list' } : null)}
-              onDraw={currentLayout && !drawMode && !editMode ? handleDrawFor : undefined}
+              onDraw={canDraw && currentLayout && !drawMode && !editMode ? handleDrawFor : undefined}
               onGoToFloor={goToFloor}
               rowRef={(id, el) => (el ? listRows.current.set(id, el) : listRows.current.delete(id))}
             />

@@ -7,6 +7,8 @@ import { createUser, updateUser, getRoles } from '../../api/users';
 import { getOrganizations } from '../../api/organizations';
 import { getPlants } from '../../api/plants';
 import type { User } from '../../types';
+import { useCan } from '../../hooks/usePermissions';
+import { useAuthStore } from '../../store/authStore';
 
 interface UserModalProps {
   isOpen: boolean;
@@ -17,6 +19,9 @@ interface UserModalProps {
 
 const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalProps) => {
   const queryClient = useQueryClient();
+  // Only the platform picks the company: everyone else creates users in theirs
+  const isPlatformUser = useCan()('organizations.create');
+  const ownOrganizationId = useAuthStore((state) => state.user?.organization_id) || '';
   const isEditing = !!user;
 
   const [formData, setFormData] = useState({
@@ -41,7 +46,7 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
   const { data: orgsData } = useQuery({
     queryKey: ['organizations'],
     queryFn: () => getOrganizations({ limit: 100 }),
-    enabled: isOpen, // Solo cargar cuando el modal está abierto
+    enabled: isOpen && isPlatformUser, // Solo cargar cuando el modal está abierto
   });
 
   useEffect(() => {
@@ -63,12 +68,12 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
         first_name: '',
         last_name: '',
         role_id: '',
-        organization_id: defaultOrganizationId || '',
+        organization_id: defaultOrganizationId || (isPlatformUser ? '' : ownOrganizationId),
         plant_ids: [],
         is_active: true,
       });
     }
-  }, [user, defaultOrganizationId]);
+  }, [user, defaultOrganizationId, isPlatformUser, ownOrganizationId]);
 
   const createMutation = useMutation({
     mutationFn: createUser,
@@ -275,6 +280,7 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
               </select>
             </div>
 
+            {isPlatformUser && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Organización {!isPlatformAdminRole && '*'}
@@ -294,6 +300,7 @@ const UserModal = ({ isOpen, onClose, user, defaultOrganizationId }: UserModalPr
                 ))}
               </select>
             </div>
+            )}
 
             {needsPlants && (
               <fieldset>

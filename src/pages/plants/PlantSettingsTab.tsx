@@ -6,13 +6,12 @@ import Button from '../../components/ui/Button';
 import { updatePlant, type UpdatePlantRequest } from '../../api/plants';
 import type { Plant } from '../../types';
 import { PLANT_TIMEZONES, timezoneLabel } from './timezones';
-import { MANAGERS } from './plantTabs';
-import { useAuthStore } from '../../store/authStore';
 import PhotoGallery from '../../components/media/PhotoGallery';
 import PhoneInput from '../../components/ui/PhoneInput';
 import AddressInput from '../../components/ui/AddressInput';
 import { plantAddressDefaults, type AddressDetails } from '../../utils/googlePlaces';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Configuración" tab of the plant workspace: the plant's own details, edited in place.
 // Platform admins and organization owners edit; everyone else sees them read-only.
@@ -51,8 +50,8 @@ const Field = ({ id, label, hint, children }: { id: string; label: string; hint?
 
 const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
   const queryClient = useQueryClient();
-  const role = useAuthStore((state) => state.user?.role?.name) || '';
-  const canEdit = MANAGERS.includes(role);
+  const can = useCan();
+  const canEdit = can('plants.update');
   const [form, setForm] = useState<Form>(() => toForm(plant));
   const [addressDetails, setAddressDetails] = useState<AddressDetails | null>(plant.address_details || null);
   const [autoNote, setAutoNote] = useState<string | null>(null); // what picking the address filled in
@@ -198,7 +197,7 @@ const PlantSettingsTab = ({ plant }: { plant: Plant }) => {
           </p>
         </div>
         <div className="p-4">
-          <PhotoGallery organizationId={plant.organization_id} plantId={plant.id} canEdit={canEdit} emptyText="Aún no hay fotos de la planta." />
+          <PhotoGallery organizationId={plant.organization_id} plantId={plant.id} canEdit={canEdit && can('company_profile.update')} emptyText="Aún no hay fotos de la planta." />
         </div>
       </section>
 

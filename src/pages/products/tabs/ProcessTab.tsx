@@ -1,3 +1,4 @@
+import { useCan } from '../../../hooks/usePermissions';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -13,7 +14,6 @@ import {
 } from '../../../api/products';
 import ProcessStepModal from '../modals/ProcessStepModal';
 import StepEquipmentModal from '../modals/StepEquipmentModal';
-import { useAuthStore } from '../../../store/authStore';
 import { useBackState } from '../../../hooks/useBackNavigation';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import { EQUIPMENT_STATUS_COLORS, EQUIPMENT_STATUS_LABELS } from '../../../api/equipment';
@@ -25,7 +25,6 @@ import {
 } from '../../../api/productStepEquipment';
 
 // Same roles the backend requires to link equipment to steps
-const EQUIPMENT_EDITOR_ROLES = ['platform_admin', 'org_owner'];
 
 interface ProcessTabProps {
   productId: string;
@@ -37,8 +36,8 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
   const [editingStep, setEditingStep] = useState<ProductProcessStep | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [equipmentStep, setEquipmentStep] = useState<ProductProcessStep | null>(null);
-  const { user } = useAuthStore();
-  const canEditEquipment = !!user?.role && EQUIPMENT_EDITOR_ROLES.includes(user.role.name);
+  const canEdit = useCan()('products.update');
+  const canEditEquipment = canEdit;
 
   // Equipment used in each step
   const { data: stepEquipment = [] } = useQuery({
@@ -186,10 +185,12 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
           </>
         }
         actions={
-          <Button onClick={handleCreateNew} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar Paso
-          </Button>
+          canEdit && (
+            <Button onClick={handleCreateNew} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Agregar Paso
+            </Button>
+          )
         }
       />
 
@@ -203,10 +204,12 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
           <p className="text-gray-600 mb-4">
             Agrega los pasos por los que pasa el producto, en orden
           </p>
-          <Button onClick={handleCreateNew} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar Primer Paso
-          </Button>
+          {canEdit && (
+            <Button onClick={handleCreateNew} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Agregar Primer Paso
+            </Button>
+          )}
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-200">
@@ -298,40 +301,48 @@ const ProcessTab = ({ productId }: ProcessTabProps) => {
                     {/* Actions */}
                     <div className="flex items-center gap-1">
                       {/* Move Up (phones: desktop drags) */}
-                      <button
-                        onClick={() => handleMoveUp(step.id)}
-                        disabled={step.step_number === 1 || moveMutation.isPending}
-                        className="p-1.5 sm:hidden text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Mover arriba"
-                      >
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleMoveUp(step.id)}
+                          disabled={step.step_number === 1 || moveMutation.isPending}
+                          className="p-1.5 sm:hidden text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Mover arriba"
+                        >
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       {/* Move Down */}
-                      <button
-                        onClick={() => handleMoveDown(step.id)}
-                        disabled={step.step_number === processSteps.length || moveMutation.isPending}
-                        className="p-1.5 sm:hidden text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Mover abajo"
-                      >
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleMoveDown(step.id)}
+                          disabled={step.step_number === processSteps.length || moveMutation.isPending}
+                          className="p-1.5 sm:hidden text-gray-600 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Mover abajo"
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       {/* Edit */}
-                      <button
-                        onClick={() => handleEdit(step)}
-                        className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                        title="Editar"
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleEdit(step)}
+                          className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                          title="Editar"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       {/* Delete */}
-                      <button
-                        onClick={() => handleDelete(step)}
-                        disabled={deleteMutation.isPending}
-                        className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleDelete(step)}
+                          disabled={deleteMutation.isPending}
+                          className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 

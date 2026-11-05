@@ -22,11 +22,11 @@ import SystemCertificationModal from './SystemCertificationModal';
 import HoldersModal from './HoldersModal';
 import { useAuthStore } from '../../store/authStore';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Certificaciones" tab of a plant (PLAN_LAB_KRAFT.md point 9): system certifications that cover the
 // plant (company-wide, plant or area) and people certifications with their holders (checkboxes).
 
-const EDITORS = ['platform_admin', 'org_owner', 'plant_manager'];
 const inputClass = 'mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none';
 
 /** Create / edit a people certification (name, issuing body, validity) */
@@ -131,7 +131,10 @@ const iconBtn = 'rounded p-1 text-gray-500 hover:bg-gray-100';
 
 const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organization_id: string; name?: string }; area?: { id: string; name: string } }) => {
   const queryClient = useQueryClient();
-  const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
+  const can = useCan();
+  const canEdit = can('certifications.update');
+  // Plant scope: what is of the whole company is read, not changed
+  const isPlantScope = useAuthStore((s) => s.user?.role?.scope) === 'plant';
   const [systemModal, setSystemModal] = useState<{ open: boolean; certification: SystemCertification | null }>({ open: false, certification: null });
   const [typeModal, setTypeModal] = useState<{ open: boolean; type: PersonCertificationStats | null }>({ open: false, type: null });
   const [rosterType, setRosterType] = useState<string | null>(null);
@@ -179,7 +182,7 @@ const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organiza
     </p>
   );
 
-  const header = (Icon: typeof Award, iconClass: string, title: string, description: string, onAdd: () => void, addLabel: string) => (
+  const header = (Icon: typeof Award, iconClass: string, title: string, description: string, onAdd: () => void, addLabel: string, canAdd = canEdit) => (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
       <div>
         <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
@@ -187,7 +190,7 @@ const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organiza
         </h3>
         <p className="mt-0.5 text-xs text-gray-500">{description}</p>
       </div>
-      {canEdit && (
+      {canAdd && (
         <Button size="sm" className="gap-1.5" onClick={onAdd} aria-label={addLabel}>
           <Plus className="h-4 w-4" /> Agregar
         </Button>
@@ -196,7 +199,7 @@ const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organiza
   );
 
   const systemActions = (c: SystemCertification) =>
-    canEdit && (
+    canEdit && !(isPlantScope && c.scope === 'organization') && (
       <span className="flex flex-shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
         <button type="button" onClick={() => setSystemModal({ open: true, certification: c })} className={iconBtn} aria-label={`Editar ${c.name}`}>
           <Pencil className="h-4 w-4" />
@@ -213,7 +216,7 @@ const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organiza
     );
 
   const personActions = (t: PersonCertificationStats) =>
-    canEdit && (
+    canEdit && !isPlantScope && (
       <span className="flex flex-shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
         <button type="button" onClick={() => setTypeModal({ open: true, type: t })} className={iconBtn} aria-label={`Editar ${t.name}`}>
           <Pencil className="h-4 w-4" />
@@ -319,7 +322,7 @@ const PlantCertificationsTab = ({ plant, area }: { plant: { id: string; organiza
 
       {/* People */}
       <section className="rounded-lg border border-gray-200 bg-white">
-        {header(UserCheck, 'text-blue-600', 'Del personal', 'Licencias y cursos por persona (montacargas, auditor interno…). Clic en una para ver y marcar al personal.', () => setTypeModal({ open: true, type: null }), 'Agregar certificación de personal')}
+        {header(UserCheck, 'text-blue-600', 'Del personal', 'Licencias y cursos por persona (montacargas, auditor interno…). Clic en una para ver y marcar al personal.', () => setTypeModal({ open: true, type: null }), 'Agregar certificación de personal', canEdit && !isPlantScope)}
         {data.person.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-gray-500">Sin certificaciones de personal.</p>
         ) : shownPerson.length === 0 ? (

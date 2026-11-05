@@ -1,3 +1,4 @@
+import { useCan } from '../../../hooks/usePermissions';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
@@ -11,6 +12,7 @@ interface EquipmentSpecificationsEditorProps {
 }
 
 const EquipmentSpecificationsEditor = ({ equipmentId, specifications }: EquipmentSpecificationsEditorProps) => {
+  const canEdit = useCan()('equipment.update');
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [specs, setSpecs] = useState<Record<string, any>>(specifications || {});
@@ -96,7 +98,8 @@ const EquipmentSpecificationsEditor = ({ equipmentId, specifications }: Equipmen
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-gray-900">Especificaciones técnicas</h3>
-          <Button
+          {canEdit && (
+<Button
             onClick={() => setIsEditing(true)}
             variant="outline"
             size="sm"
@@ -105,6 +108,7 @@ const EquipmentSpecificationsEditor = ({ equipmentId, specifications }: Equipmen
             <Edit className="h-4 w-4" />
             Editar especificaciones
           </Button>
+)}
         </div>
 
         {hasSpecs ? (

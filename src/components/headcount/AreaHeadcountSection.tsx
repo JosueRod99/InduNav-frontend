@@ -4,16 +4,16 @@ import toast from 'react-hot-toast';
 import { Plus, Trash2, UsersRound } from 'lucide-react';
 import Button from '../ui/Button';
 import { addHeadcount, getHeadcount, removeHeadcount, updateHeadcount, type HeadcountRow } from '../../api/areaHeadcount';
-import { useAuthStore } from '../../store/authStore';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Plantilla" of an area: people counted by position, without names ("Montacarguista · 5").
 // With high turnover only the number changes. The area's total = named people + this.
 
-const EDITORS = ['platform_admin', 'org_owner', 'plant_manager'];
 
 const AreaHeadcountSection = ({ areaId, namedCount }: { areaId: string; namedCount: number }) => {
   const queryClient = useQueryClient();
-  const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
+  const can = useCan();
+  const canEdit = can('areas.update');
   const [position, setPosition] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [shift, setShift] = useState('');

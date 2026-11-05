@@ -12,6 +12,7 @@ import type { Tour } from '../../types';
 import type { PlantScopedProps } from '../plants/plantScope';
 import { rememberToursList } from './toursReturn';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useCan } from '../../hooks/usePermissions';
 
 // Catalog of the organization's tours (cards). Each card opens the editor or the preview.
 
@@ -79,6 +80,11 @@ const statusBadge = (tour: TourCard) => {
 };
 
 const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
+  const can = useCan();
+  const canCreate = can('tours.create');
+  const canUpdate = can('tours.update');
+  const canDelete = can('tours.delete');
+  const canSeeStats = can('tours.stats');
   const embedded = !!plantId; // inside the plant workspace: fixed plant, no org/plant selectors
   const { pathname } = useLocation();
   useEffect(() => rememberToursList(pathname), [pathname]); // the editor's back arrow returns here
@@ -145,6 +151,13 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
 
   const getPlantName = (plantId: string) => plantsData?.plants.find((p) => p.id === plantId)?.name || '—';
 
+  // Whoever cannot edit opens what they can see: the preview, or what visitors see
+  const openTour = (tour: { id: string; public_code?: string | null }) => {
+    if (canUpdate) navigate(`/tours/${tour.id}/edit`);
+    else if (can('tours.read')) navigate(`/preview/tours/${tour.id}`);
+    else if (tour.public_code) navigate(`/t/${tour.public_code}`);
+  };
+
   return (
     <div>
       <SectionHeader
@@ -152,10 +165,12 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
         title="Tours"
         description={embedded ? 'Recorridos virtuales de la planta: borradores y publicados.' : 'Recorridos virtuales de tus plantas'}
         actions={
-          <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Tour
-          </Button>
+          canCreate && (
+            <Button onClick={handleCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo Tour
+            </Button>
+          )
         }
       />
 
@@ -222,10 +237,12 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
           </h3>
           <p className="mt-1 text-sm text-gray-500">Crea un recorrido virtual con las áreas de tu planta.</p>
           <div className="mt-6">
-            <Button onClick={handleCreate} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nuevo Tour
-            </Button>
+            {canCreate && (
+              <Button onClick={handleCreate} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Nuevo Tour
+              </Button>
+            )}
           </div>
         </div>
       ) : (
@@ -238,9 +255,9 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
             return (
               <article key={tour.id} className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
                 <button
-                  onClick={() => navigate(`/tours/${tour.id}/edit`)}
+                  onClick={() => openTour(tour)}
                   className="relative aspect-[16/9] w-full overflow-hidden rounded-t-xl bg-gradient-to-br from-blue-600 to-slate-800 text-left"
-                  aria-label={`Abrir el editor de ${title}`}
+                  aria-label={canUpdate ? `Abrir el editor de ${title}` : `Ver ${title}`}
                 >
                   {tour.cover_image_url ? (
                     <img src={tour.cover_image_url} alt="" className="h-full w-full object-cover" />
@@ -277,7 +294,7 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
                       </span>
                     )}
                     {!embedded && <span>{getPlantName(tour.plant_id)}</span>}
-                    {tour.status === 'published' && (
+                    {tour.status === 'published' && canSeeStats && (
                       <button
                         onClick={() => navigate(`/tours/${tour.id}/stats`)}
                         className="inline-flex items-center gap-1 rounded hover:text-blue-700 hover:underline"
@@ -297,33 +314,39 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
                 {/* One line at any card width: the main action with text, the rest as labeled icons */}
                 <div className="flex items-center gap-2 border-t border-gray-100 px-4 py-3">
                   <button
-                    onClick={() => navigate(`/tours/${tour.id}/edit`)}
+                    onClick={() => openTour(tour)}
                     className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
                   >
                     <LayoutList className="h-4 w-4 flex-shrink-0" />
-                    Editor
+                    {canUpdate ? 'Editor' : 'Ver tour'}
                   </button>
                   <div className="flex flex-shrink-0 items-center gap-0.5">
-                    {tour.status === 'published' && tour.public_code && (
+                    {tour.status === 'published' && tour.public_code && can('tours.share') && (
                       <CardAction label="Compartir: link y QR" onClick={() => setShareTour(tour)} className="text-green-700 hover:bg-green-50">
                         <Share2 className="h-4 w-4" />
                       </CardAction>
                     )}
-                    <CardAction label="Vista previa" href={`/preview/tours/${tour.id}`}>
-                      <Eye className="h-4 w-4" />
-                    </CardAction>
-                    {tour.status === 'published' && (
+                    {can('tours.read') && (
+                      <CardAction label="Vista previa" href={`/preview/tours/${tour.id}`}>
+                        <Eye className="h-4 w-4" />
+                      </CardAction>
+                    )}
+                    {tour.status === 'published' && canSeeStats && (
                       <CardAction label="Estadísticas" onClick={() => navigate(`/tours/${tour.id}/stats`)}>
                         <BarChart3 className="h-4 w-4" />
                       </CardAction>
                     )}
-                    <span className="mx-0.5 h-5 w-px bg-gray-200" aria-hidden />
-                    <CardAction label="Editar datos básicos" onClick={() => handleEdit(tour)}>
-                      <Pencil className="h-4 w-4" />
-                    </CardAction>
-                    <CardAction label="Eliminar tour" alignEnd onClick={() => handleDelete(tour)} className="text-gray-500 hover:bg-red-50 hover:text-red-600">
-                      <Trash2 className="h-4 w-4" />
-                    </CardAction>
+                    {(canUpdate || canDelete) && <span className="mx-0.5 h-5 w-px bg-gray-200" aria-hidden />}
+                    {canUpdate && (
+                      <CardAction label="Editar datos básicos" onClick={() => handleEdit(tour)}>
+                        <Pencil className="h-4 w-4" />
+                      </CardAction>
+                    )}
+                    {canDelete && (
+                      <CardAction label="Eliminar tour" alignEnd onClick={() => handleDelete(tour)} className="text-gray-500 hover:bg-red-50 hover:text-red-600">
+                        <Trash2 className="h-4 w-4" />
+                      </CardAction>
+                    )}
                   </div>
                 </div>
               </article>

@@ -20,6 +20,7 @@ import {
 import { useNavigateWithBack } from '../../../hooks/useBackNavigation';
 import SectionHeader from '../../../components/ui/SectionHeader';
 import { floorLabel } from '../../../utils/floors';
+import { useCan } from '../../../hooks/usePermissions';
 
 interface EquipmentAssignmentsTabProps {
   equipmentId: string;
@@ -37,6 +38,7 @@ const formatDate = (date: Date | string) =>
 const today = () => new Date().toISOString().split('T')[0];
 
 const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignmentsTabProps) => {
+  const canEdit = useCan()('equipment.update');
   const queryClient = useQueryClient();
   const navigate = useNavigateWithBack(); // detail pages opened from here return here
   const [showForm, setShowForm] = useState(false);
@@ -158,7 +160,8 @@ const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignment
         title="Ubicación"
         description="Dónde está el equipo ahora, si está en el plano y por dónde ha pasado."
         actions={
-          !showForm && (
+          !showForm &&
+          canEdit && (
             <Button onClick={() => setShowForm(true)} className="gap-2">
               {current ? <ArrowRight className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {current ? 'Reubicar' : 'Asignar a Área'}
@@ -195,15 +198,17 @@ const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignment
                 {current.notes && <p className="text-sm text-gray-700 mt-2">{current.notes}</p>}
               </div>
             </div>
-            <button
-              onClick={() => handleEnd(current)}
-              disabled={endMutation.isPending}
-              className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-red-600 flex-shrink-0"
-              title="Retirar del área"
-            >
-              <StopCircle className="h-4 w-4" />
-              Retirar
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => handleEnd(current)}
+                disabled={endMutation.isPending}
+                className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-red-600 flex-shrink-0"
+                title="Retirar del área"
+              >
+                <StopCircle className="h-4 w-4" />
+                Retirar
+              </button>
+            )}
           </div>
         ) : (
           !showForm && (
@@ -333,14 +338,16 @@ const EquipmentAssignmentsTab = ({ equipmentId, equipment }: EquipmentAssignment
                   </p>
                   {assignment.notes && <p className="text-xs text-gray-600 mt-1">{assignment.notes}</p>}
                 </div>
-                <button
-                  onClick={() => handleDelete(assignment)}
-                  disabled={deleteMutation.isPending}
-                  className="p-1 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
-                  title="Eliminar registro"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {canEdit && (
+                  <button
+                    onClick={() => handleDelete(assignment)}
+                    disabled={deleteMutation.isPending}
+                    className="p-1 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
+                    title="Eliminar registro"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>

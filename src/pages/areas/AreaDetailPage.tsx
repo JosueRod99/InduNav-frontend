@@ -21,6 +21,7 @@ import PlantBreadcrumb from '../../components/layout/PlantBreadcrumb';
 import { areaTypeLabel } from '../../constants/areaTypes';
 import { personName } from '../../utils/personName';
 import ScrollTabs from '../../components/ui/ScrollTabs';
+import { useCan } from '../../hooks/usePermissions';
 
 type TabType = 'general' | 'personal' | 'safety' | 'certifications' | 'documents' | 'gallery' | 'products' | 'processes' | 'equipment' | 'layout';
 
@@ -31,6 +32,7 @@ const AreaDetailPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') as TabType) || 'general';
   const setActiveTab = (tab: TabType) => setSearchParams({ tab }, { replace: true });
+  const can = useCan();
 
   // Fetch area details
   const { data: area, isLoading, error } = useQuery({
@@ -71,19 +73,20 @@ const AreaDetailPage = () => {
   // Same order as the plant's tabs
   const tabs: { id: TabType; label: string; Icon: typeof Users; count?: number }[] = [
     { id: 'general', label: 'Resumen', Icon: LayoutDashboard },
-    { id: 'layout', label: 'Layout', Icon: LayoutGrid },
-    { id: 'equipment', label: 'Equipos', Icon: Wrench, count: figures?.equipment },
-    { id: 'products', label: 'Productos', Icon: Package, count: figures?.products },
-    { id: 'processes', label: 'Procesos', Icon: GitBranch },
-    { id: 'certifications', label: 'Certificaciones', Icon: Award },
-    { id: 'documents', label: 'Documentos', Icon: FileText, count: figures?.documents },
-    { id: 'personal', label: 'Personal', Icon: Users, count: figures ? figures.employees + figures.headcount : undefined },
-    { id: 'safety', label: 'Seguridad', Icon: Shield },
+    ...(can('layouts.read') ? [{ id: 'layout' as TabType, label: 'Layout', Icon: LayoutGrid }] : []),
+    ...(can('equipment.read') ? [{ id: 'equipment' as TabType, label: 'Equipos', Icon: Wrench, count: figures?.equipment }] : []),
+    ...(can('products.read') ? [{ id: 'products' as TabType, label: 'Productos', Icon: Package, count: figures?.products }] : []),
+    ...(can('processes.read') ? [{ id: 'processes' as TabType, label: 'Procesos', Icon: GitBranch }] : []),
+    ...(can('certifications.read') ? [{ id: 'certifications' as TabType, label: 'Certificaciones', Icon: Award }] : []),
+    ...(can('documents.read', 'documents.read_public') ? [{ id: 'documents' as TabType, label: 'Documentos', Icon: FileText, count: figures?.documents }] : []),
+    ...(can('employees.read') ? [{ id: 'personal' as TabType, label: 'Personal', Icon: Users, count: figures ? figures.employees + figures.headcount : undefined }] : []),
+    ...(can('safety.read') ? [{ id: 'safety' as TabType, label: 'Seguridad', Icon: Shield }] : []),
     { id: 'gallery', label: 'Galería', Icon: Image },
   ];
 
   const scope = { plantId: area.plant_id, organizationId: area.organization_id, area: { id: area.id, name: area.name } };
   const renderTabContent = () => {
+    if (!tabs.some((t) => t.id === activeTab)) return <GeneralTab area={area} />;
     switch (activeTab) {
       case 'general':
         return <GeneralTab area={area} />;

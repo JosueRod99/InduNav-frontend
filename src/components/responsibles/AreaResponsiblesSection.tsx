@@ -18,14 +18,13 @@ import {
 } from '../../api/areaResponsibles';
 import type { Employee } from '../../api/employees';
 import { personName } from '../../utils/personName';
-import { useAuthStore } from '../../store/authStore';
 import EmployeeAvatar from '../employees/EmployeeAvatar';
 import { formatPhone, phoneHref } from '../../utils/phone';
+import { useCan } from '../../hooks/usePermissions';
 
 // "Responsables" of an area (General tab): supervisors, quality and emergency contacts. Several
 // people per role, each with an optional shift; the first one is the main one (shown in tours).
 
-const EDITORS = ['platform_admin', 'org_owner', 'plant_manager'];
 const ROLE_ICON: Record<ResponsibleRole, JSX.Element> = {
   supervisor: <User className="h-5 w-5 text-blue-600" />,
   quality: <Award className="h-5 w-5 text-purple-600" />,
@@ -39,7 +38,8 @@ interface Props {
 
 const AreaResponsiblesSection = ({ area, onOpenEmployee }: Props) => {
   const queryClient = useQueryClient();
-  const canEdit = EDITORS.includes(useAuthStore((s) => s.user?.role?.name) || '');
+  const can = useCan();
+  const canEdit = can('areas.update');
   const [adding, setAdding] = useState<ResponsibleRole | null>(null);
   const [picked, setPicked] = useState<Employee | null>(null);
   const [shift, setShift] = useState('');
