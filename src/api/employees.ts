@@ -172,14 +172,6 @@ export const deleteEmployee = async (id: string): Promise<void> => {
   await apiClient.delete(`/employees/${id}`);
 };
 
-// Check employee number availability
-export const checkEmployeeNumber = async (organizationId: string, employeeNumber: string, excludeId?: string): Promise<boolean> => {
-  const { data } = await apiClient.get('/employees/check-employee-number', {
-    params: { organization_id: organizationId, employee_number: employeeNumber, exclude_id: excludeId },
-  });
-  return data.available;
-};
-
 // Spreadsheet import (preview with dryRun, then save)
 export interface EmployeeImportRow {
   row: number;
