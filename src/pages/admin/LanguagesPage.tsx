@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Languages, Loader2, Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import { Building2, Languages, Loader2, Pencil, Plus, Power, Trash2, Type } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import { confirmar } from '../../components/ui/ConfirmDialog';
@@ -19,6 +19,7 @@ import {
   type CatalogLanguage,
   type OrganizationLanguages,
 } from '../../api/languages';
+import { missingPlaceholders, VIEWER_TEXT_KEYS, viewerTextInEnglish, viewerTextInSpanish, type ViewerTextKey } from '../tourViewer/viewerTexts';
 
 // Languages of the tours: the catalog of the platform and which ones each company has. Each tour then
 // chooses among those of its company.
@@ -107,10 +108,90 @@ const LanguageModal = ({ language, onClose }: { language: CatalogLanguage | null
   );
 };
 
+const translatedTexts = (language: CatalogLanguage) => VIEWER_TEXT_KEYS.filter((key) => language.ui_texts?.[key]).length;
+
+/** Buttons and labels of the tour viewer in a language. What stays empty is shown in English */
+const ViewerTextsModal = ({ language, onClose }: { language: CatalogLanguage; onClose: () => void }) => {
+  const queryClient = useQueryClient();
+  const [texts, setTexts] = useState<Record<string, string>>(language.ui_texts ?? {});
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  // Fixed when the modal opens or the filter changes, so a row does not vanish while it is being typed in
+  const [shownKeys, setShownKeys] = useState(VIEWER_TEXT_KEYS);
+
+  const problemOf = (key: ViewerTextKey) => {
+    const missing = texts[key]?.trim() ? missingPlaceholders(key, texts[key]) : [];
+    return missing.length ? `Debe incluir ${missing.join(' y ')}: ahí va el dato.` : null;
+  };
+  const save = useMutation({
+    mutationFn: () =>
+      updateLanguage(language.code, { ui_texts: Object.fromEntries(VIEWER_TEXT_KEYS.map((key) => [key, texts[key]?.trim() ?? ''])) }),
+    onSuccess: () => {
+      toast.success('Textos guardados');
+      queryClient.invalidateQueries({ queryKey: ['languages'] });
+      onClose();
+    },
+    onError: (error) => toast.error(errorMessage(error, 'No se pudieron guardar los textos')),
+  });
+  const hasProblems = VIEWER_TEXT_KEYS.some(problemOf);
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={`Textos del visor en ${language.name}`}
+      size="lg"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={() => save.mutate()} disabled={hasProblems} isLoading={save.isPending}>
+            Guardar
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Botones y etiquetas que ve el visitante. Lo que quede vacío se muestra en inglés. Los textos en singular pueden quedar vacíos si el idioma no
+          distingue singular y plural. Los cambios llegan de inmediato a los tours publicados.
+        </p>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={onlyMissing}
+            onChange={(e) => {
+              setOnlyMissing(e.target.checked);
+              setShownKeys(e.target.checked ? VIEWER_TEXT_KEYS.filter((key) => !texts[key]?.trim()) : VIEWER_TEXT_KEYS);
+            }}
+          />
+          Solo los que faltan
+        </label>
+        {shownKeys.length === 0 && <p className="text-sm text-gray-500">No falta ningún texto.</p>}
+        <ul className="space-y-3">
+          {shownKeys.map((key) => (
+            <li key={key}>
+              <Input
+                label={viewerTextInEnglish(key)}
+                value={texts[key] ?? ''}
+                maxLength={300}
+                onChange={(e) => setTexts({ ...texts, [key]: e.target.value })}
+                error={problemOf(key) ?? undefined}
+                helperText={`En español: ${viewerTextInSpanish(key)}`}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Modal>
+  );
+};
+
 const CatalogTab = () => {
   const queryClient = useQueryClient();
   const { data: languages = [], isLoading, isError } = useQuery({ queryKey: ['languages'], queryFn: getLanguages });
   const [editing, setEditing] = useState<CatalogLanguage | 'new' | null>(null);
+  const [editingTexts, setEditingTexts] = useState<CatalogLanguage | null>(null);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['languages'] });
@@ -170,9 +251,21 @@ const CatalogTab = () => {
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">
                     {countLabel(language.organizations_count, 'empresa', 'empresas')} · {countLabel(language.tours_count, 'tour', 'tours')}
+                    {!language.is_built_in && ` · Textos del visor: ${translatedTexts(language)} de ${VIEWER_TEXT_KEYS.length}`}
                   </p>
                 </div>
                 <span className="flex items-center gap-1">
+                  {!language.is_built_in && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingTexts(language)}
+                      className="rounded p-1.5 text-gray-600 hover:bg-gray-100"
+                      title="Textos del visor"
+                      aria-label={`Textos del visor en ${language.name}`}
+                    >
+                      <Type className="h-4 w-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setEditing(language)}
@@ -215,6 +308,7 @@ const CatalogTab = () => {
         </ul>
       )}
       {editing && <LanguageModal language={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {editingTexts && <ViewerTextsModal language={editingTexts} onClose={() => setEditingTexts(null)} />}
     </div>
   );
 };

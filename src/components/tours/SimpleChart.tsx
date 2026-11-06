@@ -15,12 +15,13 @@ const formatValue = (value: number, unit?: string) => {
 interface SimpleChartProps {
   chart: ChartData;
   language: TourLanguage;
+  sourceLanguage?: TourLanguage;
   title?: string;
   compact?: boolean; // smaller height for the editor preview
 }
 
-const SimpleChart = ({ chart, language, title, compact = false }: SimpleChartProps) => {
-  const points = chart.points.map((p) => ({ label: tr(p.label, language), value: Number(p.value) || 0 }));
+const SimpleChart = ({ chart, language, sourceLanguage, title, compact = false }: SimpleChartProps) => {
+  const points = chart.points.map((p) => ({ label: tr(p.label, language, sourceLanguage), value: Number(p.value) || 0 }));
   if (points.length === 0) return null;
 
   const description = `${title ? `${title}: ` : ''}${points.map((p) => `${p.label} ${formatValue(p.value, chart.unit)}`).join(', ')}`;

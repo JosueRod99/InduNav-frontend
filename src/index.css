@@ -9,6 +9,32 @@
   }
 
   /*
+   * The tour viewer sets the language of the page. These alphabets share characters that are drawn
+   * differently in each one, so the fonts of each system are named. No web font: they weigh several
+   * megabytes and visitors open tours on their phones.
+   */
+  html:lang(ja) {
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
+    line-break: strict;
+  }
+
+  html:lang(zh) {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
+    line-break: strict;
+  }
+
+  html:lang(zh-Hant),
+  html:lang(zh-TW),
+  html:lang(zh-HK) {
+    font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", "Noto Sans TC", sans-serif;
+  }
+
+  html:lang(ko) {
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", "Noto Sans KR", sans-serif;
+    word-break: keep-all;
+  }
+
+  /*
    * Drop-downs: the same look everywhere. Our own chevron, away from the right border, and a
    * minimum height and padding for the selects that set none. Classes on each select (padding,
    * border, colors) still win; only the right padding is forced (below) so text never runs under

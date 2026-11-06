@@ -8,6 +8,7 @@ export interface CatalogLanguage {
   native_name: string;
   is_active: boolean;
   is_built_in: boolean; // Spanish and English: their fixed texts are in code
+  ui_texts: Record<string, string>; // fixed texts of the viewer, the rest
   organizations_count: number;
   tours_count: number;
 }
@@ -32,7 +33,7 @@ export const createLanguage = async (input: LanguageInput): Promise<void> => {
   await apiClient.post('/languages', input);
 };
 
-export const updateLanguage = async (code: string, input: Partial<Omit<LanguageInput, 'code'>> & { is_active?: boolean }): Promise<void> => {
+export const updateLanguage = async (code: string, input: Partial<Omit<LanguageInput, 'code'>> & { is_active?: boolean; ui_texts?: Record<string, string> }): Promise<void> => {
   await apiClient.patch(`/languages/${code}`, input);
 };
 

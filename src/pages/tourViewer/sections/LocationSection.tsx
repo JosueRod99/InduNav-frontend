@@ -2,15 +2,13 @@ import { useMemo, useState } from 'react';
 import { Layers } from 'lucide-react';
 import { liveOutlines, plantImageBoundsForCrop } from '../../../utils/areaLayout';
 import { ringArea, zonesOf } from '../../../utils/areaGeometry';
-import { floorLabel } from '../../../utils/floors';
-import type { TourLanguage } from '../../../api/tourBuilder';
-import { tr, type TourView, type TourViewPlantLayout, type TourViewStop } from '../../../api/tourView';
+import type { TourView, TourViewPlantLayout, TourViewStop } from '../../../api/tourView';
+import { useViewerTexts } from '../useViewerTexts';
 import TourMapViewer, { type ViewerArea, type ViewerInterior } from '../components/TourMapViewer';
 
 interface LocationSectionProps {
   view: TourView;
   stop: TourViewStop;
-  language: TourLanguage;
   onGoToArea: (areaId: string) => void;
 }
 
@@ -18,7 +16,8 @@ interface LocationSectionProps {
 const areaSurface = (layout: TourViewPlantLayout, areaId: string) =>
   layout.areas.filter((a) => a.area_id === areaId).reduce((sum, a) => sum + zonesOf(a.geometry).reduce((s, ring) => s + ringArea(ring), 0), 0);
 
-const LocationSection = ({ view, stop, language, onGoToArea }: LocationSectionProps) => {
+const LocationSection = ({ view, stop, onGoToArea }: LocationSectionProps) => {
+  const { language, t, text, floorName } = useViewerTexts();
   // Older responses only have the ground floor
   const plantLayouts = useMemo(() => view.plant_layouts ?? (view.plant_layout ? [view.plant_layout] : []), [view]);
 
@@ -43,9 +42,9 @@ const LocationSection = ({ view, stop, language, onGoToArea }: LocationSectionPr
         const tourStop = view.stops.find((s) => s.area_id === a.area_id);
         return {
           id: a.area_id,
-          name: tourStop ? tr(tourStop.title, language) || a.name : a.name,
+          name: tourStop ? text(tourStop.title) || a.name : a.name,
           zones: zonesOf(a.geometry),
-          description: tourStop ? tr(tourStop.content.narrative, language).slice(0, 160) || undefined : undefined,
+          description: tourStop ? text(tourStop.content.narrative).slice(0, 160) || undefined : undefined,
         };
       }),
     [plantLayout, view.stops, language]
@@ -89,7 +88,7 @@ const LocationSection = ({ view, stop, language, onGoToArea }: LocationSectionPr
           status: f.status,
           polygon: f.geometry.coordinates[0],
           usedIn: (details?.used_in || []).map(
-            (u) => `${u.product} · ${language === 'es' ? 'Paso' : 'Step'} ${u.step_number} · ${u.step_name}`
+            (u) => `${u.product} · ${t('step', { number: u.step_number })} · ${u.step_name}`
           ),
         };
       }),
@@ -104,9 +103,9 @@ const LocationSection = ({ view, stop, language, onGoToArea }: LocationSectionPr
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 text-sm text-slate-600">
             <Layers className="h-4 w-4" />
-            {language === 'es' ? `Esta área está en ${floors.length} pisos:` : `This area spans ${floors.length} floors:`}
+            {t('area_on_floors', { count: floors.length })}
           </span>
-          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={language === 'es' ? 'Piso' : 'Floor'}>
+          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={t('floor')}>
             {floors.map((level) => (
               <button
                 key={level}
@@ -117,7 +116,7 @@ const LocationSection = ({ view, stop, language, onGoToArea }: LocationSectionPr
                   level === floor ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                {floorLabel(level, language)}
+                {floorName(level)}
               </button>
             ))}
           </div>
@@ -130,7 +129,6 @@ const LocationSection = ({ view, stop, language, onGoToArea }: LocationSectionPr
         areas={areas}
         currentAreaId={stop.area_id}
         interior={interior}
-        language={language}
         onGoToArea={onGoToArea}
         tourAreaIds={new Set(view.stops.map((s) => s.area_id).filter((id): id is string => !!id))}
       />

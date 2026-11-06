@@ -153,6 +153,12 @@ export interface TourCompanyProfile {
   plant_cover_url: string | null;
 }
 
+export interface TourLanguageInfo {
+  code: TourLanguage;
+  native_name: string;
+  ui_texts: Record<string, string>; // fixed texts of the viewer; empty in Spanish and English (in code)
+}
+
 export interface TourView {
   tour: {
     id: string;
@@ -160,6 +166,7 @@ export interface TourView {
     description: Translations;
     languages: TourLanguage[];
     source_language: TourLanguage;
+    language_options: TourLanguageInfo[];
     cover_image_url: string | null;
     plant_name: string;
     organization: { name: string | null; logo_url: string | null; profile: TourCompanyProfile | null };
@@ -205,6 +212,6 @@ export const resolveStopQr = async (qrCode: string): Promise<{ tour_code: string
   return data;
 };
 
-/** Text in the requested language, falling back to Spanish */
-export const tr = (text: Translations | undefined | null, language: TourLanguage): string =>
-  (text?.[language] || text?.es || Object.values(text || {}).find(Boolean) || '').trim();
+/** Text in the requested language, else the one it was written in, else any it has */
+export const tr = (text: Translations | undefined | null, language: TourLanguage, sourceLanguage?: TourLanguage): string =>
+  (text?.[language] || (sourceLanguage && text?.[sourceLanguage]) || text?.es || Object.values(text || {}).find(Boolean) || '').trim();

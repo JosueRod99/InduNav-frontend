@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Building2, ChevronLeft, ChevronRight, Compass, ExternalLink, Factory, FileText, Globe, Heart, Mail, MapPin, Navigation, Phone, Target, X } from 'lucide-react';
-import type { TourLanguage } from '../../../api/tourBuilder';
-import { tr, type TourGeneralDocument, type TourView } from '../../../api/tourView';
+import type { TourGeneralDocument, TourView } from '../../../api/tourView';
+import { useViewerTexts } from '../useViewerTexts';
 import { formatPhone, phoneHref } from '../../../utils/phone';
 import { directionsUrl, type AddressDetails } from '../../../utils/googlePlaces';
 
@@ -11,9 +11,9 @@ import { directionsUrl, type AddressDetails } from '../../../utils/googlePlaces'
 type Photo = { image_url: string; caption: string | null };
 
 /** Horizontal photo strip; a photo opens full screen */
-const PhotoStrip = ({ photos, language }: { photos: Photo[]; language: TourLanguage }) => {
+const PhotoStrip = ({ photos }: { photos: Photo[] }) => {
   const [open, setOpen] = useState<number | null>(null);
-  const lang = (es: string, en: string) => (language === 'es' ? es : en);
+  const { t } = useViewerTexts();
 
   useEffect(() => {
     if (open === null) return;
@@ -37,7 +37,7 @@ const PhotoStrip = ({ photos, language }: { photos: Photo[]; language: TourLangu
             <button
               onClick={() => setOpen(index)}
               className="group block w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 text-left"
-              aria-label={photo.caption || lang(`Ver foto ${index + 1}`, `View photo ${index + 1}`)}
+              aria-label={photo.caption || t('view_photo', { number: index + 1 })}
             >
               <img src={photo.image_url} alt={photo.caption || ''} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform group-hover:scale-[1.03]" />
             </button>
@@ -47,7 +47,7 @@ const PhotoStrip = ({ photos, language }: { photos: Photo[]; language: TourLangu
       </ul>
       {current && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 p-4" role="dialog" aria-modal="true" onClick={() => setOpen(null)}>
-          <button className="absolute right-3 top-3 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" aria-label={lang('Cerrar', 'Close')}>
+          <button className="absolute right-3 top-3 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" aria-label={t('close')}>
             <X className="h-5 w-5" />
           </button>
           {photos.length > 1 && (
@@ -58,7 +58,7 @@ const PhotoStrip = ({ photos, language }: { photos: Photo[]; language: TourLangu
                   setOpen((open! - 1 + photos.length) % photos.length);
                 }}
                 className="absolute left-2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 sm:left-4"
-                aria-label={lang('Foto anterior', 'Previous photo')}
+                aria-label={t('previous_photo')}
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
@@ -68,7 +68,7 @@ const PhotoStrip = ({ photos, language }: { photos: Photo[]; language: TourLangu
                   setOpen((open! + 1) % photos.length);
                 }}
                 className="absolute right-2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 sm:right-4"
-                aria-label={lang('Foto siguiente', 'Next photo')}
+                aria-label={t('next_photo')}
               >
                 <ChevronRight className="h-6 w-6" />
               </button>
@@ -87,7 +87,9 @@ const PhotoStrip = ({ photos, language }: { photos: Photo[]; language: TourLangu
 };
 
 /** Address with a "Cómo llegar" link to Google Maps directions (a plain link: no API, no cost) */
-const AddressLine = ({ address, details, language }: { address: string; details?: AddressDetails | null; language: TourLanguage }) => (
+const AddressLine = ({ address, details }: { address: string; details?: AddressDetails | null }) => {
+  const { t } = useViewerTexts();
+  return (
   <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
     <span className="inline-flex items-center gap-1.5">
       <MapPin className="h-4 w-4 flex-shrink-0" />
@@ -100,10 +102,11 @@ const AddressLine = ({ address, details, language }: { address: string; details?
       className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
     >
       <Navigation className="h-3.5 w-3.5" />
-      {language === 'es' ? 'Cómo llegar' : 'Directions'}
+      {t('directions')}
     </a>
   </span>
-);
+  );
+};
 
 const websiteLabel = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
@@ -131,14 +134,14 @@ const GeneralDocuments = ({ documents, title }: { documents: TourGeneralDocument
     </div>
   ) : null;
 
-export const CompanySection = ({ view, language }: { view: TourView; language: TourLanguage }) => {
+export const CompanySection = ({ view }: { view: TourView }) => {
+  const { t, text } = useViewerTexts();
   const company = view.tour.organization.profile;
   if (!company) return null;
-  const lang = (es: string, en: string) => (language === 'es' ? es : en);
-  const about = tr(company.about, language);
-  const mission = tr(company.mission, language);
-  const vision = tr(company.vision, language);
-  const values = company.values.filter((v) => tr(v.title, language));
+  const about = text(company.about);
+  const mission = text(company.mission);
+  const vision = text(company.vision);
+  const values = company.values.filter((v) => text(v.title));
   const contact = company.contact && Object.values(company.contact).some(Boolean) ? company.contact : null;
   const documents = company.documents || [];
   if (!about && !mission && !vision && !values.length && !contact && !company.photos.length && !documents.length) return null;
@@ -154,7 +157,7 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
           </span>
         )}
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{lang('Conoce a la empresa', 'About the company')}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('about_company')}</p>
           <h2 id="company-heading" className="text-xl font-bold text-slate-900">
             {view.tour.organization.name}
           </h2>
@@ -167,8 +170,8 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
       {(mission || vision) && (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {[
-            { text: mission, title: lang('Misión', 'Mission'), Icon: Target },
-            { text: vision, title: lang('Visión', 'Vision'), Icon: Compass },
+            { text: mission, title: t('mission'), Icon: Target },
+            { text: vision, title: t('vision'), Icon: Compass },
           ]
             .filter((b) => b.text)
             .map(({ text, title, Icon }) => (
@@ -187,22 +190,22 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
         <div>
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Heart className="h-4 w-4 text-blue-600" />
-            {lang('Nuestros valores', 'Our values')}
+            {t('our_values')}
           </h3>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {values.map((value, index) => (
               <li key={index} className="rounded-lg border border-slate-200 p-3">
-                <p className="text-sm font-semibold text-slate-900">{tr(value.title, language)}</p>
-                {tr(value.description, language) && <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{tr(value.description, language)}</p>}
+                <p className="text-sm font-semibold text-slate-900">{text(value.title)}</p>
+                {text(value.description) && <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{text(value.description)}</p>}
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      <PhotoStrip photos={company.photos} language={language} />
+      <PhotoStrip photos={company.photos} />
 
-      <GeneralDocuments documents={documents} title={lang('Documentos de la empresa', 'Company documents')} />
+      <GeneralDocuments documents={documents} title={t('company_documents')} />
 
       {contact && (
         <ul className="flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-700">
@@ -232,7 +235,7 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
           )}
           {contact.address && (
             <li>
-              <AddressLine address={contact.address} details={contact.address_details} language={language} />
+              <AddressLine address={contact.address} details={contact.address_details} />
             </li>
           )}
         </ul>
@@ -241,15 +244,15 @@ export const CompanySection = ({ view, language }: { view: TourView; language: T
   );
 };
 
-export const PlantSection = ({ view, language }: { view: TourView; language: TourLanguage }) => {
+export const PlantSection = ({ view }: { view: TourView }) => {
+  const { t } = useViewerTexts();
   const plant = view.tour.organization.profile?.plant;
   const documents = view.tour.organization.profile?.plant_documents || [];
   if ((!plant || (!plant.description && !plant.photos.length && !plant.address)) && !documents.length) return null;
-  const lang = (es: string, en: string) => (language === 'es' ? es : en);
   return (
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{lang('La planta', 'The plant')}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('the_plant')}</p>
         <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900">
           <Factory className="h-5 w-5 text-blue-600" />
           {view.tour.plant_name}
@@ -257,12 +260,12 @@ export const PlantSection = ({ view, language }: { view: TourView; language: Tou
       </div>
       {plant?.address && (
         <p className="text-sm text-slate-700">
-          <AddressLine address={plant.address} details={plant.address_details} language={language} />
+          <AddressLine address={plant.address} details={plant.address_details} />
         </p>
       )}
       {plant?.description && <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 sm:text-base">{plant.description}</p>}
-      {plant && <PhotoStrip photos={plant.photos} language={language} />}
-      <GeneralDocuments documents={documents} title={lang('Documentos de la planta', 'Plant documents')} />
+      {plant && <PhotoStrip photos={plant.photos} />}
+      <GeneralDocuments documents={documents} title={t('plant_documents')} />
     </section>
   );
 };

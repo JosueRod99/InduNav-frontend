@@ -27,7 +27,6 @@ import OrganizationWorkspacePage from './pages/organizations/OrganizationWorkspa
 import TourViewerRealPage from './pages/tourViewer/TourViewerRealPage';
 import PublicTourPage, { StopQrRedirect } from './pages/tourViewer/PublicTourPage';
 import TourQrSheetPage from './pages/tours/TourQrSheetPage';
-import StopsPage from './pages/stops/StopsPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AreaDetailPage from './pages/areas/AreaDetailPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
@@ -220,14 +219,6 @@ function App() {
                 }
               />
             ))}
-            <Route
-              path="stops"
-              element={
-                <PermissionRoute anyOf={['tours.update']}>
-                  <StopsPage />
-                </PermissionRoute>
-              }
-            />
             {/* Old section pages: now tabs of each plant (redirect keeps old links working) */}
             <Route path="layouts" element={<LegacyPlantRedirect tab="layout" />} />
             <Route path="employees" element={<LegacyPlantRedirect tab="personal" />} />
