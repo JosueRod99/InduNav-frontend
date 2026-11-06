@@ -4,10 +4,18 @@ import type { CustomSectionIcon } from '../components/tours/customSectionIcons';
 // Tours v2 builder (PLAN_TOURS_REALES.md). The tour/stops rows are the draft; visitors see the
 // latest published snapshot.
 
-export type TourLanguage = 'es' | 'en';
+export type TourLanguage = string; // a code of the catalog: es, ja, pt-BR
 export type Translations = Partial<Record<TourLanguage, string>>;
 
-export const TOUR_LANGUAGE_LABELS: Record<TourLanguage, string> = { es: 'Español', en: 'English' };
+export interface TourLanguageOption {
+  code: string;
+  name: string;
+  native_name: string;
+}
+
+// Lists show the title in the language the tour was written in
+export const tourTitle = (tour: { title: string; title_translations?: Translations | null; source_language?: string }) =>
+  tour.title_translations?.[tour.source_language || 'es'] || tour.title;
 
 export type TourSectionKey =
   | 'summary'
@@ -130,6 +138,7 @@ export interface BuilderStop {
 
 export interface BuilderTour {
   id: string;
+  source_language: string;
   plant_id: string;
   plant_name: string;
   organization_id: string;
@@ -161,7 +170,7 @@ export interface TourBuilderData {
   tour: BuilderTour;
   stops: BuilderStop[];
   publications: PublicationUsage;
-  available_languages?: { code: string; name: string; native_name: string }[]; // those of the company
+  available_languages?: TourLanguageOption[]; // those of the company
   narration_test_mode?: boolean; // TTS_TEST_MODE: only the first sentence of each script is synthesized
 }
 

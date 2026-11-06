@@ -8,7 +8,7 @@ import { Pause, Play, RotateCcw, RotateCw } from 'lucide-react';
 
 interface NarrationPlayerProps {
   src: string;
-  language: 'es' | 'en';
+  language: string;
   isFallback?: boolean; // no narration in the selected language: the Spanish one plays
   onListen?: (seconds: number) => void; // seconds of real playback (visit stats)
 }

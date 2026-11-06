@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useSourceLanguage } from './sourceLanguage';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Map as MapIcon, Plus, Settings2, Trash2 } from 'lucide-react';
 import SortableList from '../../../components/ui/SortableList';
@@ -28,6 +29,7 @@ const centroid = (ring: number[][]) => {
 };
 
 const StopsPanel = ({ plantId, stops, selectedStopId, onSelect, onAdd, onAddArea, onMove, onDelete }: StopsPanelProps) => {
+  const source = useSourceLanguage();
   // Plant layout for the mini map (ground floor first)
   const { data: layouts = [] } = useQuery({
     queryKey: ['layouts', plantId, 'all'],
@@ -135,7 +137,7 @@ const StopsPanel = ({ plantId, stops, selectedStopId, onSelect, onAdd, onAddArea
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className={`block truncate text-sm ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}>
-                        {stop.title_translations.es || stop.area_name || 'Sin título'}
+                        {stop.title_translations[source.code] || stop.area_name || 'Sin título'}
                       </span>
                       <span className="block truncate text-[11px] text-gray-500">
                         {stop.area_available ? stop.area_code || stop.area_name : 'Área no disponible'}

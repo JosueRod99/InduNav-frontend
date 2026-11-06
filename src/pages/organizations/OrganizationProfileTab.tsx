@@ -1,3 +1,4 @@
+import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -7,6 +8,7 @@ import PhotoGallery from '../../components/media/PhotoGallery';
 import { uploadImage, ImageType } from '../../api/upload';
 import {
   getOrganizationProfile,
+  setDefaultLanguage,
   updateOrganizationProfile,
   type OrganizationProfile,
   type OrganizationProfileData,
@@ -99,7 +101,7 @@ const Section = ({
 
 const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: string; canEdit: boolean }) => {
   const queryClient = useQueryClient();
-  const [language, setLanguage] = useState<TourLanguage>('es');
+  const [pickedLanguage, setLanguage] = useState<TourLanguage | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInput = useRef<HTMLInputElement>(null);
@@ -108,12 +110,26 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
     queryKey: ['organization-profile', organizationId],
     queryFn: () => getOrganizationProfile(organizationId),
   });
+  const baseLanguage = data?.default_language ?? 'es';
+  const languages = data?.languages ?? [];
+  const language = pickedLanguage ?? baseLanguage;
+  const nameOf = (code: string) => languages.find((l) => l.code === code)?.name ?? code;
   useEffect(() => {
     if (data) setForm(toForm(data));
   }, [data]);
 
   const initial = useMemo(() => (data ? JSON.stringify(toForm(data)) : ''), [data]);
   const isDirty = !!form && JSON.stringify(form) !== initial;
+
+  const changeBase = useMutation({
+    mutationFn: (code: string) => setDefaultLanguage(organizationId, code),
+    onSuccess: (profile) => {
+      setLanguage(null);
+      queryClient.setQueryData(['organization-profile', organizationId], profile);
+      toast.success('Idioma base cambiado');
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'No se pudo cambiar el idioma base'),
+  });
 
   const save = useMutation({
     mutationFn: () => updateOrganizationProfile(organizationId, form!),
@@ -142,7 +158,7 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
   // Translated text of the current language
   const tText = (field: 'tagline' | 'about' | 'mission' | 'vision') => profile[field][language] || '';
   const setT = (field: 'tagline' | 'about' | 'mission' | 'vision', value: string) => setProfile({ [field]: { ...profile[field], [language]: value } });
-  const placeholderFor = (value: Translations, fallback: string) => (language === 'en' ? value.es || fallback : fallback);
+  const placeholderFor = (value: Translations, fallback: string) => (language !== baseLanguage ? value[baseLanguage] || fallback : fallback);
 
   const setValue = (index: number, key: 'title' | 'description', value: string) =>
     setProfile({ values: profile.values.map((v, i) => (i === index ? { ...v, [key]: { ...v[key], [language]: value } } : v)) });
@@ -169,7 +185,7 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
   };
 
   const sectionProps = { form, setDisplay, canEdit };
-  const englishMissing = language === 'en';
+  const isTranslation = language !== baseLanguage;
 
   return (
     <form
@@ -188,7 +204,7 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
         <div className="flex items-center gap-2 text-xs text-gray-500">
           Idioma del texto
           <div className="flex rounded-lg border border-gray-300 bg-white p-0.5 text-sm font-medium" role="group" aria-label="Idioma del texto">
-            {(['es', 'en'] as const).map((l) => (
+            {languages.map(({ code: l, name }) => (
               <button
                 key={l}
                 type="button"
@@ -196,16 +212,44 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
                 aria-pressed={language === l}
                 className={`rounded-md px-3 py-1 ${language === l ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
               >
-                {l === 'es' ? 'Español' : 'English'}
+                {name}
               </button>
             ))}
           </div>
         </div>
       </div>
-      {englishMissing && (
+      {isTranslation && (
         <p className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
-          Versión en inglés para los tours en inglés. Lo que dejes vacío se mostrará en español.
+          Versión en {nameOf(language).toLowerCase()} para los tours en ese idioma. Lo que dejes vacío se mostrará en{' '}
+          {nameOf(baseLanguage).toLowerCase()}.
         </p>
+      )}
+      {languages.length > 1 && (
+        <label className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+          Idioma base de la empresa
+          <select
+            value={baseLanguage}
+            disabled={!canEdit || isDirty || changeBase.isPending}
+            title={isDirty ? 'Guarda tus cambios primero' : undefined}
+            onChange={async (e) => {
+              const code = e.target.value;
+              const accepted = await confirmar({
+                title: 'Cambiar idioma base',
+                message: `Los tours nuevos se escribirán en ${nameOf(code).toLowerCase()}. Los tours que ya existen no cambian.`,
+                confirmLabel: 'Cambiar',
+                danger: false,
+              });
+              if (accepted) changeBase.mutate(code);
+            }}
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50"
+          >
+            {languages.map(({ code, name }) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
 
       <fieldset disabled={!canEdit} className="space-y-4">

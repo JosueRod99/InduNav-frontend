@@ -56,7 +56,7 @@ interface TourMapViewerProps {
   areas: ViewerArea[];
   currentAreaId: string;
   interior?: ViewerInterior | null;
-  language: 'es' | 'en';
+  language: string;
   onGoToArea?: (areaId: string) => void; // jump to another area of the tour
   tourAreaIds?: Set<string>; // areas that are stops of the tour (only those offer "go to")
 }

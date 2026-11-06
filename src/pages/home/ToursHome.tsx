@@ -1,3 +1,4 @@
+import { tourTitle } from '../../api/tourBuilder';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -14,6 +15,7 @@ interface HomeTour {
   id: string;
   title: string;
   title_translations?: Record<string, string> | null;
+  source_language?: string;
   status: string;
   has_unpublished_changes?: boolean;
   plant_name?: string;
@@ -22,7 +24,7 @@ interface HomeTour {
   updated_at: string;
 }
 
-const titleOf = (tour: HomeTour) => tour.title_translations?.es || tour.title;
+const titleOf = (tour: HomeTour) => tourTitle(tour);
 const LIST_LIMIT = 8;
 
 const ToursHome = ({ organizationId, readOnly = false }: { organizationId?: string; readOnly?: boolean }) => {

@@ -217,8 +217,8 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
   };
 
   const tourTitle = tr(view.tour.title, language);
-  // Without narration in the selected language, visitors hear the Spanish one (same as texts)
-  const audioUrl = stop?.audio?.[language] || stop?.audio?.es || null;
+  // Without narration in the selected language, visitors hear the one it was written in (same as texts)
+  const audioUrl = stop?.audio?.[language] || stop?.audio?.[view.tour.source_language] || null;
   const audioIsFallback = !!audioUrl && !stop?.audio?.[language];
 
   // Anonymous visit stats (published tours only, never the editor preview)

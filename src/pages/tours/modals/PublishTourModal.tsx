@@ -43,13 +43,16 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
     : '';
 
   const emptyStops = (preview?.stops || []).filter((s) => s.sections.length === 0);
-  const untranslated = tour.languages.includes('en')
-    ? stops.filter(
-        (s) =>
-          (s.title_translations.es && !s.title_translations.en) ||
-          (s.content.narrative?.es && !s.content.narrative?.en)
-      )
-    : [];
+  const source = tour.source_language;
+  const sourceName = builder.available_languages?.find((l) => l.code === source)?.name.toLowerCase() || source;
+  const translations = tour.languages.filter((l) => l !== source);
+  const untranslated = stops.filter((s) =>
+    translations.some(
+      (l) =>
+        (s.title_translations[source] && !s.title_translations[l]) ||
+        (s.content.narrative?.[source] && !s.content.narrative?.[l])
+    )
+  );
   const nextVersion = (publications.latest_version ?? 0) + 1;
   const isRepublish = tour.status !== 'draft';
 
@@ -183,14 +186,14 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
             </p>
             {emptyStops.length > 0 && (
               <p>
-                Sin contenido visible: {emptyStops.map((s) => tr(s.title, 'es')).join(', ')}. Los visitantes solo verán el
+                Sin contenido visible: {emptyStops.map((s) => tr(s.title, source)).join(', ')}. Los visitantes solo verán el
                 título.
               </p>
             )}
             {untranslated.length > 0 && (
               <p>
-                Falta traducir al inglés en: {untranslated.map((s) => s.title_translations.es).join(', ')}. Se mostrará en
-                español.
+                Falta traducir en: {untranslated.map((s) => s.title_translations[source]).join(', ')}. Se mostrará en{' '}
+                {sourceName}.
               </p>
             )}
           </div>

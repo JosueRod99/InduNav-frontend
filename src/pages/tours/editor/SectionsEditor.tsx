@@ -1,3 +1,4 @@
+import { tr } from '../../../api/tourView';
 import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { useState } from 'react';
 import {
@@ -163,7 +164,7 @@ const SectionsEditor = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`text-sm font-medium ${section.visible ? 'text-gray-900' : 'text-gray-500'}`}>
-                      {isOwn ? section.title?.[language] || section.title?.es || SECTION_LABELS[section.key] : SECTION_LABELS[section.key]}
+                      {isOwn ? tr(section.title, language) || SECTION_LABELS[section.key] : SECTION_LABELS[section.key]}
                     </span>
                     {isCustom && (
                       <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">Propia</span>

@@ -6,7 +6,7 @@ export interface NarrationUsageAudio {
   id: string;
   publication_id: string;
   area_title: string;
-  language: 'es' | 'en';
+  language: string;
   characters: number;
   duration_seconds: number | null;
   cost_usd: number;

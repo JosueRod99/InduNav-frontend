@@ -2,7 +2,6 @@ import { Globe, Lock } from 'lucide-react';
 import ImageUpload from '../../../components/shared/ImageUpload';
 import { ImageType } from '../../../api/upload';
 import {
-  TOUR_LANGUAGE_LABELS,
   type BuilderTour,
   type TourLanguage,
   type UpdateTourSettingsPayload,
@@ -11,7 +10,7 @@ import TranslatedField from './TranslatedField';
 import SectionsEditor from './SectionsEditor';
 
 interface TourSettingsEditorProps {
-  availableLanguages?: { code: string }[];
+  availableLanguages?: { code: string; name: string }[];
   tour: BuilderTour;
   language: TourLanguage;
   onChange: (patch: UpdateTourSettingsPayload) => void;
@@ -33,10 +32,11 @@ const VISIBILITY_OPTIONS = [
 ];
 
 const TourSettingsEditor = ({ tour, language, availableLanguages, onChange }: TourSettingsEditorProps) => {
-  // Only Spanish and English until the viewer and the editor handle the rest (PLAN_IDIOMAS.md, phases 2 and 3)
-  const offered = (Object.keys(TOUR_LANGUAGE_LABELS) as TourLanguage[]).filter(
-    (lang) => !availableLanguages || tour.languages.includes(lang) || availableLanguages.some((l) => l.code === lang)
-  );
+  // Those of the company, plus any the tour still has
+  const offered = [
+    ...(availableLanguages || []),
+    ...tour.languages.filter((code) => !availableLanguages?.some((l) => l.code === code)).map((code) => ({ code, name: code })),
+  ];
   const toggleLanguage = (lang: TourLanguage) => {
     const next = tour.languages.includes(lang) ? tour.languages.filter((l) => l !== lang) : [...tour.languages, lang];
     if (next.length > 0) onChange({ languages: next });
@@ -90,18 +90,18 @@ const TourSettingsEditor = ({ tour, language, availableLanguages, onChange }: To
         <p className="mb-2 text-xs text-gray-500">
           Cada idioma activo genera su propia narración en audio al publicar.
         </p>
-        <div className="flex gap-4">
-          {offered.map((lang) => (
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {offered.map(({ code: lang, name }) => (
             <label key={lang} className="flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
                 checked={tour.languages.includes(lang)}
-                disabled={lang === 'es'}
+                disabled={lang === tour.source_language}
                 onChange={() => toggleLanguage(lang)}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              {TOUR_LANGUAGE_LABELS[lang]}
-              {lang === 'es' && <span className="text-xs text-gray-400">(principal)</span>}
+              {name}
+              {lang === tour.source_language && <span className="text-xs text-gray-400">(principal)</span>}
             </label>
           ))}
         </div>

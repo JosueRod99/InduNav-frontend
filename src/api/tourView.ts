@@ -159,6 +159,7 @@ export interface TourView {
     title: Translations;
     description: Translations;
     languages: TourLanguage[];
+    source_language: TourLanguage;
     cover_image_url: string | null;
     plant_name: string;
     organization: { name: string | null; logo_url: string | null; profile: TourCompanyProfile | null };
@@ -206,4 +207,4 @@ export const resolveStopQr = async (qrCode: string): Promise<{ tour_code: string
 
 /** Text in the requested language, falling back to Spanish */
 export const tr = (text: Translations | undefined | null, language: TourLanguage): string =>
-  (text?.[language] || text?.es || '').trim();
+  (text?.[language] || text?.es || Object.values(text || {}).find(Boolean) || '').trim();

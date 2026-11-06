@@ -1,6 +1,6 @@
 // Floor of a plant layout: 0 ground floor, negative basements, positive upper floors
 
-export const floorLabel = (level: number, language: 'es' | 'en' = 'es') => {
+export const floorLabel = (level: number, language: string = 'es') => {
   if (level === 0) return language === 'es' ? 'Planta Baja' : 'Ground floor';
   if (level < 0) {
     const base = language === 'es' ? 'Sótano' : 'Basement';
