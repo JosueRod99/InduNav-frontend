@@ -46,6 +46,7 @@ import StopsPanel from './editor/StopsPanel';
 import StopContentEditor from './editor/StopContentEditor';
 import SectionsEditor, { applyStructure } from './editor/SectionsEditor';
 import TourSettingsEditor from './editor/TourSettingsEditor';
+import LanguageFlag from '../../components/ui/LanguageFlag';
 import AddStopModal from './editor/AddStopModal';
 import PublishTourModal from './modals/PublishTourModal';
 import ShareTourModal from './modals/ShareTourModal';
@@ -481,9 +482,10 @@ const TourEditorPage = () => {
                   <button
                     key={lang}
                     onClick={() => setLanguage(lang)}
-                    className={`rounded px-2.5 py-1 ${language === lang ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className={`flex items-center gap-1 rounded px-2 py-1 ${language === lang ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
                     title={`Editar textos en ${languageName(lang)}`}
                   >
+                    <LanguageFlag code={lang} className="h-3.5 w-3.5" />
                     {lang.toUpperCase()}
                   </button>
                 ))}

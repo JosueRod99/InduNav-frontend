@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import { confirmar } from '../../components/ui/ConfirmDialog';
 import Input from '../../components/ui/Input';
+import LanguageFlag from '../../components/ui/LanguageFlag';
 import Modal from '../../components/ui/Modal';
 import ScrollTabs from '../../components/ui/ScrollTabs';
 import SectionHeader from '../../components/ui/SectionHeader';
@@ -244,6 +245,7 @@ const CatalogTab = () => {
               <li key={language.code} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900">
+                    <LanguageFlag code={language.code} />
                     {language.name}
                     <span className="font-normal text-gray-600">{language.native_name}</span>
                     <code className="text-xs font-normal text-gray-500">{language.code}</code>
@@ -373,6 +375,7 @@ const OrganizationsTab = () => {
                         onChange={() => toggle(organization, language.code)}
                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
+                      <LanguageFlag code={language.code} />
                       {language.name}
                       {isBase && <span className="text-xs text-gray-400">(base)</span>}
                     </label>

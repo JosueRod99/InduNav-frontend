@@ -1,3 +1,4 @@
+import LanguageFlag from '../../../components/ui/LanguageFlag';
 import { Globe, Lock } from 'lucide-react';
 import ImageUpload from '../../../components/shared/ImageUpload';
 import { ImageType } from '../../../api/upload';
@@ -100,6 +101,7 @@ const TourSettingsEditor = ({ tour, language, availableLanguages, onChange }: To
                 onChange={() => toggleLanguage(lang)}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
+              <LanguageFlag code={lang} />
               {name}
               {lang === tour.source_language && <span className="text-xs text-gray-400">(principal)</span>}
             </label>

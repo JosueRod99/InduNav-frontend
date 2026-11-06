@@ -1,3 +1,4 @@
+import LanguageFlag from '../../components/ui/LanguageFlag';
 import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -210,8 +211,9 @@ const OrganizationProfileTab = ({ organizationId, canEdit }: { organizationId: s
                 type="button"
                 onClick={() => setLanguage(l)}
                 aria-pressed={language === l}
-                className={`rounded-md px-3 py-1 ${language === l ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1 ${language === l ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
               >
+                <LanguageFlag code={l} />
                 {name}
               </button>
             ))}
