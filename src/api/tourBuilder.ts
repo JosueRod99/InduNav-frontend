@@ -161,6 +161,7 @@ export interface TourBuilderData {
   tour: BuilderTour;
   stops: BuilderStop[];
   publications: PublicationUsage;
+  available_languages?: { code: string; name: string; native_name: string }[]; // those of the company
   narration_test_mode?: boolean; // TTS_TEST_MODE: only the first sentence of each script is synthesized
 }
 

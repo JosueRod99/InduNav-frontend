@@ -19,6 +19,7 @@ import NarrationUsagePage from './pages/admin/NarrationUsagePage';
 import RolesPage from './pages/admin/RolesPage';
 import RoleEditorPage from './pages/admin/RoleEditorPage';
 import AuditLogPage from './pages/admin/AuditLogPage';
+import LanguagesPage from './pages/admin/LanguagesPage';
 import TourStatsPage from './pages/tours/TourStatsPage';
 import PlantWorkspacePage from './pages/plants/PlantWorkspacePage';
 import LegacyPlantRedirect from './pages/plants/LegacyPlantRedirect';
@@ -175,6 +176,14 @@ function App() {
                 element={<PermissionRoute anyOf={['roles.manage']}>{index === 0 ? <RolesPage /> : <RoleEditorPage />}</PermissionRoute>}
               />
             ))}
+            <Route
+              path="admin/languages"
+              element={
+                <PermissionRoute anyOf={['system.languages']}>
+                  <LanguagesPage />
+                </PermissionRoute>
+              }
+            />
             <Route
               path="admin/narration-usage"
               element={

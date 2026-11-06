@@ -11,6 +11,7 @@ import TranslatedField from './TranslatedField';
 import SectionsEditor from './SectionsEditor';
 
 interface TourSettingsEditorProps {
+  availableLanguages?: { code: string }[];
   tour: BuilderTour;
   language: TourLanguage;
   onChange: (patch: UpdateTourSettingsPayload) => void;
@@ -31,7 +32,11 @@ const VISIBILITY_OPTIONS = [
   },
 ];
 
-const TourSettingsEditor = ({ tour, language, onChange }: TourSettingsEditorProps) => {
+const TourSettingsEditor = ({ tour, language, availableLanguages, onChange }: TourSettingsEditorProps) => {
+  // Only Spanish and English until the viewer and the editor handle the rest (PLAN_IDIOMAS.md, phases 2 and 3)
+  const offered = (Object.keys(TOUR_LANGUAGE_LABELS) as TourLanguage[]).filter(
+    (lang) => !availableLanguages || tour.languages.includes(lang) || availableLanguages.some((l) => l.code === lang)
+  );
   const toggleLanguage = (lang: TourLanguage) => {
     const next = tour.languages.includes(lang) ? tour.languages.filter((l) => l !== lang) : [...tour.languages, lang];
     if (next.length > 0) onChange({ languages: next });
@@ -86,7 +91,7 @@ const TourSettingsEditor = ({ tour, language, onChange }: TourSettingsEditorProp
           Cada idioma activo genera su propia narración en audio al publicar.
         </p>
         <div className="flex gap-4">
-          {(Object.keys(TOUR_LANGUAGE_LABELS) as TourLanguage[]).map((lang) => (
+          {offered.map((lang) => (
             <label key={lang} className="flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"

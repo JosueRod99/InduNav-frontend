@@ -4,6 +4,7 @@ import { getPlants } from '../../api/plants';
 import { useEffect, useMemo } from 'react';
 import {
   AudioLines,
+  Languages,
   ScrollText,
   Building2,
   Factory,
@@ -42,6 +43,7 @@ const adminItems: NavItem[] = [
   { to: '/organizations', icon: Building2, label: 'Organizaciones', activePrefix: '/organizations', anyOf: ['organizations.create'] },
   { to: '/users', icon: Users, label: 'Usuarios', anyOf: ['users.read'] },
   { to: '/admin/roles', icon: Shield, label: 'Roles y permisos', activePrefix: '/admin/roles', anyOf: ['roles.manage'] },
+  { to: '/admin/languages', icon: Languages, label: 'Idiomas', anyOf: ['system.languages'] },
   { to: '/admin/audit', icon: ScrollText, label: 'Auditoría', anyOf: ['system.audit'] },
   { to: '/admin/narration-usage', icon: AudioLines, label: 'Consumo de narración', anyOf: ['system.narration'] },
 ];

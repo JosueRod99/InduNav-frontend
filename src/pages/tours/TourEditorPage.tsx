@@ -523,7 +523,7 @@ const TourEditorPage = () => {
 
           <div className="p-5">
             {!selectedStop ? (
-              <TourSettingsEditor tour={tour} language={language} onChange={editSettings} />
+              <TourSettingsEditor tour={tour} language={language} availableLanguages={data!.available_languages} onChange={editSettings} />
             ) : tab === 'narration' ? (
               <StopNarrationEditor
                 key={selectedStop.id}
