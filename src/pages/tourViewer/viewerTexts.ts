@@ -260,6 +260,25 @@ const placeholdersOf = (text: string) => text.match(/\{\w+\}/g) ?? [];
 export const missingPlaceholders = (key: ViewerTextKey, text: string) =>
   placeholdersOf(EN[key]).filter((placeholder) => !text.includes(placeholder));
 
+// Language and alphabet: pt-BR reads pt, but zh-TW (traditional) does not read zh (simplified)
+const readingOf = (code: string) => {
+  try {
+    const { language, script } = new Intl.Locale(code).maximize();
+    return `${language}-${script}`;
+  } catch {
+    return code;
+  }
+};
+
+/** The language a visitor starts in: the first of their browser the tour has, else the one it was written in */
+export const startingLanguage = (languages: string[], sourceLanguage: string, browserLanguages: readonly string[] = navigator.languages) => {
+  for (const wanted of browserLanguages) {
+    const match = languages.find((l) => l === wanted) ?? languages.find((l) => readingOf(l) === readingOf(wanted));
+    if (match) return match;
+  }
+  return languages.includes(sourceLanguage) ? sourceLanguage : languages[0] || sourceLanguage;
+};
+
 type Values = Record<string, string | number>;
 
 const fill = (text: string, values: Values = {}) =>

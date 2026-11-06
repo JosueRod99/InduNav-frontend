@@ -53,7 +53,7 @@ import NarrationPlayer from './components/NarrationPlayer';
 import { useVisitTracking, type VisitSource } from './useVisitTracking';
 import { isPageReload, tourProgress } from './tourProgress';
 import { avatarUrl } from '../../utils/avatarUrl';
-import { createViewerTexts } from './viewerTexts';
+import { createViewerTexts, startingLanguage } from './viewerTexts';
 import { useViewerTexts, ViewerTextsProvider } from './useViewerTexts';
 
 // Viewer of REAL tours (separate from the demo at /tour/:slug, which is not touched).
@@ -179,7 +179,7 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
   });
   const [stopIndex, setStopIndex] = useState(arrivalStop ?? restored?.index ?? 0);
   const [language, setLanguage] = useState<TourLanguage>(
-    canUseLanguage(restored?.language) ? restored.language : view.tour.languages[0] || 'es'
+    canUseLanguage(restored?.language) ? restored.language : startingLanguage(view.tour.languages, view.tour.source_language)
   );
   const [activeSection, setActiveSection] = useState<string | null>(restored?.section ?? null);
   const [menuOpen, setMenuOpen] = useState(false);
