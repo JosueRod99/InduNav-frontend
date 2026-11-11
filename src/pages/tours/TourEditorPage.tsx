@@ -16,6 +16,7 @@ import {
   Share2,
   Volume2,
   FlaskConical,
+  Languages,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -39,8 +40,9 @@ import {
   type UpdateTourSettingsPayload,
 } from '../../api/tourBuilder';
 import { getTourPreview } from '../../api/tourView';
-import { getPublishEstimate } from '../../api/tourBuilder';
-import { SourceLanguageContext } from './editor/sourceLanguage';
+import { getPublishEstimate, translateTour } from '../../api/tourBuilder';
+import { pendingTranslations } from '../../utils/translationState';
+import { SourceLanguageContext, TranslationMetaContext } from './editor/sourceLanguage';
 import StopNarrationEditor from './editor/StopNarrationEditor';
 import StopsPanel from './editor/StopsPanel';
 import StopContentEditor from './editor/StopContentEditor';
@@ -86,6 +88,7 @@ const TourEditorPage = () => {
   const [isPublishOpen, setIsPublishOpen] = useState(false);
   const canPublish = useCan()('tours.publish');
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   // While editing, the cache is the source of truth: no background refetch over typed text
   const { data, isLoading, error } = useQuery({
@@ -150,9 +153,32 @@ const TourEditorPage = () => {
     stopAutosave.schedule({ id: stopId, ...patch });
   };
 
+  /**
+   * Automatic translation of what is missing or outdated. Saves first and then takes the editor data
+   * the server answers with; editing waits meanwhile so nothing typed is lost.
+   */
+  const translate = async (languages?: string[]) => {
+    if (isTranslating) return;
+    setIsTranslating(true);
+    (document.activeElement as HTMLElement | null)?.blur();
+    try {
+      await flushAll();
+      const { result, builder } = await translateTour(tourId!, languages);
+      queryClient.setQueryData(queryKey, builder);
+      toast.success(result.translated ? `${result.translated} ${result.translated === 1 ? 'texto traducido' : 'textos traducidos'}` : 'No había nada que traducir');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'No se pudo traducir', { duration: 7000 });
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const editSettings = (patch: UpdateTourSettingsPayload) => {
+    const added = patch.languages?.filter((code) => !data?.tour.languages.includes(code)) ?? [];
     setBuilder((prev) => ({ ...prev, tour: { ...prev.tour, ...patch } }));
     settingsAutosave.schedule(patch);
+    // A language just turned on gets its texts right away
+    if (added.length) void translate(added);
   };
 
   const selectStop = async (stopId: string | null) => {
@@ -341,7 +367,19 @@ const TourEditorPage = () => {
   const languageOptions = data!.available_languages || [];
   const languageName = (code: string) => languageOptions.find((l) => l.code === code)?.name || code;
   const language = pickedLanguage && tour.languages.includes(pickedLanguage) ? pickedLanguage : sourceCode;
-  const flushAll = () => Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
+  function flushAll() {
+    return Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
+  }
+  const pending = pendingTranslations(
+    [
+      { texts: [tour.title_translations, tour.description_translations], meta: tour.translation_meta },
+      ...stops.map((s) => ({ texts: [s.title_translations, s.content, s.sections], meta: s.translation_meta })),
+    ],
+    sourceCode,
+    tour.languages
+  );
+  const pendingTotal = Object.values(pending).reduce((a, b) => a + b, 0);
+  const translationUsage = data!.translation;
 
   return (
     <SourceLanguageContext.Provider value={{ code: sourceCode, name: languageName(sourceCode) }}>
@@ -445,7 +483,11 @@ const TourEditorPage = () => {
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           {/* Editing area (left, wide) */}
-          <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white">
+          <div
+            className={`min-w-0 flex-1 rounded-lg border border-gray-200 bg-white ${isTranslating ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={isTranslating}
+          >
+            <TranslationMetaContext.Provider value={(selectedStop ? selectedStop.translation_meta : tour.translation_meta) ?? {}}>
             {/* Editor toolbar: what is being edited + language */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
               {selectedStop ? (
@@ -477,6 +519,22 @@ const TourEditorPage = () => {
                 </div>
               )}
 
+              <div className="flex flex-wrap items-center gap-2">
+              {pendingTotal > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  isLoading={isTranslating}
+                  onClick={() => translate()}
+                  title={`Traduce con ${translationUsage?.provider === 'google' ? 'Google' : 'el traductor automático'} lo que falta o cambió. Lo que escribiste a mano no se modifica.${
+                    translationUsage ? ` Este mes la empresa lleva ${translationUsage.used.toLocaleString('es-MX')} de ${translationUsage.limit.toLocaleString('es-MX')} caracteres.` : ''
+                  }`}
+                >
+                  {!isTranslating && <Languages className="h-4 w-4" />}
+                  Traducir {pendingTotal} {pendingTotal === 1 ? 'texto' : 'textos'}
+                </Button>
+              )}
               <div className="flex flex-wrap rounded-md border border-gray-300 p-0.5 text-xs font-medium" role="group" aria-label="Idioma de edición">
                 {tour.languages.map((lang) => (
                   <button
@@ -489,6 +547,7 @@ const TourEditorPage = () => {
                     {lang.toUpperCase()}
                   </button>
                 ))}
+              </div>
               </div>
             </div>
 
@@ -575,6 +634,7 @@ const TourEditorPage = () => {
                 </div>
               )}
             </div>
+            </TranslationMetaContext.Provider>
           </div>
 
           {/* Stops (right) */}
@@ -598,6 +658,8 @@ const TourEditorPage = () => {
             onClose={() => setIsPublishOpen(false)}
             builder={data!}
             beforePublish={flushAll}
+            pendingTranslations={pending}
+            onTranslate={() => translate()}
             onPublished={(result) => {
               setBuilder((prev) => ({
                 ...prev,

@@ -6,6 +6,7 @@ import {
   Award,
   Flag,
   Globe,
+  Languages,
   Home,
   Play,
   RotateCcw,
@@ -558,6 +559,12 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
                     </div>
                   )}
                   <StopFaq stop={stop} />
+                  {stop.machine_translated?.includes(language) && (
+                    <p className="flex items-center gap-2 text-xs text-slate-500">
+                      <Languages className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                      {t('machine_translation')}
+                    </p>
+                  )}
                   {audioUrl ? (
                     audioFallback && (
                       <p className="flex items-center gap-2 text-xs text-slate-500">

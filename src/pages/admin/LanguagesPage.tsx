@@ -16,6 +16,7 @@ import {
   getLanguages,
   getOrganizationLanguages,
   setOrganizationLanguages,
+  translateViewerTexts,
   updateLanguage,
   type CatalogLanguage,
   type OrganizationLanguages,
@@ -134,6 +135,16 @@ const ViewerTextsModal = ({ language, onClose }: { language: CatalogLanguage; on
     onError: (error) => toast.error(errorMessage(error, 'No se pudieron guardar los textos')),
   });
   const hasProblems = VIEWER_TEXT_KEYS.some(problemOf);
+  const missingKeys = VIEWER_TEXT_KEYS.filter((key) => !texts[key]?.trim());
+  const translate = useMutation({
+    mutationFn: () => translateViewerTexts(language.code, Object.fromEntries(missingKeys.map((key) => [key, viewerTextInEnglish(key)]))),
+    onSuccess: (translated) => {
+      setTexts((current) => ({ ...translated, ...Object.fromEntries(Object.entries(current).filter(([, text]) => text?.trim())) }));
+      const count = Object.keys(translated).length;
+      toast.success(`${count} ${count === 1 ? 'texto traducido' : 'textos traducidos'}. Revísalos y guarda.`);
+    },
+    onError: (error) => toast.error(errorMessage(error, 'No se pudo traducir')),
+  });
 
   return (
     <Modal
@@ -157,6 +168,15 @@ const ViewerTextsModal = ({ language, onClose }: { language: CatalogLanguage; on
           Botones y etiquetas que ve el visitante. Lo que quede vacío se muestra en inglés. Los textos en singular pueden quedar vacíos si el idioma no
           distingue singular y plural. Los cambios llegan de inmediato a los tours publicados.
         </p>
+        {missingKeys.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            <span>Faltan {missingKeys.length}. Se traducen desde el inglés y no se guardan hasta que pulses Guardar.</span>
+            <Button size="sm" variant="outline" className="gap-1.5" isLoading={translate.isPending} onClick={() => translate.mutate()}>
+              {!translate.isPending && <Languages className="h-4 w-4" />}
+              Traducir automáticamente
+            </Button>
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input
             type="checkbox"

@@ -12,16 +12,18 @@ interface PublishTourModalProps {
   onClose: () => void;
   builder: TourBuilderData;
   beforePublish: () => Promise<unknown>; // save pending edits first
+  pendingTranslations: Record<string, number>; // texts missing or outdated, per language
+  onTranslate: () => Promise<unknown>;
   onPublished: (result: PublishResult) => void;
 }
 
 /** Summary + warnings before publishing. Publishing without audio does not use a monthly credit. */
-const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished }: PublishTourModalProps) => {
+const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, pendingTranslations, onTranslate, onPublished }: PublishTourModalProps) => {
   const { tour, stops, publications } = builder;
   const [isPublishing, setIsPublishing] = useState(false);
 
   // The preview tells which areas would show nothing; the estimate, what happens with the narration
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, refetch } = useQuery({
     queryKey: ['tour-publish-check', tour.id],
     queryFn: async () => {
       await beforePublish();
@@ -45,14 +47,15 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
   const emptyStops = (preview?.stops || []).filter((s) => s.sections.length === 0);
   const source = tour.source_language;
   const sourceName = builder.available_languages?.find((l) => l.code === source)?.name.toLowerCase() || source;
-  const translations = tour.languages.filter((l) => l !== source);
-  const untranslated = stops.filter((s) =>
-    translations.some(
-      (l) =>
-        (s.title_translations[source] && !s.title_translations[l]) ||
-        (s.content.narrative?.[source] && !s.content.narrative?.[l])
-    )
-  );
+  const languageName = (code: string) => builder.available_languages?.find((l) => l.code === code)?.name.toLowerCase() || code;
+  const untranslated = Object.entries(pendingTranslations).filter(([, count]) => count > 0);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const translateNow = async () => {
+    setIsTranslating(true);
+    await onTranslate();
+    setIsTranslating(false);
+    refetch(); // translated texts may need new narration
+  };
   const nextVersion = (publications.latest_version ?? 0) + 1;
   const isRepublish = tour.status !== 'draft';
 
@@ -191,10 +194,15 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
               </p>
             )}
             {untranslated.length > 0 && (
-              <p>
-                Falta traducir en: {untranslated.map((s) => s.title_translations[source]).join(', ')}. Se mostrará en{' '}
-                {sourceName}.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>
+                  Textos sin traducir o desactualizados:{' '}
+                  {untranslated.map(([code, count]) => `${count} en ${languageName(code)}`).join(', ')}. Se mostrarán en {sourceName}.
+                </p>
+                <Button size="sm" variant="outline" isLoading={isTranslating} onClick={translateNow}>
+                  Traducir ahora
+                </Button>
+              </div>
             )}
           </div>
         )}

@@ -1,5 +1,6 @@
 import type { TourLanguage, Translations } from '../../../api/tourBuilder';
-import { useSourceLanguage } from './sourceLanguage';
+import { useSourceLanguage, useTranslationMeta } from './sourceLanguage';
+import { translationState } from '../../../utils/translationState';
 
 interface TranslatedFieldProps {
   label?: string;
@@ -34,7 +35,17 @@ const TranslatedField = ({
   const current = value?.[language] || '';
   const source = useSourceLanguage();
   const original = value?.[source.code] || '';
-  const missingTranslation = language !== source.code && !current && !!original;
+  const state = translationState(value, source.code, language, useTranslationMeta());
+  const notice =
+    state === 'missing'
+      ? `Sin traducir · se mostrará en ${source.name.toLowerCase()}`
+      : state === 'outdated'
+      ? 'Traducción automática de un texto anterior · se actualiza al traducir'
+      : state === 'auto'
+      ? 'Traducción automática'
+      : null;
+  // Fields without a label say it with their border and a tooltip
+  const stateClass = state === 'missing' || state === 'outdated' ? 'border-amber-300' : state === 'auto' ? 'bg-slate-50' : '';
 
   const handleChange = (text: string) => onChange({ ...(value || {}), [language]: text });
   const effectivePlaceholder = language !== source.code && original ? original : placeholder;
@@ -44,8 +55,8 @@ const TranslatedField = ({
       {label && (
         <div className="mb-1 flex items-center justify-between">
           <label className="text-sm font-medium text-gray-700">{label}</label>
-          {missingTranslation && (
-            <span className="text-[11px] font-medium text-amber-600">Sin traducir · se mostrará en {source.name.toLowerCase()}</span>
+          {notice && (
+            <span className={`text-[11px] font-medium ${state === 'auto' ? 'text-gray-500' : 'text-amber-600'}`}>{notice}</span>
           )}
         </div>
       )}
@@ -56,7 +67,8 @@ const TranslatedField = ({
           rows={rows}
           maxLength={maxLength}
           placeholder={effectivePlaceholder}
-          className={`${inputClass} resize-y ${missingTranslation ? 'border-amber-300' : ''}`}
+          title={label ? undefined : notice ?? undefined}
+          className={`${inputClass} resize-y ${stateClass}`}
         />
       ) : (
         <input
@@ -64,7 +76,8 @@ const TranslatedField = ({
           onChange={(e) => handleChange(e.target.value)}
           maxLength={maxLength}
           placeholder={effectivePlaceholder}
-          className={`${inputClass} ${missingTranslation ? 'border-amber-300' : ''}`}
+          title={label ? undefined : notice ?? undefined}
+          className={`${inputClass} ${stateClass}`}
         />
       )}
     </div>

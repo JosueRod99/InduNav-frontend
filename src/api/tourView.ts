@@ -57,6 +57,7 @@ export interface TourViewStop {
   content: StopContent;
   sections: TourSection[]; // visible, non-empty, in order
   audio: Partial<Record<TourLanguage, string | null>>;
+  machine_translated?: TourLanguage[]; // languages in which some text came from the translator
   live: {
     personnel: { id: string; name: string; position: string | null; avatar_url: string | null; is_primary: boolean }[];
     headcount?: { position: string; quantity: number; shift: string | null }[]; // unnamed staff by position

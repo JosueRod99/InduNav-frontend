@@ -1,4 +1,5 @@
 import apiClient from './client';
+import type { TranslationMeta } from '../utils/translationState';
 import type { CustomSectionIcon } from '../components/tours/customSectionIcons';
 
 // Tours v2 builder (PLAN_TOURS_REALES.md). The tour/stops rows are the draft; visitors see the
@@ -129,6 +130,7 @@ export interface BuilderStop {
   image_url: string | null;
   qr_short_code: string | null;
   updated_at: string;
+  translation_meta?: TranslationMeta; // which texts came from the translator
   area_name: string | null;
   area_code: string | null;
   area_color: string | null;
@@ -155,6 +157,7 @@ export interface BuilderTour {
   default_sections: TourSection[];
   max_publications_per_month: number;
   has_unpublished_changes: boolean;
+  translation_meta?: TranslationMeta;
 }
 
 export interface PublicationUsage {
@@ -171,6 +174,7 @@ export interface TourBuilderData {
   stops: BuilderStop[];
   publications: PublicationUsage;
   available_languages?: TourLanguageOption[]; // those of the company
+  translation?: { used: number; limit: number; provider: string }; // characters this month, whole company
   narration_test_mode?: boolean; // TTS_TEST_MODE: only the first sentence of each script is synthesized
 }
 
@@ -331,4 +335,16 @@ export interface TourStats {
 export const getTourStats = async (tourId: string, days: number): Promise<TourStats> => {
   const { data } = await apiClient.get(`/tours/${tourId}/stats`, { params: { days } });
   return data.stats;
+};
+
+export interface TranslateResult {
+  translated: number; // texts written
+  characters: number; // sent to the translator
+  languages: Record<string, number>;
+}
+
+/** Translate automatically what is missing or outdated; answers with the whole editor data */
+export const translateTour = async (tourId: string, languages?: string[]): Promise<{ result: TranslateResult; builder: TourBuilderData }> => {
+  const { data } = await apiClient.post(`/tours/${tourId}/translate`, languages ? { languages } : {});
+  return data;
 };
