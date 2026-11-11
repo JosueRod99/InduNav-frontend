@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Languages, Loader2, Pencil, Plus, Power, Trash2, Type } from 'lucide-react';
+import { AlertTriangle, Building2, Languages, Loader2, Pencil, Plus, Power, Trash2, Type, Volume2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
 import { confirmar } from '../../components/ui/ConfirmDialog';
@@ -15,10 +15,12 @@ import {
   deleteLanguage,
   getLanguages,
   getOrganizationLanguages,
+  getVoice,
   setOrganizationLanguages,
   translateViewerTexts,
   updateLanguage,
   type CatalogLanguage,
+  type NarrationVoice,
   type OrganizationLanguages,
 } from '../../api/languages';
 import { missingPlaceholders, VIEWER_TEXT_KEYS, viewerTextInEnglish, viewerTextInSpanish, type ViewerTextKey } from '../tourViewer/viewerTexts';
@@ -34,18 +36,97 @@ const TABS = [
 const countLabel = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const errorMessage = (error: any, fallback: string) => error?.response?.data?.message || fallback;
 
+const narrationLabel = (language: CatalogLanguage) =>
+  !language.can_narrate
+    ? 'sin narración disponible'
+    : language.voice_source === 'catalog'
+    ? 'voz propia'
+    : language.voice_source === 'environment'
+    ? 'voz del servidor'
+    : 'sin voz';
+
+/** Narration voice of a language: an ElevenLabs id, checked with its name and sample before saving */
+const VoiceField = ({ language, value, onChange }: { language: CatalogLanguage; value: string; onChange: (value: string) => void }) => {
+  const [voice, setVoice] = useState<NarrationVoice | null>(null);
+  const check = useMutation({
+    mutationFn: () => getVoice(value.trim()),
+    onSuccess: setVoice,
+    onError: (error) => {
+      setVoice(null);
+      toast.error(errorMessage(error, 'No se pudo consultar la voz'));
+    },
+  });
+
+  if (!language.can_narrate) {
+    return (
+      <p className="flex items-start gap-2 rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+        <Volume2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400" />
+        El servicio de narración no tiene voces en este idioma: los visitantes escuchan la narración en el idioma original del tour.
+      </p>
+    );
+  }
+
+  const base = language.code.split('-')[0];
+  const verified = voice && voice.languages.includes(base);
+  const changed = value.trim() !== (language.voice_id ?? '');
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <Input
+            label="Voz de narración"
+            value={value}
+            maxLength={40}
+            onChange={(e) => {
+              onChange(e.target.value);
+              setVoice(null);
+            }}
+            placeholder="Identificador de ElevenLabs"
+          />
+        </div>
+        <Button type="button" variant="outline" disabled={!value.trim()} isLoading={check.isPending} onClick={() => check.mutate()}>
+          Comprobar
+        </Button>
+      </div>
+      {voice && (
+        <div className="space-y-2 rounded-lg border border-gray-200 p-3 text-sm">
+          <p className="font-medium text-gray-900">{voice.name}</p>
+          {voice.preview_url && <audio controls src={voice.preview_url} className="w-full" aria-label={`Muestra de ${voice.name}`} />}
+          <p className={`flex items-start gap-1.5 text-xs ${verified ? 'text-gray-600' : 'text-amber-800'}`}>
+            {!verified && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />}
+            {verified
+              ? `Verificada en ${language.name.toLowerCase()}. La muestra puede estar en otro idioma.`
+              : `No está verificada en ${language.name.toLowerCase()}: puede leerse con acento. La muestra está en su idioma original.`}
+          </p>
+        </div>
+      )}
+      <p className="text-xs text-gray-500">
+        {language.is_built_in
+          ? 'Vacío: usa la voz configurada en el servidor.'
+          : 'Vacío: sin audio en este idioma; los visitantes escuchan la narración en el idioma original del tour.'}
+        {changed && ' Al cambiarla, cada tour en este idioma genera su audio de nuevo en su siguiente publicación.'}
+      </p>
+    </div>
+  );
+};
+
 const LanguageModal = ({ language, onClose }: { language: CatalogLanguage | null; onClose: () => void }) => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     code: language?.code ?? '',
     name: language?.name ?? '',
     native_name: language?.native_name ?? '',
+    voice_id: language?.voice_id ?? '',
   });
   const save = useMutation({
     mutationFn: () =>
       language
-        ? updateLanguage(language.code, { name: form.name, native_name: form.native_name })
-        : createLanguage(form),
+        ? updateLanguage(language.code, {
+            name: form.name,
+            native_name: form.native_name,
+            ...(form.voice_id.trim() !== (language.voice_id ?? '') && { voice_id: form.voice_id.trim() || null }),
+          })
+        : createLanguage({ code: form.code, name: form.name, native_name: form.native_name }),
     onSuccess: () => {
       toast.success(language ? 'Idioma guardado' : 'Idioma agregado');
       queryClient.invalidateQueries({ queryKey: ['languages'] });
@@ -105,6 +186,7 @@ const LanguageModal = ({ language, onClose }: { language: CatalogLanguage | null
           placeholder="日本語"
           helperText="Es el que verá el visitante del tour."
         />
+        {language && <VoiceField language={language} value={form.voice_id} onChange={(voice_id) => setForm({ ...form, voice_id })} />}
       </form>
     </Modal>
   );
@@ -272,7 +354,8 @@ const CatalogTab = () => {
                     {!language.is_active && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-700">Inactivo</span>}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">
-                    {countLabel(language.organizations_count, 'empresa', 'empresas')} · {countLabel(language.tours_count, 'tour', 'tours')}
+                    {countLabel(language.organizations_count, 'empresa', 'empresas')} · {countLabel(language.tours_count, 'tour', 'tours')} ·
+                    Narración: {narrationLabel(language)}
                     {!language.is_built_in && ` · Textos del visor: ${translatedTexts(language)} de ${VIEWER_TEXT_KEYS.length}`}
                   </p>
                 </div>

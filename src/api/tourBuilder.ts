@@ -266,7 +266,7 @@ export interface NarrationItem {
   stop_id: string;
   stop_title: string;
   language: TourLanguage;
-  script: string | null; // null = nothing to narrate in this language (visitors hear Spanish)
+  script: string | null; // null = nothing to narrate in this language (visitors hear the source language)
   synth_text: string | null; // text actually synthesized (first sentence in test mode)
   characters: number;
   text_hash: string | null;

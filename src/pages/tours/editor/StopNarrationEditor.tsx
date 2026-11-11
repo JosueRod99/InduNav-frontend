@@ -1,5 +1,6 @@
 import { CheckCircle2, Clock, Info, Loader2, PenLine, RotateCcw, Sparkles } from 'lucide-react';
 import type { BuilderStop, NarrationItem, TourLanguage, UpdateStopPayload } from '../../../api/tourBuilder';
+import { narrationSeconds } from '../../../utils/narrationDuration';
 import { useSourceLanguage } from './sourceLanguage';
 
 // Narration of an area: by default it is composed from the title, narrative and key points; it can
@@ -13,10 +14,8 @@ interface StopNarrationEditorProps {
   onChange: (patch: UpdateStopPayload) => void;
 }
 
-const CHARS_PER_MINUTE = 900; // approximate speaking rate of the narration voices
-
-const duration = (chars: number) => {
-  const seconds = Math.max(1, Math.round((chars / CHARS_PER_MINUTE) * 60));
+const duration = (chars: number, language: string) => {
+  const seconds = Math.max(1, narrationSeconds(chars, language));
   return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 };
 
@@ -66,7 +65,7 @@ const StopNarrationEditor = ({ stop, language, item, isLoading, onChange }: Stop
         </span>
         {chars > 0 && (
           <span className="text-xs text-gray-500">
-            {chars.toLocaleString('es-MX')} caracteres · ~{duration(chars)} de audio
+            {chars.toLocaleString('es-MX')} caracteres · ~{duration(chars, language)} de audio
           </span>
         )}
       </div>

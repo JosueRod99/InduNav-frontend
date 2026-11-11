@@ -6,6 +6,7 @@ import Modal from '../../../components/ui/Modal';
 import Button from '../../../components/ui/Button';
 import { getPublishEstimate, publishTour, type PublishResult, type TourBuilderData } from '../../../api/tourBuilder';
 import { getTourPreview, tr } from '../../../api/tourView';
+import { narrationSeconds } from '../../../utils/narrationDuration';
 
 interface PublishTourModalProps {
   isOpen: boolean;
@@ -39,7 +40,10 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, pendingTran
   const preview = checks?.preview;
   const estimate = checks?.estimate;
   const keepPreviousAudio = !!estimate && estimate.limit_reached && estimate.to_generate > 0;
-  const minutes = estimate ? Math.max(1, Math.round(estimate.characters_to_generate / 900)) : 0;
+  const seconds = (estimate?.items ?? [])
+    .filter((item) => item.script && !item.audio_url)
+    .reduce((sum, item) => sum + narrationSeconds(item.characters, item.language), 0);
+  const minutes = Math.max(1, Math.round(seconds / 60));
   const resetsOn = estimate
     ? new Date(`${String(estimate.usage.resets_on).slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
     : '';
