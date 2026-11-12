@@ -52,6 +52,7 @@ import LocationSection from './sections/LocationSection';
 import { CompanySection, PlantSection } from './sections/CompanySections';
 import NarrationPlayer from './components/NarrationPlayer';
 import { useVisitTracking, type VisitSource } from './useVisitTracking';
+import { localizeView } from './liveTexts';
 import { isPageReload, tourProgress } from './tourProgress';
 import { avatarUrl } from '../../utils/avatarUrl';
 import LanguageFlag from '../../components/ui/LanguageFlag';
@@ -178,24 +179,26 @@ interface TourExperienceProps {
   source?: VisitSource; // how the visitor arrived (visit stats)
 }
 
-export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = null, source = 'link' }: TourExperienceProps) => {
+export const TourExperience = ({ view: original, onExit = () => {}, initialStopIndex = null, source = 'link' }: TourExperienceProps) => {
   const validInitialStop =
-    initialStopIndex !== null && initialStopIndex >= 0 && initialStopIndex < view.stops.length ? initialStopIndex : null;
-  const progress = useMemo(() => tourProgress(view.tour.id, !!view.is_preview), [view.tour.id, view.is_preview]);
-  const canUseLanguage = (value?: string): value is TourLanguage => view.tour.languages.includes(value as TourLanguage);
+    initialStopIndex !== null && initialStopIndex >= 0 && initialStopIndex < original.stops.length ? initialStopIndex : null;
+  const progress = useMemo(() => tourProgress(original.tour.id, !!original.is_preview), [original.tour.id, original.is_preview]);
+  const canUseLanguage = (value?: string): value is TourLanguage => original.tour.languages.includes(value as TourLanguage);
   // A QR code wins when arriving by it; its ?stop=N stays in the URL, so a reload does not count
   const [arrivalStop] = useState(() => (isPageReload() ? null : validInitialStop));
   // Reloading this tab keeps going; coming back later goes through the cover (see tourProgress)
   const [restored] = useState(() => {
     if (arrivalStop !== null || !progress.isThisTabInside()) return null;
     const saved = progress.read();
-    const index = view.stops.findIndex((s) => s.id === saved?.stopId);
+    const index = original.stops.findIndex((s) => s.id === saved?.stopId);
     return saved && index >= 0 ? { ...saved, index } : null;
   });
   const [stopIndex, setStopIndex] = useState(arrivalStop ?? restored?.index ?? 0);
   const [language, setLanguage] = useState<TourLanguage>(
-    canUseLanguage(restored?.language) ? restored.language : startingLanguage(view.tour.languages, view.tour.source_language)
+    canUseLanguage(restored?.language) ? restored.language : startingLanguage(original.tour.languages, original.tour.source_language)
   );
+  // Live data (safety, positions...) in the visitor's language
+  const view = useMemo(() => localizeView(original, language), [original, language]);
   const [activeSection, setActiveSection] = useState<string | null>(restored?.section ?? null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [started, setStarted] = useState(arrivalStop !== null || restored !== null); // false = cover screen (step 0)
@@ -559,10 +562,16 @@ export const TourExperience = ({ view, onExit = () => {}, initialStopIndex = nul
                     </div>
                   )}
                   <StopFaq stop={stop} />
-                  {stop.machine_translated?.includes(language) && (
+                  {(stop.machine_translated?.includes(language) || stop.live_notes?.machine) && (
                     <p className="flex items-center gap-2 text-xs text-slate-500">
                       <Languages className="h-4 w-4 flex-shrink-0 text-slate-400" />
                       {t('machine_translation')}
+                    </p>
+                  )}
+                  {stop.live_notes?.original && (
+                    <p className="flex items-center gap-2 text-xs text-slate-500">
+                      <Languages className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                      {t('live_in_original', { language: languageName(view.tour.live_language ?? view.tour.source_language) })}
                     </p>
                   )}
                   {audioUrl ? (

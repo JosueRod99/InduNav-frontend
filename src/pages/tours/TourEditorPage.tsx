@@ -40,7 +40,7 @@ import {
   type UpdateTourSettingsPayload,
 } from '../../api/tourBuilder';
 import { getTourPreview } from '../../api/tourView';
-import { getPublishEstimate, translateTour } from '../../api/tourBuilder';
+import { getLiveTexts, getPublishEstimate, saveLiveTranslation, translateTour, type TourLiveTexts } from '../../api/tourBuilder';
 import { pendingTranslations } from '../../utils/translationState';
 import { SourceLanguageContext, TranslationMetaContext } from './editor/sourceLanguage';
 import StopNarrationEditor from './editor/StopNarrationEditor';
@@ -48,6 +48,7 @@ import StopsPanel from './editor/StopsPanel';
 import StopContentEditor from './editor/StopContentEditor';
 import SectionsEditor, { applyStructure } from './editor/SectionsEditor';
 import TourSettingsEditor from './editor/TourSettingsEditor';
+import LiveTextsEditor from './editor/LiveTextsEditor';
 import LanguageFlag from '../../components/ui/LanguageFlag';
 import AddStopModal from './editor/AddStopModal';
 import PublishTourModal from './modals/PublishTourModal';
@@ -55,7 +56,7 @@ import ShareTourModal from './modals/ShareTourModal';
 import { toursListPath } from './toursReturn';
 import { useCan } from '../../hooks/usePermissions';
 
-type EditorTab = 'content' | 'sections' | 'narration';
+type EditorTab = 'content' | 'sections' | 'narration' | 'live';
 
 const STATUS_PRIORITY: AutosaveStatus[] = ['error', 'saving', 'pending', 'saved', 'idle'];
 
@@ -165,6 +166,7 @@ const TourEditorPage = () => {
       await flushAll();
       const { result, builder } = await translateTour(tourId!, languages);
       queryClient.setQueryData(queryKey, builder);
+      await refetchLive();
       toast.success(result.translated ? `${result.translated} ${result.translated === 1 ? 'texto traducido' : 'textos traducidos'}` : 'No había nada que traducir');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'No se pudo traducir', { duration: 7000 });
@@ -198,6 +200,7 @@ const TourEditorPage = () => {
       }));
       setSelectedStopId(stop.id);
       setTab('content');
+      refetchLive();
       toast.success(`"${stop.area_name}" agregada como área ${stop.order_index}`);
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'No se pudo agregar el área'),
@@ -230,6 +233,7 @@ const TourEditorPage = () => {
       const remaining = stops.filter((s) => s.id !== stop.id).map((s, i) => ({ ...s, order_index: i + 1 }));
       setBuilder((prev) => ({ ...prev, tour: { ...prev.tour, has_unpublished_changes: true }, stops: remaining }));
       if (selectedStopId === stop.id) setSelectedStopId(remaining[0]?.id ?? null);
+      refetchLive();
       toast.success('Área quitada del tour');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'No se pudo quitar el área');
@@ -311,6 +315,25 @@ const TourEditorPage = () => {
     staleTime: 30_000,
   });
 
+  // Live data the tour shows (safety, positions...) and its translations; it changes in other modules
+  const liveKey = ['tour-live-texts', tourId];
+  const { data: live, refetch: refetchLive } = useQuery({
+    queryKey: liveKey,
+    queryFn: () => getLiveTexts(tourId!),
+    enabled: !!tourId,
+    refetchOnWindowFocus: true,
+  });
+  const saveLive = async (language: string, source: string, text: string) => {
+    const translation = await saveLiveTranslation(tourId!, language, source, text);
+    queryClient.setQueryData<TourLiveTexts>(liveKey, (prev) => {
+      if (!prev) return prev;
+      const current = { ...(prev.translations[language] || {}) };
+      if (translation) current[source] = translation;
+      else delete current[source];
+      return { ...prev, translations: { ...prev.translations, [language]: current } };
+    });
+  };
+
   // Narration plan of the saved draft (which audios exist / will be generated)
   const {
     data: narrationEstimate,
@@ -378,7 +401,31 @@ const TourEditorPage = () => {
     sourceCode,
     tour.languages
   );
+  // Live data without translation counts too; it is translated from the organization's language
+  const liveLanguage = live?.live_language ?? sourceCode;
+  const liveTextsOf = (items: TourLiveTexts['tour'] = []) => items.map((item) => item.text);
+  const allLive = live ? [...new Set([...liveTextsOf(live.tour), ...Object.values(live.stops).flatMap((items) => liveTextsOf(items))])] : [];
+  const liveMissing = (lang: string, texts: string[]) => texts.filter((text) => !live?.translations[lang]?.[text]).length;
+  for (const lang of tour.languages) {
+    if (lang === liveLanguage) continue;
+    const count = liveMissing(lang, allLive);
+    if (count) pending[lang] = (pending[lang] || 0) + count;
+  }
   const pendingTotal = Object.values(pending).reduce((a, b) => a + b, 0);
+  const liveEditor = (items: TourLiveTexts['tour'], emptyText: string) => (
+    <LiveTextsEditor
+      items={items}
+      language={language}
+      languageName={languageName(language).toLowerCase()}
+      liveLanguageName={languageName(liveLanguage).toLowerCase()}
+      isOriginal={language === liveLanguage}
+      translations={live?.translations[language] ?? {}}
+      onSave={(source, text) => saveLive(language, source, text)}
+      emptyText={emptyText}
+    />
+  );
+  const stopLiveMissing =
+    selectedStop && language !== liveLanguage ? liveMissing(language, liveTextsOf(live?.stops[selectedStop.id])) : 0;
   const translationUsage = data!.translation;
 
   return (
@@ -565,6 +612,7 @@ const TourEditorPage = () => {
                     ['content', 'Contenido'],
                     ['sections', 'Secciones'],
                     ['narration', 'Narración'],
+                    ['live', 'Datos de la planta'],
                   ] as const
                 ).map(([id, label]) => (
                   <button
@@ -576,12 +624,25 @@ const TourEditorPage = () => {
                         await stopAutosave.flush();
                         refetchNarration();
                       }
+                      // Hidden sections are not translated: their data leaves the list
+                      if (id === 'live') {
+                        await stopAutosave.flush();
+                        refetchLive();
+                      }
                     }}
                     className={`border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                       tab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
                     }`}
                   >
                     {label}
+                    {id === 'live' && stopLiveMissing > 0 && (
+                      <span
+                        className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800"
+                        title={`${stopLiveMissing} sin traducir en ${languageName(language).toLowerCase()}`}
+                      >
+                        {stopLiveMissing}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -589,7 +650,17 @@ const TourEditorPage = () => {
 
             <div className="p-5">
               {!selectedStop ? (
-                <TourSettingsEditor tour={tour} language={language} availableLanguages={data!.available_languages} onChange={editSettings} />
+                <div className="space-y-8">
+                  <TourSettingsEditor tour={tour} language={language} availableLanguages={data!.available_languages} onChange={editSettings} />
+                  {!!live?.tour.length && (
+                    <section className="space-y-3 border-t border-gray-200 pt-6">
+                      <h4 className="text-base font-semibold text-gray-900">Datos de la empresa y del mapa</h4>
+                      {liveEditor(live.tour, '')}
+                    </section>
+                  )}
+                </div>
+              ) : tab === 'live' ? (
+                liveEditor(live?.stops[selectedStop.id] ?? [], 'Esta área no muestra datos que se traduzcan: personal, seguridad, procesos o productos.')
               ) : tab === 'narration' ? (
                 <StopNarrationEditor
                   key={selectedStop.id}

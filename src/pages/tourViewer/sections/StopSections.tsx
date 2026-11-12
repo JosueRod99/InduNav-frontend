@@ -6,6 +6,7 @@ import {
   ExternalLink,
   FileText,
   HardHat,
+  Languages,
   MapPin,
   Package,
   ShieldCheck,
@@ -256,6 +257,12 @@ export const SafetySection = ({ stop }: { stop: TourViewStop }) => {
   const s = stop.live.safety!;
   return (
     <div className="space-y-5">
+      {stop.live_notes?.safety_machine && (
+        <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <Languages className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          {t('safety_machine_translation')}
+        </p>
+      )}
       {s.required_ppe.length > 0 && (
         <div>
           <h4 className="mb-2 text-sm font-semibold text-slate-900">

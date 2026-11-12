@@ -348,3 +348,48 @@ export const translateTour = async (tourId: string, languages?: string[]): Promi
   const { data } = await apiClient.post(`/tours/${tourId}/translate`, languages ? { languages } : {});
   return data;
 };
+
+/** Where a live text comes from (backend services/liveTranslationService.ts) */
+export type LiveField =
+  | 'area_name'
+  | 'area_description'
+  | 'map_area'
+  | 'position'
+  | 'shift'
+  | 'process_name'
+  | 'process_step'
+  | 'process_description'
+  | 'process_activity'
+  | 'product_description'
+  | 'product_step'
+  | 'safety_ppe'
+  | 'safety_hazard'
+  | 'safety_assembly_point'
+  | 'safety_access'
+  | 'safety_instructions'
+  | 'industry'
+  | 'plant_description';
+
+export interface LiveText {
+  text: string;
+  field: LiveField;
+}
+
+export interface LiveTranslation {
+  text: string;
+  auto: boolean; // came from the translator and nobody changed it
+}
+
+/** Live data the draft shows, in the organization's language, with its translations */
+export interface TourLiveTexts {
+  live_language: string;
+  tour: LiveText[]; // company and plant map: the whole tour
+  stops: Record<string, LiveText[]>;
+  translations: Record<string, Record<string, LiveTranslation>>; // language -> original -> translation
+}
+
+export const getLiveTexts = async (tourId: string): Promise<TourLiveTexts> => (await apiClient.get(`/tours/${tourId}/live-texts`)).data;
+
+/** A translation written by a person, shared by every tour of the organization; empty removes it */
+export const saveLiveTranslation = async (tourId: string, language: string, source: string, text: string): Promise<LiveTranslation | null> =>
+  (await apiClient.put(`/tours/${tourId}/live-translations`, { language, source, text })).data.translation;
