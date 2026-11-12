@@ -275,12 +275,13 @@ const ViewerTextsModal = ({ language, onClose }: { language: CatalogLanguage; on
           {shownKeys.map((key) => (
             <li key={key}>
               <Input
-                label={viewerTextInEnglish(key)}
+                label={viewerTextInSpanish(key)}
                 value={texts[key] ?? ''}
                 maxLength={300}
+                placeholder={viewerTextInEnglish(key)} // what the visitor sees while it is empty
                 onChange={(e) => setTexts({ ...texts, [key]: e.target.value })}
                 error={problemOf(key) ?? undefined}
-                helperText={`En español: ${viewerTextInSpanish(key)}`}
+                helperText={`En inglés: ${viewerTextInEnglish(key)}`}
               />
             </li>
           ))}
