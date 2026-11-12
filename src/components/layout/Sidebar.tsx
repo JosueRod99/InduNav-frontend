@@ -45,7 +45,7 @@ const adminItems: NavItem[] = [
   { to: '/admin/roles', icon: Shield, label: 'Roles y permisos', activePrefix: '/admin/roles', anyOf: ['roles.manage'] },
   { to: '/admin/languages', icon: Languages, label: 'Idiomas', anyOf: ['system.languages'] },
   { to: '/admin/audit', icon: ScrollText, label: 'Auditoría', anyOf: ['system.audit'] },
-  { to: '/admin/narration-usage', icon: AudioLines, label: 'Consumo de narración', anyOf: ['system.narration'] },
+  { to: '/admin/usage', icon: AudioLines, label: 'Consumo de servicios', anyOf: ['system.narration'] },
 ];
 
 const Sidebar = () => {

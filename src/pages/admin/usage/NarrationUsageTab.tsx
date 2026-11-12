@@ -1,14 +1,40 @@
 import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, FlaskConical, Loader2, Volume2 } from 'lucide-react';
-import { getNarrationUsage } from '../../api/admin';
+import { getNarrationAccount, getNarrationUsage } from '../../../api/admin';
+import UsageMeter from './UsageMeter';
 
-// Internal report (platform_admin): narration audios generated per month and their estimated cost.
+// Internal report (platform_admin): narration audios generated per month and their estimated cost,
+// and the balance of the ElevenLabs account.
 
-const currentMonth = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' }).slice(0, 7);
+/** Balance of the provider's account right now: it does not depend on the month chosen */
+const AccountBalance = () => {
+  const { data, isLoading, error } = useQuery({ queryKey: ['narration-account'], queryFn: getNarrationAccount, staleTime: 60_000 });
+  const num = (value: number) => value.toLocaleString('es-MX');
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-4">
+      <h3 className="text-sm font-semibold text-gray-900">Cuenta de ElevenLabs, hoy</h3>
+      {isLoading ? (
+        <p className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+          <Loader2 className="h-4 w-4 animate-spin" /> Consultando…
+        </p>
+      ) : error || !data ? (
+        <p className="mt-2 text-sm text-red-600">{(error as any)?.response?.data?.message || 'No se pudo consultar la cuenta de ElevenLabs.'}</p>
+      ) : (
+        <UsageMeter
+          used={data.characters_used}
+          limit={data.characters_limit}
+          title={`Plan ${data.plan}: ${num(data.characters_used)} de ${num(data.characters_limit)} caracteres usados`}
+          note={`${
+            data.resets_at ? `Se renueva el ${new Date(data.resets_at).toLocaleDateString('es-MX', { dateStyle: 'long' })}. ` : ''
+          }Es el saldo real del proveedor: incluye lo que se haya usado fuera de la plataforma.`}
+        />
+      )}
+    </section>
+  );
+};
 
-const NarrationUsagePage = () => {
-  const [month, setMonth] = useState(currentMonth());
+const NarrationUsageTab = ({ month }: { month: string }) => {
   const [openPublication, setOpenPublication] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
@@ -23,27 +49,7 @@ const NarrationUsagePage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Consumo de narración</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Audios generados al publicar tours y su costo estimado. Solo visible para administradores de la plataforma.
-          </p>
-        </div>
-        <div>
-          <label htmlFor="usage-month" className="mb-1 block text-sm font-medium text-gray-700">
-            Mes
-          </label>
-          <input
-            id="usage-month"
-            type="month"
-            value={month}
-            max={currentMonth()}
-            onChange={(e) => e.target.value && setMonth(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
+      <AccountBalance />
 
       {isLoading ? (
         <p className="flex items-center gap-2 text-gray-600">
@@ -218,4 +224,4 @@ const NarrationUsagePage = () => {
   );
 };
 
-export default NarrationUsagePage;
+export default NarrationUsageTab;

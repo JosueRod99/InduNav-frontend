@@ -15,7 +15,7 @@ import UsersPage from './pages/users/UsersPage';
 import PlantsPage from './pages/plants/PlantsPage';
 import ToursPage from './pages/tours/ToursPage';
 import TourEditorPage from './pages/tours/TourEditorPage';
-import NarrationUsagePage from './pages/admin/NarrationUsagePage';
+import ServiceUsagePage from './pages/admin/ServiceUsagePage';
 import RolesPage from './pages/admin/RolesPage';
 import RoleEditorPage from './pages/admin/RoleEditorPage';
 import AuditLogPage from './pages/admin/AuditLogPage';
@@ -184,13 +184,15 @@ function App() {
               }
             />
             <Route
-              path="admin/narration-usage"
+              path="admin/usage"
               element={
                 <PermissionRoute anyOf={['system.narration']}>
-                  <NarrationUsagePage />
+                  <ServiceUsagePage />
                 </PermissionRoute>
               }
             />
+            {/* Former address of the page, when it only showed narration */}
+            <Route path="admin/narration-usage" element={<Navigate to="/admin/usage?tab=narration" replace />} />
             <Route
               path="tours/:tourId/edit"
               element={
