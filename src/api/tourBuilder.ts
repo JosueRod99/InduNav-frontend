@@ -393,3 +393,19 @@ export const getLiveTexts = async (tourId: string): Promise<TourLiveTexts> => (a
 /** A translation written by a person, shared by every tour of the organization; empty removes it */
 export const saveLiveTranslation = async (tourId: string, language: string, source: string, text: string): Promise<LiveTranslation | null> =>
   (await apiClient.put(`/tours/${tourId}/live-translations`, { language, source, text })).data.translation;
+
+/** Published tour whose live data the hourly review translated since the user last opened it */
+export interface TranslationAlert {
+  tour_id: string;
+  tour_title: string;
+  texts: number; // different texts
+  last_at: string;
+}
+
+export const getTranslationAlerts = async (organizationId?: string): Promise<TranslationAlert[]> =>
+  (await apiClient.get('/tours/translation-alerts', { params: organizationId ? { organization_id: organizationId } : undefined })).data.alerts;
+
+/** Opening the tour in the editor turns off its alert for this user */
+export const markTranslationsSeen = async (tourId: string) => {
+  await apiClient.put(`/tours/${tourId}/translations-seen`);
+};

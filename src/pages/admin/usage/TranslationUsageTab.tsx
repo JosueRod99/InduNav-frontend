@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
-import { getTranslationUsage, type CharactersByLanguage } from '../../../api/admin';
+import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
+import { getTranslationUsage, type CharactersByLanguage, type LiveReview } from '../../../api/admin';
 import UsageMeter from './UsageMeter';
 
 // Internal report (platform_admin): characters sent to the automatic translator per month, by company,
@@ -29,6 +29,62 @@ const Languages = ({ byLanguage }: { byLanguage: CharactersByLanguage }) => (
       ))}
   </span>
 );
+
+const dateTime = (value: string) => new Date(value).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+
+/** State of the hourly review of live data: when it ran last and what it did */
+const LiveReviewStatus = ({ review }: { review: LiveReview }) => {
+  const result = review.last_result;
+  const running = review.last_started_at && (!review.last_finished_at || review.last_finished_at < review.last_started_at);
+  return (
+    <section className="rounded-lg border border-gray-200 bg-white p-4">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+        <RefreshCw className="h-4 w-4 text-gray-500" /> Revisión automática de los datos de la planta
+      </h3>
+      <p className="mt-1 text-sm text-gray-600">
+        Cuando cambia un dato (por ejemplo, una instrucción de seguridad), los tours publicados lo muestran en el idioma original hasta que se
+        traduce. Esta revisión traduce solo esos textos nuevos;{' '}
+        {review.interval_minutes > 0 ? `en este servidor corre cada ${review.interval_minutes} minutos.` : 'este servidor no la ejecuta (en producción corre cada hora).'}
+      </p>
+      <div className="mt-3 text-sm text-gray-800">
+        {!review.last_started_at ? (
+          <p className="text-gray-500">Todavía no ha corrido.</p>
+        ) : running ? (
+          <p>Revisando desde {dateTime(review.last_started_at)}…</p>
+        ) : review.last_error ? (
+          <p className="flex items-start gap-2 text-red-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" /> Última revisión ({dateTime(review.last_finished_at!)}) falló: {review.last_error}
+          </p>
+        ) : (
+          result && (
+            <>
+              <p>
+                <strong>Última revisión:</strong> {dateTime(review.last_finished_at!)} ·{' '}
+                {result.characters === 0
+                  ? `Revisó ${num(result.tours)} ${result.tours === 1 ? 'tour publicado' : 'tours publicados'}: no había textos nuevos, no se usó el traductor.`
+                  : `Tradujo ${num(result.translated)} ${result.translated === 1 ? 'texto' : 'textos'} (${num(result.characters)} caracteres) en ${num(result.tours)} ${result.tours === 1 ? 'tour publicado' : 'tours publicados'}.`}
+              </p>
+              {result.by_organization.length > 0 && (
+                <p className="mt-1 text-xs text-gray-600">
+                  {result.by_organization.map((o) => `${o.organization_name}: ${num(o.translated)}`).join(' · ')}
+                </p>
+              )}
+              {result.errors.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-amber-800">
+                  {result.errors.map((e) => (
+                    <li key={e.tour_id} className="flex items-start gap-1.5">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" /> {e.tour_title ?? 'Tour'}: {e.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )
+        )}
+      </div>
+    </section>
+  );
+};
 
 const TranslationUsageTab = ({ month }: { month: string }) => {
   const { data, isLoading, error } = useQuery({
@@ -61,6 +117,8 @@ const TranslationUsageTab = ({ month }: { month: string }) => {
           note={`Pasando los ${num(free)}, Google cobra $${rates.usd_per_1m_characters} USD por cada millón de caracteres. El gratuito es de toda la cuenta de Google: si la llave se usa en otros proyectos, también cuenta ahí.`}
         />
       </section>
+
+      <LiveReviewStatus review={data.live_review} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
@@ -148,9 +206,7 @@ const TranslationUsageTab = ({ month }: { month: string }) => {
                     <td className="px-4 py-2">
                       <Languages byLanguage={t.by_language} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-2 text-gray-700">
-                      {new Date(t.last_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
-                    </td>
+                    <td className="whitespace-nowrap px-4 py-2 text-gray-700">{dateTime(t.last_at)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -146,8 +146,9 @@ const LiveTextsEditor = ({ items, language, languageName, liveLanguageName, isOr
                 Una traducción <strong>se comparte en toda la empresa</strong>: si corriges un texto, cambia en todos los tours que lo muestren.
               </li>
               <li>
-                Si alguien cambia un dato en su módulo, el visitante lo verá en {liveLanguageName} hasta que se traduzca de nuevo con el botón
-                <strong> Traducir</strong>. Así nunca lee una instrucción vieja.
+                Si alguien cambia un dato en su módulo, el visitante lo verá en {liveLanguageName} hasta que se traduzca: en los tours publicados
+                se traduce solo, <strong>cada hora</strong>; para no esperar, usa el botón <strong>Traducir</strong>. Así nunca lee una instrucción
+                vieja.
               </li>
             </ul>
           )}

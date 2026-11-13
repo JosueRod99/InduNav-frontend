@@ -1,6 +1,6 @@
 import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -40,7 +40,7 @@ import {
   type UpdateTourSettingsPayload,
 } from '../../api/tourBuilder';
 import { getTourPreview } from '../../api/tourView';
-import { getLiveTexts, getPublishEstimate, saveLiveTranslation, translateTour, type TourLiveTexts } from '../../api/tourBuilder';
+import { getLiveTexts, getPublishEstimate, markTranslationsSeen, saveLiveTranslation, translateTour, type TourLiveTexts } from '../../api/tourBuilder';
 import { pendingTranslations } from '../../utils/translationState';
 import { SourceLanguageContext, TranslationMetaContext } from './editor/sourceLanguage';
 import StopNarrationEditor from './editor/StopNarrationEditor';
@@ -84,10 +84,20 @@ const TourEditorPage = () => {
 
   const [selectedStopId, setSelectedStopId] = useState<string | null | undefined>(undefined);
   const [pickedLanguage, setLanguage] = useState<TourLanguage | null>(null);
-  const [tab, setTab] = useState<EditorTab>('content');
+  const [searchParams] = useSearchParams();
+  // The alert on Inicio opens the plant data directly
+  const [tab, setTab] = useState<EditorTab>(searchParams.get('tab') === 'live' ? 'live' : 'content');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
   const canPublish = useCan()('tours.publish');
+
+  // Opening the tour turns off its "translated automatically" alert on Inicio, for this user
+  useEffect(() => {
+    if (!tourId) return;
+    markTranslationsSeen(tourId)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['translation-alerts'] }))
+      .catch(() => undefined);
+  }, [tourId, queryClient]);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
 
@@ -389,7 +399,9 @@ const TourEditorPage = () => {
   const isPublished = tour.status === 'published';
   const languageOptions = data!.available_languages || [];
   const languageName = (code: string) => languageOptions.find((l) => l.code === code)?.name || code;
-  const language = pickedLanguage && tour.languages.includes(pickedLanguage) ? pickedLanguage : sourceCode;
+  // Coming from the alert on Inicio, it opens on a translated language: what there is to review
+  const startLanguage = searchParams.get('tab') === 'live' ? tour.languages.find((l) => l !== sourceCode) ?? sourceCode : sourceCode;
+  const language = pickedLanguage && tour.languages.includes(pickedLanguage) ? pickedLanguage : startLanguage;
   function flushAll() {
     return Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
   }

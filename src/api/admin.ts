@@ -80,6 +80,22 @@ export interface TranslationUsage {
     by_language: CharactersByLanguage;
     last_at: string;
   }[];
+  live_review: LiveReview;
+}
+
+/** Hourly review that translates new live data of published tours (scheduled_jobs) */
+export interface LiveReview {
+  interval_minutes: number; // of the server that answered; 0: it does not run there
+  last_started_at: string | null;
+  last_finished_at: string | null;
+  last_result: {
+    tours: number;
+    translated: number;
+    characters: number;
+    by_organization: { organization_id: string; organization_name: string | null; translated: number; characters: number }[];
+    errors: { tour_id: string; tour_title: string | null; message: string }[];
+  } | null;
+  last_error: string | null;
 }
 
 export const getTranslationUsage = async (month?: string): Promise<TranslationUsage> => {
