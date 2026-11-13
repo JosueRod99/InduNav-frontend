@@ -35,6 +35,7 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
         plan: organization.plan,
         logo_url: organization.logo_url || undefined,
         tour_publications_per_month: organization.tour_publications_per_month ?? DEFAULT_TOUR_PUBLICATIONS,
+        translation_characters_per_month: organization.translation_characters_per_month ?? null,
       });
     } else {
       setFormData({
@@ -175,6 +176,31 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
           <p className="mt-1 text-xs text-gray-500">
             Se comparten entre todos los tours de la organización. Solo cuentan las publicaciones que generan audio
             nuevo, y el conteo vuelve a 0 automáticamente el día 1 de cada mes (hora de México).
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="translation_characters_per_month" className="block text-sm font-medium text-gray-700 mb-1">
+            Caracteres de traducción automática por mes
+          </label>
+          <Input
+            id="translation_characters_per_month"
+            name="translation_characters_per_month"
+            type="number"
+            min={0}
+            step={1000}
+            placeholder="Límite general"
+            value={formData.translation_characters_per_month ?? ''}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                translation_characters_per_month: e.target.value === '' ? null : Math.max(0, Math.floor(Number(e.target.value))),
+              }))
+            }
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Vacío usa el límite general de la plataforma. Súbelo cuando la empresa traduzca sus tours por primera vez (unos 15,000
+            caracteres por tour y por idioma) y bájalo después. Se reinicia el día 1 de cada mes (hora de México).
           </p>
         </div>
 

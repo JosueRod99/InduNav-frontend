@@ -1,0 +1,70 @@
+import apiClient from './client';
+
+// "Idiomas" (platform only)
+
+export interface CatalogLanguage {
+  code: string;
+  name: string;
+  native_name: string;
+  is_active: boolean;
+  is_built_in: boolean; // Spanish and English: their fixed texts are in code
+  ui_texts: Record<string, string>; // fixed texts of the viewer, the rest
+  organizations_count: number;
+  tours_count: number;
+  voice_id: string | null; // narration voice of the catalog
+  can_narrate: boolean; // the narration service has voices in this language
+  voice_source: 'catalog' | 'environment' | null; // null: no audio, visitors hear the source language
+}
+
+export interface NarrationVoice {
+  voice_id: string;
+  name: string;
+  preview_url: string | null; // sample in the voice's own language
+  languages: string[]; // languages the service verified it in
+}
+
+export interface LanguageInput {
+  code: string;
+  name: string;
+  native_name: string;
+}
+
+export interface OrganizationLanguages {
+  id: string;
+  name: string;
+  is_active: boolean;
+  default_language: string;
+  languages: string[];
+}
+
+export const getLanguages = async (): Promise<CatalogLanguage[]> => (await apiClient.get('/languages')).data.languages;
+
+export const createLanguage = async (input: LanguageInput): Promise<void> => {
+  await apiClient.post('/languages', input);
+};
+
+export const updateLanguage = async (
+  code: string,
+  input: Partial<Omit<LanguageInput, 'code'>> & { is_active?: boolean; ui_texts?: Record<string, string>; voice_id?: string | null }
+): Promise<void> => {
+  await apiClient.patch(`/languages/${code}`, input);
+};
+
+/** Fixed texts of the viewer translated from English; nothing is saved until the screen saves */
+export const translateViewerTexts = async (code: string, texts: Record<string, string>): Promise<Record<string, string>> =>
+  (await apiClient.post(`/languages/${code}/translate-ui`, { texts })).data.texts;
+
+/** Checks a voice of the narration service before assigning it (free, generates no audio) */
+export const getVoice = async (voiceId: string): Promise<NarrationVoice> =>
+  (await apiClient.get(`/languages/voices/${encodeURIComponent(voiceId)}`)).data.voice;
+
+export const deleteLanguage = async (code: string): Promise<void> => {
+  await apiClient.delete(`/languages/${code}`);
+};
+
+export const getOrganizationLanguages = async (): Promise<OrganizationLanguages[]> =>
+  (await apiClient.get('/languages/organizations')).data.organizations;
+
+export const setOrganizationLanguages = async (organizationId: string, languages: string[]): Promise<void> => {
+  await apiClient.put(`/languages/organizations/${organizationId}`, { languages });
+};

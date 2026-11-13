@@ -1,3 +1,4 @@
+import { tr } from '../../../api/tourView';
 import { confirmar } from '../../../components/ui/ConfirmDialog';
 import { ChartColumn, Plus, Trash2, Type } from 'lucide-react';
 import SortableList, { moveItem } from '../../../components/ui/SortableList';
@@ -83,7 +84,7 @@ const BlocksEditor = ({ blocks, language, onChange }: BlocksEditorProps) => {
                   <ChartFields
                     chart={block.chart}
                     language={language}
-                    title={block.title?.[language] || block.title?.es}
+                    title={tr(block.title, language)}
                     onChange={(chart) => update(index, { ...block, chart })}
                   />
                 </div>

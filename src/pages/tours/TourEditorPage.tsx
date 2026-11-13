@@ -1,6 +1,6 @@
 import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -16,6 +16,7 @@ import {
   Share2,
   Volume2,
   FlaskConical,
+  Languages,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
@@ -29,7 +30,6 @@ import {
   reorderTourStops,
   updateTourSettings,
   updateTourStop,
-  TOUR_LANGUAGE_LABELS,
   SECTION_LABELS,
   type BuilderStop,
   type TourSection,
@@ -40,19 +40,23 @@ import {
   type UpdateTourSettingsPayload,
 } from '../../api/tourBuilder';
 import { getTourPreview } from '../../api/tourView';
-import { getPublishEstimate } from '../../api/tourBuilder';
+import { getLiveTexts, getPublishEstimate, markTranslationsSeen, saveLiveTranslation, translateTour, type TourLiveTexts } from '../../api/tourBuilder';
+import { pendingTranslations } from '../../utils/translationState';
+import { SourceLanguageContext, TranslationMetaContext } from './editor/sourceLanguage';
 import StopNarrationEditor from './editor/StopNarrationEditor';
 import StopsPanel from './editor/StopsPanel';
 import StopContentEditor from './editor/StopContentEditor';
 import SectionsEditor, { applyStructure } from './editor/SectionsEditor';
 import TourSettingsEditor from './editor/TourSettingsEditor';
+import LiveTextsEditor from './editor/LiveTextsEditor';
+import LanguageFlag from '../../components/ui/LanguageFlag';
 import AddStopModal from './editor/AddStopModal';
 import PublishTourModal from './modals/PublishTourModal';
 import ShareTourModal from './modals/ShareTourModal';
 import { toursListPath } from './toursReturn';
 import { useCan } from '../../hooks/usePermissions';
 
-type EditorTab = 'content' | 'sections' | 'narration';
+type EditorTab = 'content' | 'sections' | 'narration' | 'live';
 
 const STATUS_PRIORITY: AutosaveStatus[] = ['error', 'saving', 'pending', 'saved', 'idle'];
 
@@ -79,12 +83,23 @@ const TourEditorPage = () => {
   const queryKey = ['tour-builder', tourId];
 
   const [selectedStopId, setSelectedStopId] = useState<string | null | undefined>(undefined);
-  const [language, setLanguage] = useState<TourLanguage>('es');
-  const [tab, setTab] = useState<EditorTab>('content');
+  const [pickedLanguage, setLanguage] = useState<TourLanguage | null>(null);
+  const [searchParams] = useSearchParams();
+  // The alert on Inicio opens the plant data directly
+  const [tab, setTab] = useState<EditorTab>(searchParams.get('tab') === 'live' ? 'live' : 'content');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
   const canPublish = useCan()('tours.publish');
+
+  // Opening the tour turns off its "translated automatically" alert on Inicio, for this user
+  useEffect(() => {
+    if (!tourId) return;
+    markTranslationsSeen(tourId)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['translation-alerts'] }))
+      .catch(() => undefined);
+  }, [tourId, queryClient]);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   // While editing, the cache is the source of truth: no background refetch over typed text
   const { data, isLoading, error } = useQuery({
@@ -94,6 +109,7 @@ const TourEditorPage = () => {
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
+  const sourceCode = data?.tour.source_language ?? 'es';
 
   const tour = data?.tour;
   const stops = data?.stops || [];
@@ -148,9 +164,33 @@ const TourEditorPage = () => {
     stopAutosave.schedule({ id: stopId, ...patch });
   };
 
+  /**
+   * Automatic translation of what is missing or outdated. Saves first and then takes the editor data
+   * the server answers with; editing waits meanwhile so nothing typed is lost.
+   */
+  const translate = async (languages?: string[]) => {
+    if (isTranslating) return;
+    setIsTranslating(true);
+    (document.activeElement as HTMLElement | null)?.blur();
+    try {
+      await flushAll();
+      const { result, builder } = await translateTour(tourId!, languages);
+      queryClient.setQueryData(queryKey, builder);
+      await refetchLive();
+      toast.success(result.translated ? `${result.translated} ${result.translated === 1 ? 'texto traducido' : 'textos traducidos'}` : 'No había nada que traducir');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'No se pudo traducir', { duration: 7000 });
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const editSettings = (patch: UpdateTourSettingsPayload) => {
+    const added = patch.languages?.filter((code) => !data?.tour.languages.includes(code)) ?? [];
     setBuilder((prev) => ({ ...prev, tour: { ...prev.tour, ...patch } }));
     settingsAutosave.schedule(patch);
+    // A language just turned on gets its texts right away
+    if (added.length) void translate(added);
   };
 
   const selectStop = async (stopId: string | null) => {
@@ -170,6 +210,7 @@ const TourEditorPage = () => {
       }));
       setSelectedStopId(stop.id);
       setTab('content');
+      refetchLive();
       toast.success(`"${stop.area_name}" agregada como área ${stop.order_index}`);
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'No se pudo agregar el área'),
@@ -189,7 +230,7 @@ const TourEditorPage = () => {
   };
 
   const handleDelete = async (stop: BuilderStop) => {
-    const name = stop.title_translations.es || stop.area_name;
+    const name = stop.title_translations[sourceCode] || stop.area_name;
     const confirmed = await confirmar({
       title: 'Quitar área del tour',
       message: `Se quitará "${name}" del tour y se perderán su texto y secciones. El área no se borra.`,
@@ -202,6 +243,7 @@ const TourEditorPage = () => {
       const remaining = stops.filter((s) => s.id !== stop.id).map((s, i) => ({ ...s, order_index: i + 1 }));
       setBuilder((prev) => ({ ...prev, tour: { ...prev.tour, has_unpublished_changes: true }, stops: remaining }));
       if (selectedStopId === stop.id) setSelectedStopId(remaining[0]?.id ?? null);
+      refetchLive();
       toast.success('Área quitada del tour');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'No se pudo quitar el área');
@@ -242,7 +284,7 @@ const TourEditorPage = () => {
     if (!selectedStop) return;
     const confirmed = await confirmar({
       title: 'Aplicar a todas las áreas',
-      message: `Se aplicarán el orden y la visibilidad de las secciones de "${selectedStop.title_translations.es}" a todas las áreas.\n\nLas secciones propias de cada área se conservan. También se guardará como estructura por defecto para áreas nuevas.`,
+      message: `Se aplicarán el orden y la visibilidad de las secciones de "${selectedStop.title_translations[sourceCode]}" a todas las áreas.\n\nLas secciones propias de cada área se conservan. También se guardará como estructura por defecto para áreas nuevas.`,
       confirmLabel: 'Aplicar',
       danger: false,
     });
@@ -282,6 +324,25 @@ const TourEditorPage = () => {
     enabled: !!tourId && !!selectedStop && tab === 'sections',
     staleTime: 30_000,
   });
+
+  // Live data the tour shows (safety, positions...) and its translations; it changes in other modules
+  const liveKey = ['tour-live-texts', tourId];
+  const { data: live, refetch: refetchLive } = useQuery({
+    queryKey: liveKey,
+    queryFn: () => getLiveTexts(tourId!),
+    enabled: !!tourId,
+    refetchOnWindowFocus: true,
+  });
+  const saveLive = async (language: string, source: string, text: string) => {
+    const translation = await saveLiveTranslation(tourId!, language, source, text);
+    queryClient.setQueryData<TourLiveTexts>(liveKey, (prev) => {
+      if (!prev) return prev;
+      const current = { ...(prev.translations[language] || {}) };
+      if (translation) current[source] = translation;
+      else delete current[source];
+      return { ...prev, translations: { ...prev.translations, [language]: current } };
+    });
+  };
 
   // Narration plan of the saved draft (which audios exist / will be generated)
   const {
@@ -336,297 +397,389 @@ const TourEditorPage = () => {
       ? { text: 'Cambios sin publicar', className: 'bg-amber-100 text-amber-800' }
       : { text: 'Publicado', className: 'bg-green-100 text-green-800' };
   const isPublished = tour.status === 'published';
-  const flushAll = () => Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
+  const languageOptions = data!.available_languages || [];
+  const languageName = (code: string) => languageOptions.find((l) => l.code === code)?.name || code;
+  // Coming from the alert on Inicio, it opens on a translated language: what there is to review
+  const startLanguage = searchParams.get('tab') === 'live' ? tour.languages.find((l) => l !== sourceCode) ?? sourceCode : sourceCode;
+  const language = pickedLanguage && tour.languages.includes(pickedLanguage) ? pickedLanguage : startLanguage;
+  function flushAll() {
+    return Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
+  }
+  const pending = pendingTranslations(
+    [
+      { texts: [tour.title_translations, tour.description_translations], meta: tour.translation_meta },
+      ...stops.map((s) => ({ texts: [s.title_translations, s.content, s.sections], meta: s.translation_meta })),
+    ],
+    sourceCode,
+    tour.languages
+  );
+  // Live data without translation counts too; it is translated from the organization's language
+  const liveLanguage = live?.live_language ?? sourceCode;
+  const liveTextsOf = (items: TourLiveTexts['tour'] = []) => items.map((item) => item.text);
+  const allLive = live ? [...new Set([...liveTextsOf(live.tour), ...Object.values(live.stops).flatMap((items) => liveTextsOf(items))])] : [];
+  const liveMissing = (lang: string, texts: string[]) => texts.filter((text) => !live?.translations[lang]?.[text]).length;
+  for (const lang of tour.languages) {
+    if (lang === liveLanguage) continue;
+    const count = liveMissing(lang, allLive);
+    if (count) pending[lang] = (pending[lang] || 0) + count;
+  }
+  const pendingTotal = Object.values(pending).reduce((a, b) => a + b, 0);
+  const liveEditor = (items: TourLiveTexts['tour'], emptyText: string) => (
+    <LiveTextsEditor
+      items={items}
+      language={language}
+      languageName={languageName(language).toLowerCase()}
+      liveLanguageName={languageName(liveLanguage).toLowerCase()}
+      isOriginal={language === liveLanguage}
+      translations={live?.translations[language] ?? {}}
+      onSave={(source, text) => saveLive(language, source, text)}
+      emptyText={emptyText}
+    />
+  );
+  const stopLiveMissing =
+    selectedStop && language !== liveLanguage ? liveMissing(language, liveTextsOf(live?.stops[selectedStop.id])) : 0;
+  const translationUsage = data!.translation;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            onClick={async () => {
-              await Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
-              navigate(toursListPath(tour.plant_id));
-            }}
-            className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-            aria-label="Volver a Tours"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-xl font-bold text-gray-900">{tour.title_translations.es || tour.title}</h2>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.className}`}>
-                {statusBadge.text}
-              </span>
-              <SaveIndicator status={saveStatus} />
+    <SourceLanguageContext.Provider value={{ code: sourceCode, name: languageName(sourceCode) }}>
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              onClick={async () => {
+                await Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
+                navigate(toursListPath(tour.plant_id));
+              }}
+              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              aria-label="Volver a Tours"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="truncate text-xl font-bold text-gray-900">{tour.title_translations[sourceCode] || tour.title}</h2>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.className}`}>
+                  {statusBadge.text}
+                </span>
+                <SaveIndicator status={saveStatus} />
+              </div>
+              <p className="text-xs text-gray-500">
+                {tour.plant_name} · {stops.length} área{stops.length === 1 ? '' : 's'}
+                {usage.latest_version && (
+                  <>
+                    {' · '}
+                    <span className="font-medium text-gray-700">Versión publicada {usage.latest_version}</span>
+                  </>
+                )}
+              </p>
             </div>
-            <p className="text-xs text-gray-500">
-              {tour.plant_name} · {stops.length} área{stops.length === 1 ? '' : 's'}
-              {usage.latest_version && (
-                <>
-                  {' · '}
-                  <span className="font-medium text-gray-700">Versión publicada {usage.latest_version}</span>
-                </>
-              )}
-            </p>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            title="Abre el tour como lo verán los visitantes, con el borrador actual"
-            onClick={async () => {
-              // Open the tab synchronously (popup blockers), then save pending edits before it loads
-              const previewTab = window.open('about:blank', '_blank');
-              await Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
-              if (previewTab) previewTab.location.href = `/preview/tours/${tourId}`;
-            }}
-          >
-            <Eye className="h-4 w-4" />
-            Vista previa
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate(`/tours/${tourId}/stats`)}>
-            <BarChart3 className="h-4 w-4" />
-            Estadísticas
-          </Button>
-          {isPublished && (
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsShareOpen(true)}>
-              <Share2 className="h-4 w-4" />
-              Compartir
-            </Button>
-          )}
-          {canPublish && (
+          <div className="flex flex-wrap items-center gap-2">
             <Button
+              variant="outline"
               size="sm"
               className="gap-1.5"
-              disabled={stops.length === 0 || (isPublished && !tour.has_unpublished_changes)}
-              title={
-                stops.length === 0
-                  ? 'Agrega al menos un área para publicar'
-                  : isPublished && !tour.has_unpublished_changes
-                  ? 'No hay cambios por publicar'
-                  : undefined
-              }
-              onClick={() => setIsPublishOpen(true)}
+              title="Abre el tour como lo verán los visitantes, con el borrador actual"
+              onClick={async () => {
+                // Open the tab synchronously (popup blockers), then save pending edits before it loads
+                const previewTab = window.open('about:blank', '_blank');
+                await Promise.all([stopAutosave.flush(), settingsAutosave.flush()]);
+                if (previewTab) previewTab.location.href = `/preview/tours/${tourId}`;
+              }}
             >
-              <Rocket className="h-4 w-4" />
-              {isPublished ? 'Publicar cambios' : 'Publicar'}
-              <span
-                className="inline-flex items-center gap-1 rounded bg-white/20 px-1.5 text-[11px]"
-                title={`Publicaciones con narración en audio de tu organización este mes: ${usage.used} de ${usage.limit} (compartidas entre todos los tours). Publicar sin audio nuevo no cuenta. Se renueva el ${new Date(`${String(usage.resets_on).slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}.`}
-              >
-                <Volume2 className="h-3 w-3" />
-                {usage.used}/{usage.limit} con audio este mes
-              </span>
+              <Eye className="h-4 w-4" />
+              Vista previa
             </Button>
-          )}
-        </div>
-      </div>
-
-      {data!.narration_test_mode && (
-        <div className="flex items-start gap-2 rounded-lg border border-purple-300 bg-purple-50 px-4 py-2.5 text-sm text-purple-900" role="status">
-          <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          <p>
-            <strong>Modo prueba de narración activo:</strong> al publicar solo se genera la primera frase de cada guion (~2–5 s).
-            Apágalo en el servidor (<code className="rounded bg-purple-100 px-1">TTS_TEST_MODE=false</code>) para generar los audios completos.
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        {/* Editing area (left, wide) */}
-        <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white">
-          {/* Editor toolbar: what is being edited + language */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
-            {selectedStop ? (
-              <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Área {selectedStop.order_index}
-                </p>
-                <div className="flex items-center gap-2">
-                  <h3 className="truncate text-lg font-semibold text-gray-900">
-                    {selectedStop.title_translations.es || selectedStop.area_name}
-                  </h3>
-                  {selectedStop.organizational_area_id && (
-                    <Link
-                      to={`/areas/${selectedStop.organizational_area_id}`}
-                      target="_blank"
-                      className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-200"
-                      title="Abrir el área en otra pestaña para editar sus datos"
-                    >
-                      Ver área {selectedStop.area_code || selectedStop.area_name}
-                      <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tour</p>
-                <h3 className="text-lg font-semibold text-gray-900">Ajustes del tour</h3>
-              </div>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate(`/tours/${tourId}/stats`)}>
+              <BarChart3 className="h-4 w-4" />
+              Estadísticas
+            </Button>
+            {isPublished && (
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsShareOpen(true)}>
+                <Share2 className="h-4 w-4" />
+                Compartir
+              </Button>
             )}
-
-            <div className="flex rounded-md border border-gray-300 p-0.5 text-xs font-medium" role="group" aria-label="Idioma de edición">
-              {tour.languages.map((lang) => (
-                <button
-                  key={lang}
-                  onClick={() => setLanguage(lang)}
-                  className={`rounded px-2.5 py-1 ${language === lang ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                  title={`Editar textos en ${TOUR_LANGUAGE_LABELS[lang]}`}
+            {canPublish && (
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={stops.length === 0 || (isPublished && !tour.has_unpublished_changes)}
+                title={
+                  stops.length === 0
+                    ? 'Agrega al menos un área para publicar'
+                    : isPublished && !tour.has_unpublished_changes
+                    ? 'No hay cambios por publicar'
+                    : undefined
+                }
+                onClick={() => setIsPublishOpen(true)}
+              >
+                <Rocket className="h-4 w-4" />
+                {isPublished ? 'Publicar cambios' : 'Publicar'}
+                <span
+                  className="inline-flex items-center gap-1 rounded bg-white/20 px-1.5 text-[11px]"
+                  title={`Publicaciones con narración en audio de tu organización este mes: ${usage.used} de ${usage.limit} (compartidas entre todos los tours). Publicar sin audio nuevo no cuenta. Se renueva el ${new Date(`${String(usage.resets_on).slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}.`}
                 >
-                  {lang.toUpperCase()}
-                </button>
-              ))}
-            </div>
+                  <Volume2 className="h-3 w-3" />
+                  {usage.used}/{usage.limit} con audio este mes
+                </span>
+              </Button>
+            )}
           </div>
+        </div>
 
-          {selectedStop && !selectedStop.area_available && (
-            <div className="mx-5 mt-4 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-              Esta área fue eliminada o desactivada en el sistema. Se mostrará solo el texto escrito, sin datos en vivo.
-            </div>
-          )}
+        {data!.narration_test_mode && (
+          <div className="flex items-start gap-2 rounded-lg border border-purple-300 bg-purple-50 px-4 py-2.5 text-sm text-purple-900" role="status">
+            <FlaskConical className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <p>
+              <strong>Modo prueba de narración activo:</strong> al publicar solo se genera la primera frase de cada guion (~2–5 s).
+              Apágalo en el servidor (<code className="rounded bg-purple-100 px-1">TTS_TEST_MODE=false</code>) para generar los audios completos.
+            </p>
+          </div>
+        )}
 
-          {selectedStop && (
-            <div className="flex gap-1 border-b border-gray-200 px-5">
-              {(
-                [
-                  ['content', 'Contenido'],
-                  ['sections', 'Secciones'],
-                  ['narration', 'Narración'],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  onClick={async () => {
-                    setTab(id);
-                    // The narration plan is computed from the saved draft: save pending edits first
-                    if (id === 'narration') {
-                      await stopAutosave.flush();
-                      refetchNarration();
-                    }
-                  }}
-                  className={`border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                    tab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          {/* Editing area (left, wide) */}
+          <div
+            className={`min-w-0 flex-1 rounded-lg border border-gray-200 bg-white ${isTranslating ? 'pointer-events-none opacity-60' : ''}`}
+            aria-busy={isTranslating}
+          >
+            <TranslationMetaContext.Provider value={(selectedStop ? selectedStop.translation_meta : tour.translation_meta) ?? {}}>
+            {/* Editor toolbar: what is being edited + language */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
+              {selectedStop ? (
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Área {selectedStop.order_index}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate text-lg font-semibold text-gray-900">
+                      {selectedStop.title_translations[sourceCode] || selectedStop.area_name}
+                    </h3>
+                    {selectedStop.organizational_area_id && (
+                      <Link
+                        to={`/areas/${selectedStop.organizational_area_id}`}
+                        target="_blank"
+                        className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-200"
+                        title="Abrir el área en otra pestaña para editar sus datos"
+                      >
+                        Ver área {selectedStop.area_code || selectedStop.area_name}
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tour</p>
+                  <h3 className="text-lg font-semibold text-gray-900">Ajustes del tour</h3>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+              {pendingTotal > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  isLoading={isTranslating}
+                  onClick={() => translate()}
+                  title={`Traduce con ${translationUsage?.provider === 'google' ? 'Google' : 'el traductor automático'} lo que falta o cambió. Lo que escribiste a mano no se modifica.${
+                    translationUsage ? ` Este mes la empresa lleva ${translationUsage.used.toLocaleString('es-MX')} de ${translationUsage.limit.toLocaleString('es-MX')} caracteres.` : ''
                   }`}
                 >
-                  {label}
-                </button>
-              ))}
+                  {!isTranslating && <Languages className="h-4 w-4" />}
+                  Traducir {pendingTotal} {pendingTotal === 1 ? 'texto' : 'textos'}
+                </Button>
+              )}
+              <div className="flex flex-wrap rounded-md border border-gray-300 p-0.5 text-xs font-medium" role="group" aria-label="Idioma de edición">
+                {tour.languages.map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => setLanguage(lang)}
+                    className={`flex items-center gap-1 rounded px-2 py-1 ${language === lang ? 'bg-blue-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    title={`Editar textos en ${languageName(lang)}`}
+                  >
+                    <LanguageFlag code={lang} className="h-3.5 w-3.5" />
+                    {lang.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              </div>
             </div>
-          )}
 
-          <div className="p-5">
-            {!selectedStop ? (
-              <TourSettingsEditor tour={tour} language={language} onChange={editSettings} />
-            ) : tab === 'narration' ? (
-              <StopNarrationEditor
-                key={selectedStop.id}
-                stop={selectedStop}
-                language={language}
-                item={narrationEstimate?.items.find((i) => i.stop_id === selectedStop.id && i.language === language)}
-                isLoading={isLoadingNarration}
-                onChange={(patch) => editStop(selectedStop.id, patch)}
-              />
-            ) : tab === 'content' ? (
-              <StopContentEditor
-                key={selectedStop.id}
-                stop={selectedStop}
-                language={language}
-                organizationId={tour.organization_id}
-                plantId={tour.plant_id}
-                onChange={(patch) => editStop(selectedStop.id, patch)}
-              />
-            ) : (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <p className="max-w-xl text-sm text-gray-600">
-                    Elige qué ve el visitante en esta área y en qué orden. Las secciones <strong>en vivo</strong> se
-                    actualizan solas con los datos del área.
-                  </p>
-                  {stops.length > 1 && (
-                    <Button variant="outline" size="sm" className="gap-1.5" onClick={applyToAllStops}>
-                      <Copy className="h-4 w-4" />
-                      Aplicar a todas las áreas
-                    </Button>
-                  )}
-                </div>
-                <SectionsEditor
-                  sections={selectedStop.sections}
-                  onChange={(sections) => editStop(selectedStop.id, { sections })}
-                  language={language}
-                  counts={sectionCounts ?? null}
-                  liveData={liveView?.stops.find((s) => s.id === selectedStop.id)}
-                  areaId={selectedStop.organizational_area_id}
-                  onApplyVisibilityToAll={stops.length > 1 ? applySectionToAll : undefined}
-                />
+            {selectedStop && !selectedStop.area_available && (
+              <div className="mx-5 mt-4 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                Esta área fue eliminada o desactivada en el sistema. Se mostrará solo el texto escrito, sin datos en vivo.
               </div>
             )}
+
+            {selectedStop && (
+              <div className="flex gap-1 border-b border-gray-200 px-5">
+                {(
+                  [
+                    ['content', 'Contenido'],
+                    ['sections', 'Secciones'],
+                    ['narration', 'Narración'],
+                    ['live', 'Datos de la planta'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={async () => {
+                      setTab(id);
+                      // The narration plan is computed from the saved draft: save pending edits first
+                      if (id === 'narration') {
+                        await stopAutosave.flush();
+                        refetchNarration();
+                      }
+                      // Hidden sections are not translated: their data leaves the list
+                      if (id === 'live') {
+                        await stopAutosave.flush();
+                        refetchLive();
+                      }
+                    }}
+                    className={`border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                      tab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    {label}
+                    {id === 'live' && stopLiveMissing > 0 && (
+                      <span
+                        className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800"
+                        title={`${stopLiveMissing} sin traducir en ${languageName(language).toLowerCase()}`}
+                      >
+                        {stopLiveMissing}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="p-5">
+              {!selectedStop ? (
+                <div className="space-y-8">
+                  <TourSettingsEditor tour={tour} language={language} availableLanguages={data!.available_languages} onChange={editSettings} />
+                  {!!live?.tour.length && (
+                    <section className="space-y-3 border-t border-gray-200 pt-6">
+                      <h4 className="text-base font-semibold text-gray-900">Datos de la empresa y del mapa</h4>
+                      {liveEditor(live.tour, '')}
+                    </section>
+                  )}
+                </div>
+              ) : tab === 'live' ? (
+                liveEditor(live?.stops[selectedStop.id] ?? [], 'Esta área no muestra datos que se traduzcan: personal, seguridad, procesos o productos.')
+              ) : tab === 'narration' ? (
+                <StopNarrationEditor
+                  key={selectedStop.id}
+                  stop={selectedStop}
+                  language={language}
+                  item={narrationEstimate?.items.find((i) => i.stop_id === selectedStop.id && i.language === language)}
+                  isLoading={isLoadingNarration}
+                  onChange={(patch) => editStop(selectedStop.id, patch)}
+                />
+              ) : tab === 'content' ? (
+                <StopContentEditor
+                  key={selectedStop.id}
+                  stop={selectedStop}
+                  language={language}
+                  organizationId={tour.organization_id}
+                  plantId={tour.plant_id}
+                  onChange={(patch) => editStop(selectedStop.id, patch)}
+                />
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <p className="max-w-xl text-sm text-gray-600">
+                      Elige qué ve el visitante en esta área y en qué orden. Las secciones <strong>en vivo</strong> se
+                      actualizan solas con los datos del área.
+                    </p>
+                    {stops.length > 1 && (
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={applyToAllStops}>
+                        <Copy className="h-4 w-4" />
+                        Aplicar a todas las áreas
+                      </Button>
+                    )}
+                  </div>
+                  <SectionsEditor
+                    sections={selectedStop.sections}
+                    onChange={(sections) => editStop(selectedStop.id, { sections })}
+                    language={language}
+                    counts={sectionCounts ?? null}
+                    liveData={liveView?.stops.find((s) => s.id === selectedStop.id)}
+                    areaId={selectedStop.organizational_area_id}
+                    onApplyVisibilityToAll={stops.length > 1 ? applySectionToAll : undefined}
+                  />
+                </div>
+              )}
+            </div>
+            </TranslationMetaContext.Provider>
           </div>
+
+          {/* Stops (right) */}
+          <aside className="w-full lg:sticky lg:top-4 lg:w-80 lg:flex-shrink-0">
+            <StopsPanel
+              plantId={tour.plant_id}
+              stops={stops}
+              selectedStopId={selectedStop?.id ?? null}
+              onSelect={selectStop}
+              onAdd={() => setIsAddOpen(true)}
+              onAddArea={(areaId) => addMutation.mutate(areaId)}
+              onMove={handleMove}
+              onDelete={handleDelete}
+            />
+          </aside>
         </div>
 
-        {/* Stops (right) */}
-        <aside className="w-full lg:sticky lg:top-4 lg:w-80 lg:flex-shrink-0">
-          <StopsPanel
-            plantId={tour.plant_id}
-            stops={stops}
-            selectedStopId={selectedStop?.id ?? null}
-            onSelect={selectStop}
-            onAdd={() => setIsAddOpen(true)}
-            onAddArea={(areaId) => addMutation.mutate(areaId)}
-            onMove={handleMove}
-            onDelete={handleDelete}
+        {isPublishOpen && (
+          <PublishTourModal
+            isOpen
+            onClose={() => setIsPublishOpen(false)}
+            builder={data!}
+            beforePublish={flushAll}
+            pendingTranslations={pending}
+            onTranslate={() => translate()}
+            onPublished={(result) => {
+              setBuilder((prev) => ({
+                ...prev,
+                tour: { ...prev.tour, status: 'published', has_unpublished_changes: false, public_code: result.public_code },
+                publications: {
+                  ...prev.publications,
+                  latest_version: result.version,
+                  used: prev.publications.used + (result.counted_toward_limit ? 1 : 0),
+                  remaining: Math.max(prev.publications.remaining - (result.counted_toward_limit ? 1 : 0), 0),
+                },
+              }));
+              queryClient.invalidateQueries({ queryKey: ['tours'] });
+              queryClient.invalidateQueries({ queryKey: ['tour-share', tourId] });
+              setIsPublishOpen(false);
+              setIsShareOpen(true);
+            }}
           />
-        </aside>
-      </div>
+        )}
 
-      {isPublishOpen && (
-        <PublishTourModal
-          isOpen
-          onClose={() => setIsPublishOpen(false)}
-          builder={data!}
-          beforePublish={flushAll}
-          onPublished={(result) => {
-            setBuilder((prev) => ({
-              ...prev,
-              tour: { ...prev.tour, status: 'published', has_unpublished_changes: false, public_code: result.public_code },
-              publications: {
-                ...prev.publications,
-                latest_version: result.version,
-                used: prev.publications.used + (result.counted_toward_limit ? 1 : 0),
-                remaining: Math.max(prev.publications.remaining - (result.counted_toward_limit ? 1 : 0), 0),
-              },
-            }));
-            queryClient.invalidateQueries({ queryKey: ['tours'] });
-            queryClient.invalidateQueries({ queryKey: ['tour-share', tourId] });
-            setIsPublishOpen(false);
-            setIsShareOpen(true);
-          }}
+        <ShareTourModal
+          isOpen={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
+          tourId={tourId!}
+          tourTitle={tour.title_translations[sourceCode] || tour.title}
+          onUnpublished={() => setBuilder((prev) => ({ ...prev, tour: { ...prev.tour, status: 'archived' } }))}
         />
-      )}
 
-      <ShareTourModal
-        isOpen={isShareOpen}
-        onClose={() => setIsShareOpen(false)}
-        tourId={tourId!}
-        tourTitle={tour.title_translations.es || tour.title}
-        onUnpublished={() => setBuilder((prev) => ({ ...prev, tour: { ...prev.tour, status: 'archived' } }))}
-      />
-
-      <AddStopModal
-        isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
-        organizationId={tour.organization_id}
-        plantId={tour.plant_id}
-        usedAreaIds={usedAreaIds}
-        onAdd={(areaId) => addMutation.mutateAsync(areaId)}
-      />
-    </div>
+        <AddStopModal
+          isOpen={isAddOpen}
+          onClose={() => setIsAddOpen(false)}
+          organizationId={tour.organization_id}
+          plantId={tour.plant_id}
+          usedAreaIds={usedAreaIds}
+          onAdd={(areaId) => addMutation.mutateAsync(areaId)}
+        />
+      </div>
+    </SourceLanguageContext.Provider>
   );
 };
 

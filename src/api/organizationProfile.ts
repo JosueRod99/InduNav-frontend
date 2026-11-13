@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Translations } from './tourBuilder';
+import type { TourLanguageOption, Translations } from './tourBuilder';
 import type { AddressDetails } from '../utils/googlePlaces';
 
 // Company profile and company/plant photo galleries (PLAN_LAB_KRAFT.md points 1-2)
@@ -33,6 +33,8 @@ export interface OrganizationProfile {
   logo_url: string | null;
   profile: Partial<OrganizationProfileData>;
   tour_display: TourDisplay;
+  default_language: string;
+  languages: TourLanguageOption[];
 }
 
 export interface OrganizationPhoto {
@@ -48,6 +50,11 @@ export interface OrganizationPhoto {
 
 export const getOrganizationProfile = async (organizationId: string): Promise<OrganizationProfile> => {
   const { data } = await apiClient.get(`/organizations/${organizationId}/profile`);
+  return data;
+};
+
+export const setDefaultLanguage = async (organizationId: string, language: string): Promise<OrganizationProfile> => {
+  const { data } = await apiClient.put(`/organizations/${organizationId}/default-language`, { language });
   return data;
 };
 

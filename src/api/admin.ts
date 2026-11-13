@@ -6,7 +6,7 @@ export interface NarrationUsageAudio {
   id: string;
   publication_id: string;
   area_title: string;
-  language: 'es' | 'en';
+  language: string;
   characters: number;
   duration_seconds: number | null;
   cost_usd: number;
@@ -50,6 +50,56 @@ export interface NarrationUsage {
 
 export const getNarrationUsage = async (month?: string): Promise<NarrationUsage> => {
   const { data } = await apiClient.get('/admin/narration-usage', { params: month ? { month } : undefined });
+  return data.usage;
+};
+
+/** Plan and characters used in the narration provider's account (ElevenLabs) */
+export interface NarrationAccount {
+  plan: string;
+  characters_used: number;
+  characters_limit: number;
+  resets_at: string | null;
+}
+
+export const getNarrationAccount = async (): Promise<NarrationAccount> => (await apiClient.get('/admin/narration-account')).data.account;
+
+/** Characters per target language: {ja: 5331, en: 6264} */
+export type CharactersByLanguage = Record<string, number>;
+
+export interface TranslationUsage {
+  month: string;
+  rates: { provider: string; free_characters: number; usd_per_1m_characters: number; usd_mxn: number; limit_per_organization: number };
+  totals: { characters: number; requests: number; by_language: CharactersByLanguage; cost_usd: number };
+  platform: { characters: number; by_language: CharactersByLanguage }; // fixed texts of the viewer
+  organizations: { id: string; name: string; characters: number; limit: number; by_language: CharactersByLanguage }[];
+  tours: {
+    tour_id: string | null; // null: deleted tour
+    tour_title: string | null;
+    organization_name: string | null;
+    characters: number;
+    by_language: CharactersByLanguage;
+    last_at: string;
+  }[];
+  live_review: LiveReview;
+}
+
+/** Hourly review that translates new live data of published tours (scheduled_jobs) */
+export interface LiveReview {
+  interval_minutes: number; // of the server that answered; 0: it does not run there
+  last_started_at: string | null;
+  last_finished_at: string | null;
+  last_result: {
+    tours: number;
+    translated: number;
+    characters: number;
+    by_organization: { organization_id: string; organization_name: string | null; translated: number; characters: number }[];
+    errors: { tour_id: string; tour_title: string | null; message: string }[];
+  } | null;
+  last_error: string | null;
+}
+
+export const getTranslationUsage = async (month?: string): Promise<TranslationUsage> => {
+  const { data } = await apiClient.get('/admin/translation-usage', { params: month ? { month } : undefined });
   return data.usage;
 };
 

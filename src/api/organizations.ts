@@ -8,6 +8,7 @@ export interface CreateOrganizationRequest {
   plan?: 'free' | 'pro' | 'enterprise';
   settings?: Record<string, any>;
   tour_publications_per_month?: number; // tour publications with narration audio per month
+  translation_characters_per_month?: number | null; // automatic translation per month; null: the general limit
 }
 
 export interface UpdateOrganizationRequest {
@@ -18,6 +19,7 @@ export interface UpdateOrganizationRequest {
   is_active?: boolean;
   settings?: Record<string, any>;
   tour_publications_per_month?: number;
+  translation_characters_per_month?: number | null;
 }
 
 export interface GetOrganizationsParams {

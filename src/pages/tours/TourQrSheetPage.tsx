@@ -1,3 +1,5 @@
+import { tourTitle } from '../../api/tourBuilder';
+import { tr } from '../../api/tourView';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -137,7 +139,7 @@ const TourQrSheetPage = () => {
   }
 
   const links = share ? tourLinks(share) : null;
-  const tourTitle = builder?.tour.title_translations.es || builder?.tour.title || 'Tour';
+  const sheetTitle = builder ? tourTitle(builder.tour) : 'Tour';
 
   if (!share || share.status !== 'published' || !links?.short) {
     return (
@@ -151,13 +153,13 @@ const TourQrSheetPage = () => {
   }
 
   const cards: QrCard[] = [
-    { id: 'tour', value: links.short, title: tourTitle, subtitle: links.short.replace(/^https?:\/\//, ''), number: null },
+    { id: 'tour', value: links.short, title: sheetTitle, subtitle: links.short.replace(/^https?:\/\//, ''), number: null },
     ...share.stops
       .filter((s) => s.qr_short_code)
       .map((s) => ({
         id: s.id,
         value: links.stop(s.qr_short_code!),
-        title: s.title.es || `Área ${s.number}`,
+        title: tr(s.title, builder?.tour.source_language || 'es') || `Área ${s.number}`,
         subtitle: s.qr_short_code!,
         number: s.number,
       })),
@@ -189,7 +191,7 @@ const TourQrSheetPage = () => {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.font = '700 48px system-ui, sans-serif';
-    ctx.fillText(tourTitle, margin, margin + 30);
+    ctx.fillText(sheetTitle, margin, margin + 30);
     ctx.fillStyle = '#64748B';
     ctx.font = '26px system-ui, sans-serif';
     ctx.fillText('Escanea el código de cada área para abrir el recorrido ahí.', margin, margin + 80);
@@ -204,7 +206,7 @@ const TourQrSheetPage = () => {
       const y = margin + header + Math.floor(i / cols) * (CARD_H + gap);
       drawCard(qr, card, { ctx, x, y });
     }
-    downloadCanvas(canvas, `qrs-${slugify(tourTitle)}.png`);
+    downloadCanvas(canvas, `qrs-${slugify(sheetTitle)}.png`);
   };
 
   const cardButton =
@@ -240,7 +242,7 @@ const TourQrSheetPage = () => {
 
       <div className="mx-auto max-w-5xl p-6 print:max-w-none print:p-0">
         <div className={printOnly ? 'print:hidden' : ''}>
-          <h1 className="mb-1 text-2xl font-bold text-gray-900">{tourTitle}</h1>
+          <h1 className="mb-1 text-2xl font-bold text-gray-900">{sheetTitle}</h1>
           <p className="mb-6 text-sm text-gray-600 print:mb-4">
             Recorta cada tarjeta y pégala en su estación. Al escanearla, el tour abre directo en esa área.
           </p>

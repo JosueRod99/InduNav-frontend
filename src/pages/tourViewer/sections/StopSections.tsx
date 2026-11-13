@@ -6,37 +6,30 @@ import {
   ExternalLink,
   FileText,
   HardHat,
+  Languages,
   MapPin,
   Package,
   ShieldCheck,
   User,
   Wrench,
 } from 'lucide-react';
-import { EQUIPMENT_STATUS_COLORS, EQUIPMENT_STATUS_LABELS, EQUIPMENT_TYPE_LABELS, type EquipmentStatus } from '../../../api/equipment';
-import { getSectionBlocks, type TourLanguage, type TourSection } from '../../../api/tourBuilder';
+import { EQUIPMENT_STATUS_COLORS } from '../../../api/equipment';
+import { getSectionBlocks, type TourSection } from '../../../api/tourBuilder';
 import SimpleChart from '../../../components/tours/SimpleChart';
-import { tr, type TourViewStop } from '../../../api/tourView';
+import type { TourViewStop } from '../../../api/tourView';
 import { avatarUrl } from '../../../utils/avatarUrl';
+import { useViewerTexts, WithBoldCount } from '../useViewerTexts';
 
 // Section renderers of the real tour viewer (independent from the demo tabs)
 
-type Lang = TourLanguage;
-const t = (lang: Lang, es: string, en: string) => (lang === 'es' ? es : en);
-
-const STATUS_EN: Record<EquipmentStatus, string> = {
-  active: 'Active',
-  maintenance: 'Under maintenance',
-  out_of_service: 'Out of service',
-  retired: 'Retired',
-};
-
 // Risk level: restrained on purpose (a darker tag means more risk, no traffic-light colors)
-const SEVERITY: Record<string, { es: string; en: string; className: string }> = {
-  low: { es: 'Bajo', en: 'Low', className: 'bg-slate-100 text-slate-600' },
-  medium: { es: 'Medio', en: 'Medium', className: 'bg-slate-100 text-slate-700' },
-  high: { es: 'Alto', en: 'High', className: 'bg-slate-300 text-slate-900' },
-  critical: { es: 'Crítico', en: 'Critical', className: 'bg-slate-800 text-white' },
+const SEVERITY = {
+  low: 'bg-slate-100 text-slate-600',
+  medium: 'bg-slate-100 text-slate-700',
+  high: 'bg-slate-300 text-slate-900',
+  critical: 'bg-slate-800 text-white',
 };
+const isSeverity = (value: string): value is keyof typeof SEVERITY => value in SEVERITY;
 
 const Paragraphs = ({ text }: { text: string }) => (
   <div className="space-y-3">
@@ -53,9 +46,10 @@ const Paragraphs = ({ text }: { text: string }) => (
 
 const Empty = ({ text }: { text: string }) => <p className="text-sm text-slate-500">{text}</p>;
 
-export const SummarySection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => {
-  const narrative = tr(stop.content.narrative, language);
-  const keypoints = (stop.content.keypoints || []).map((k) => tr(k, language)).filter(Boolean);
+export const SummarySection = ({ stop }: { stop: TourViewStop }) => {
+  const { text } = useViewerTexts();
+  const narrative = text(stop.content.narrative);
+  const keypoints = (stop.content.keypoints || []).map((k) => text(k)).filter(Boolean);
 
   return (
     <div className="space-y-5">
@@ -79,10 +73,11 @@ export const SummarySection = ({ stop, language }: { stop: TourViewStop; languag
  * FAQ of the stop, shown in the stop header (under the person in charge). Works like the demo: it
  * expands in place and the stop header's info column (max-h-96) scrolls when it gets long.
  */
-export const StopFaq = ({ stop, language }: { stop: TourViewStop; language: Lang }) => {
+export const StopFaq = ({ stop }: { stop: TourViewStop }) => {
+  const { t, tn, text } = useViewerTexts();
   const [open, setOpen] = useState(false);
   const [openItem, setOpenItem] = useState<number | null>(null);
-  const faq = (stop.content.faq || []).filter((f) => tr(f.q, language));
+  const faq = (stop.content.faq || []).filter((f) => text(f.q));
 
   // New area: start closed
   useEffect(() => {
@@ -101,10 +96,10 @@ export const StopFaq = ({ stop, language }: { stop: TourViewStop; language: Lang
       >
         <span className="flex items-center gap-2">
           <ChevronDown className={`h-4 w-4 flex-shrink-0 text-blue-600 transition-transform ${open ? 'rotate-180' : ''}`} />
-          {t(language, 'Preguntas frecuentes', 'FAQ')}
+          {t('faq')}
         </span>
         <span className="flex-shrink-0 whitespace-nowrap text-xs font-normal text-slate-500">
-          {faq.length} {t(language, faq.length === 1 ? 'pregunta' : 'preguntas', faq.length === 1 ? 'question' : 'questions')}
+          {tn('questions', faq.length)}
         </span>
       </button>
       {open && (
@@ -116,14 +111,14 @@ export const StopFaq = ({ stop, language }: { stop: TourViewStop; language: Lang
                 className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium text-slate-900 hover:bg-slate-50"
                 aria-expanded={openItem === i}
               >
-                {tr(item.q, language)}
+                {text(item.q)}
                 <ChevronDown
                   className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${openItem === i ? 'rotate-180' : ''}`}
                 />
               </button>
               {openItem === i && (
                 <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
-                  <Paragraphs text={tr(item.a, language)} />
+                  <Paragraphs text={text(item.a)} />
                 </div>
               )}
             </div>
@@ -134,28 +129,33 @@ export const StopFaq = ({ stop, language }: { stop: TourViewStop; language: Lang
   );
 };
 
-export const HighlightsSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
+export const HighlightsSection = ({ stop }: { stop: TourViewStop }) => {
+  const { text } = useViewerTexts();
+  return (
   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
     {(stop.content.highlights || []).map((h, i) => (
       <div key={i} className="rounded-lg border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4">
         <p className="text-xl font-bold text-blue-700">{h.value}</p>
-        <p className="mt-1 text-xs font-medium text-slate-600">{tr(h.label, language)}</p>
+        <p className="mt-1 text-xs font-medium text-slate-600">{text(h.label)}</p>
       </div>
     ))}
   </div>
-);
+  );
+};
 
-export const CustomSection = ({ section, language }: { section: TourSection; language: Lang }) => (
+export const CustomSection = ({ section }: { section: TourSection }) => {
+  const { language, sourceLanguage, text } = useViewerTexts();
+  return (
   <div className="space-y-6">
     {getSectionBlocks(section).map((block) =>
       block.type === 'text'
-        ? tr(block.body, language) && <Paragraphs key={block.id} text={tr(block.body, language)} />
+        ? text(block.body) && <Paragraphs key={block.id} text={text(block.body)} />
         : block.chart.points.length > 0 && (
             <figure key={block.id} className="space-y-2">
-              {tr(block.title, language) && (
-                <figcaption className="text-sm font-semibold text-slate-900">{tr(block.title, language)}</figcaption>
+              {text(block.title) && (
+                <figcaption className="text-sm font-semibold text-slate-900">{text(block.title)}</figcaption>
               )}
-              <SimpleChart chart={block.chart} language={language} title={tr(block.title, language)} />
+              <SimpleChart chart={block.chart} language={language} sourceLanguage={sourceLanguage} title={text(block.title)} />
             </figure>
           ),
     )}
@@ -167,14 +167,17 @@ export const CustomSection = ({ section, language }: { section: TourSection; lan
       </div>
     )}
   </div>
-);
+  );
+};
 
-export const PersonnelSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
+export const PersonnelSection = ({ stop }: { stop: TourViewStop }) => {
+  const { t, tn } = useViewerTexts();
+  const peopleTotal = stop.live.people_total ?? 0;
+  return (
   <div className="space-y-3">
-    {(stop.live.people_total ?? 0) > 0 && (
+    {peopleTotal > 0 && (
       <p className="text-sm text-slate-700">
-        {t(language, 'Aquí trabajan', 'People working here:')} <strong className="text-slate-900">{stop.live.people_total}</strong>{' '}
-        {t(language, stop.live.people_total === 1 ? 'persona' : 'personas', '')}
+        <WithBoldCount text={tn('people_working', peopleTotal, { count: '{count}' })} count={peopleTotal} />
       </p>
     )}
     {(stop.live.headcount?.length ?? 0) > 0 && (
@@ -200,21 +203,24 @@ export const PersonnelSection = ({ stop, language }: { stop: TourViewStop; langu
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
             {p.position && <p className="truncate text-xs text-slate-600">{p.position}</p>}
-            {p.is_primary && <p className="text-[11px] text-blue-600">{t(language, 'Asignación principal', 'Primary assignment')}</p>}
+            {p.is_primary && <p className="text-[11px] text-blue-600">{t('primary_assignment')}</p>}
           </div>
         </div>
       ))}
     </div>
   </div>
-);
+  );
+};
 
 // Steps of the plant processes done in this area ("what happens here")
-export const ProcessesSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
+export const ProcessesSection = ({ stop }: { stop: TourViewStop }) => {
+  const { t } = useViewerTexts();
+  return (
   <ol className="space-y-3">
     {(stop.live.processes || []).map((step) => (
       <li key={`${step.process_name}-${step.step_number}`} className="rounded-lg border border-slate-200 p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-          {step.process_name} · {t(language, `Paso ${step.step_number} de ${step.total_steps}`, `Step ${step.step_number} of ${step.total_steps}`)}
+          {step.process_name} · {t('step_of', { number: step.step_number, total: step.total_steps })}
         </p>
         <p className="mt-1 font-semibold text-slate-900">{step.name}</p>
         {step.description && <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{step.description}</p>}
@@ -243,16 +249,24 @@ export const ProcessesSection = ({ stop, language }: { stop: TourViewStop; langu
       </li>
     ))}
   </ol>
-);
+  );
+};
 
-export const SafetySection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => {
+export const SafetySection = ({ stop }: { stop: TourViewStop }) => {
+  const { t } = useViewerTexts();
   const s = stop.live.safety!;
   return (
     <div className="space-y-5">
+      {stop.live_notes?.safety_machine && (
+        <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <Languages className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          {t('safety_machine_translation')}
+        </p>
+      )}
       {s.required_ppe.length > 0 && (
         <div>
           <h4 className="mb-2 text-sm font-semibold text-slate-900">
-            {t(language, 'Equipo de protección requerido', 'Required protective equipment')}
+            {t('required_ppe')}
           </h4>
           <div className="flex flex-wrap gap-2">
             {s.required_ppe.map((ppe) => (
@@ -269,7 +283,7 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
       )}
       {s.hazards.length > 0 && (
         <div>
-          <h4 className="mb-2 text-sm font-semibold text-slate-900">{t(language, 'Riesgos del área', 'Area hazards')}</h4>
+          <h4 className="mb-2 text-sm font-semibold text-slate-900">{t('area_hazards')}</h4>
           <ul className="space-y-1.5">
             {s.hazards.map((h, i) => (
               <li key={i} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm">
@@ -277,8 +291,8 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
                   <AlertTriangle className="h-4 w-4 text-slate-400" />
                   {h.name}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${SEVERITY[h.severity]?.className || 'bg-slate-100 text-slate-700'}`}>
-                  {SEVERITY[h.severity]?.[language] || h.severity}
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${isSeverity(h.severity) ? SEVERITY[h.severity] : 'bg-slate-100 text-slate-700'}`}>
+                  {isSeverity(h.severity) ? t(`severity_${h.severity}`) : h.severity}
                 </span>
               </li>
             ))}
@@ -289,13 +303,13 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
         <p className="flex items-start gap-2 text-sm text-slate-700">
           <MapPin className="mt-0.5 h-4 w-4 text-slate-400" />
           <span>
-            <strong>{t(language, 'Punto de reunión', 'Assembly point')}:</strong> {s.emergency_assembly_point}
+            <strong>{t('assembly_point')}:</strong> {s.emergency_assembly_point}
           </span>
         </p>
       )}
       {(s.restricted_access || s.access_requirements) && (
         <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm text-slate-800">
-          <strong>{t(language, 'Acceso restringido', 'Restricted access')}</strong>
+          <strong>{t('restricted_access')}</strong>
           {s.access_requirements && <p className="mt-1">{s.access_requirements}</p>}
         </div>
       )}
@@ -304,7 +318,9 @@ export const SafetySection = ({ stop, language }: { stop: TourViewStop; language
   );
 };
 
-export const EquipmentSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
+export const EquipmentSection = ({ stop }: { stop: TourViewStop }) => {
+  const { t } = useViewerTexts();
+  return (
   <div className="grid gap-3 sm:grid-cols-2">
     {stop.live.equipment.map((e) => (
       <div key={e.id} className="flex gap-3 rounded-lg border border-slate-200 p-3">
@@ -319,7 +335,7 @@ export const EquipmentSection = ({ stop, language }: { stop: TourViewStop; langu
           <p className="text-sm font-semibold text-slate-900">{e.name}</p>
           <p className="text-xs text-slate-500">
             <span className="font-mono">{e.code}</span>
-            {language === 'es' && ` · ${EQUIPMENT_TYPE_LABELS[e.equipment_type]}`}
+            {` · ${t(`equipment_type_${e.equipment_type}`)}`}
             {[e.manufacturer, e.model].filter(Boolean).length > 0 && ` · ${[e.manufacturer, e.model].filter(Boolean).join(' ')}`}
           </p>
           <span
@@ -327,14 +343,14 @@ export const EquipmentSection = ({ stop, language }: { stop: TourViewStop; langu
             style={{ backgroundColor: `${EQUIPMENT_STATUS_COLORS[e.status]}1A`, color: EQUIPMENT_STATUS_COLORS[e.status] }}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: EQUIPMENT_STATUS_COLORS[e.status] }} />
-            {language === 'es' ? EQUIPMENT_STATUS_LABELS[e.status] : STATUS_EN[e.status]}
+            {t(`equipment_status_${e.status}`)}
           </span>
           {e.used_in.length > 0 && (
             <ul className="mt-2 space-y-0.5">
               {e.used_in.map((u, i) => (
                 <li key={i} className="flex items-center gap-1.5 text-xs text-slate-600">
                   <Package className="h-3 w-3 text-slate-400" />
-                  {u.product} · {t(language, 'Paso', 'Step')} {u.step_number} · {u.step_name}
+                  {u.product} · {t('step', { number: u.step_number })} · {u.step_name}
                 </li>
               ))}
             </ul>
@@ -343,9 +359,12 @@ export const EquipmentSection = ({ stop, language }: { stop: TourViewStop; langu
       </div>
     ))}
   </div>
-);
+  );
+};
 
-export const ProductsSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
+export const ProductsSection = ({ stop }: { stop: TourViewStop }) => {
+  const { t } = useViewerTexts();
+  return (
   <div className="grid gap-3 sm:grid-cols-2">
     {stop.live.products.map((p) => (
       <div key={p.id} className="overflow-hidden rounded-lg border border-slate-200">
@@ -361,14 +380,15 @@ export const ProductsSection = ({ stop, language }: { stop: TourViewStop; langua
           <p className="font-mono text-xs text-slate-500">{p.sku}</p>
           {p.description && <p className="mt-1 line-clamp-2 text-xs text-slate-600">{p.description}</p>}
           <p className="mt-2 text-[11px] font-medium text-blue-700">
-            {t(language, 'En esta área', 'In this area')}:{' '}
-            {p.steps.map((s) => `${t(language, 'Paso', 'Step')} ${s.step_number} · ${s.step_name}`).join(', ')}
+            {t('in_this_area')}:{' '}
+            {p.steps.map((s) => `${t('step', { number: s.step_number })} · ${s.step_name}`).join(', ')}
           </p>
         </div>
       </div>
     ))}
   </div>
-);
+  );
+};
 
 export const GallerySection = ({ stop }: { stop: TourViewStop }) => (
   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -395,7 +415,9 @@ export const GallerySection = ({ stop }: { stop: TourViewStop }) => (
   </div>
 );
 
-export const DocumentsSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
+export const DocumentsSection = ({ stop }: { stop: TourViewStop }) => {
+  const { t } = useViewerTexts();
+  return (
   <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200">
     {stop.live.documents.map((d) => (
       <li key={d.id}>
@@ -405,14 +427,17 @@ export const DocumentsSection = ({ stop, language }: { stop: TourViewStop; langu
             <span className="block truncate text-sm font-medium text-slate-900">{d.title}</span>
             {d.description && <span className="block truncate text-xs text-slate-500">{d.description}</span>}
           </span>
-          <ExternalLink className="h-4 w-4 flex-shrink-0 text-slate-400" aria-label={t(language, 'Abrir', 'Open')} />
+          <ExternalLink className="h-4 w-4 flex-shrink-0 text-slate-400" aria-label={t('open')} />
         </a>
       </li>
     ))}
   </ul>
-);
+  );
+};
 
-export const CertificationsSection = ({ stop, language }: { stop: TourViewStop; language: Lang }) => (
+export const CertificationsSection = ({ stop }: { stop: TourViewStop }) => {
+  const { t, tn, formatDate } = useViewerTexts();
+  return (
   <div className="space-y-4">
     {stop.live.certifications.length > 0 && (
       <div className="grid gap-3 sm:grid-cols-2">
@@ -423,16 +448,11 @@ export const CertificationsSection = ({ stop, language }: { stop: TourViewStop; 
               <p className="text-sm font-semibold text-slate-900">{c.certification_name}</p>
               {c.certification_body && <p className="text-xs text-slate-600">{c.certification_body}</p>}
               {c.status === 'in_progress' ? (
-                <p className="mt-1 text-[11px] font-medium text-blue-700">{t(language, 'En proceso de certificación', 'Certification in progress')}</p>
+                <p className="mt-1 text-[11px] font-medium text-blue-700">{t('certification_in_progress')}</p>
               ) : (
                 c.expiry_date && (
                   <p className="mt-1 text-[11px] text-slate-500">
-                    {t(language, 'Vigente hasta', 'Valid until')}{' '}
-                    {new Date(c.expiry_date).toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      timeZone: 'UTC',
-                    })}
+                    {t('valid_until', { date: formatDate(c.expiry_date, { year: 'numeric', month: 'short', timeZone: 'UTC' }) })}
                   </p>
                 )
               )}
@@ -445,13 +465,13 @@ export const CertificationsSection = ({ stop, language }: { stop: TourViewStop; 
       <ul className="flex flex-wrap gap-2">
         {stop.live.certified_people!.map((p) => (
           <li key={p.name} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
-            <strong className="text-slate-900">{p.count}</strong> {t(language, p.count === 1 ? 'persona certificada en' : 'personas certificadas en', p.count === 1 ? 'person certified in' : 'people certified in')}{' '}
-            {p.name}
+            <WithBoldCount text={tn('people_certified', p.count, { count: '{count}', name: p.name })} count={p.count} />
           </li>
         ))}
       </ul>
     )}
   </div>
-);
+  );
+};
 
 export { Empty };

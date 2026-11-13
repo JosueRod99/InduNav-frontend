@@ -59,6 +59,7 @@ export interface Organization {
   is_active: boolean;
   settings: Record<string, any>;
   tour_publications_per_month?: number;
+  translation_characters_per_month?: number | null; // null: the general limit
   // Figures of the organizations list
   plants_count?: number;
   users_count?: number;

@@ -1,4 +1,5 @@
 import type { ChartData, TourLanguage } from '../../api/tourBuilder';
+import { tr } from '../../api/tourView';
 
 // Lightweight SVG charts for tour sections (bar, line, donut). Values are always printed so the
 // chart is readable without hover, and the SVG has a text description for screen readers.
@@ -14,12 +15,13 @@ const formatValue = (value: number, unit?: string) => {
 interface SimpleChartProps {
   chart: ChartData;
   language: TourLanguage;
+  sourceLanguage?: TourLanguage;
   title?: string;
   compact?: boolean; // smaller height for the editor preview
 }
 
-const SimpleChart = ({ chart, language, title, compact = false }: SimpleChartProps) => {
-  const points = chart.points.map((p) => ({ label: p.label[language] || p.label.es || '', value: Number(p.value) || 0 }));
+const SimpleChart = ({ chart, language, sourceLanguage, title, compact = false }: SimpleChartProps) => {
+  const points = chart.points.map((p) => ({ label: tr(p.label, language, sourceLanguage), value: Number(p.value) || 0 }));
   if (points.length === 0) return null;
 
   const description = `${title ? `${title}: ` : ''}${points.map((p) => `${p.label} ${formatValue(p.value, chart.unit)}`).join(', ')}`;

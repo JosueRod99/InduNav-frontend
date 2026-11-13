@@ -1,5 +1,7 @@
 import { CheckCircle2, Clock, Info, Loader2, PenLine, RotateCcw, Sparkles } from 'lucide-react';
 import type { BuilderStop, NarrationItem, TourLanguage, UpdateStopPayload } from '../../../api/tourBuilder';
+import { narrationSeconds } from '../../../utils/narrationDuration';
+import { useSourceLanguage } from './sourceLanguage';
 
 // Narration of an area: by default it is composed from the title, narrative and key points; it can
 // be replaced by a custom script. Audio is generated when publishing, only if the script changed.
@@ -12,14 +14,13 @@ interface StopNarrationEditorProps {
   onChange: (patch: UpdateStopPayload) => void;
 }
 
-const CHARS_PER_MINUTE = 900; // approximate speaking rate of the narration voices
-
-const duration = (chars: number) => {
-  const seconds = Math.max(1, Math.round((chars / CHARS_PER_MINUTE) * 60));
+const duration = (chars: number, language: string) => {
+  const seconds = Math.max(1, narrationSeconds(chars, language));
   return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 };
 
 const StopNarrationEditor = ({ stop, language, item, isLoading, onChange }: StopNarrationEditorProps) => {
+  const source = useSourceLanguage();
   const custom = stop.content.narration_script?.[language];
   const isCustom = custom !== undefined && custom !== null;
   const setScript = (value: string | undefined) => {
@@ -33,11 +34,15 @@ const StopNarrationEditor = ({ stop, language, item, isLoading, onChange }: Stop
   const chars = scriptText.trim().length;
 
   const status = (() => {
-    if (isLoading || !item) return { Icon: Loader2, text: 'Revisando…', className: 'bg-gray-100 text-gray-600', spin: true };
+    if (isLoading) return { Icon: Loader2, text: 'Revisando…', className: 'bg-gray-100 text-gray-600', spin: true };
+    // The server only plans the languages that have a voice (PLAN_IDIOMAS.md, phase 5)
+    if (!item) {
+      return { Icon: Info, text: `Este idioma aún no tiene voz: se escuchará la narración en ${source.name.toLowerCase()}`, className: 'bg-gray-100 text-gray-700' };
+    }
     if (!item.script) {
-      return language === 'es'
+      return language === source.code
         ? { Icon: Info, text: 'Sin narración: escribe una narrativa o un guion', className: 'bg-gray-100 text-gray-700' }
-        : { Icon: Info, text: 'Sin texto en inglés: se escuchará la narración en español', className: 'bg-gray-100 text-gray-700' };
+        : { Icon: Info, text: `Sin texto en este idioma: se escuchará la narración en ${source.name.toLowerCase()}`, className: 'bg-gray-100 text-gray-700' };
     }
     if (item.audio_url) return { Icon: CheckCircle2, text: 'Audio listo para este guion', className: 'bg-green-100 text-green-800' };
     return { Icon: Clock, text: 'Se generará al publicar', className: 'bg-amber-100 text-amber-800' };
@@ -60,7 +65,7 @@ const StopNarrationEditor = ({ stop, language, item, isLoading, onChange }: Stop
         </span>
         {chars > 0 && (
           <span className="text-xs text-gray-500">
-            {chars.toLocaleString('es-MX')} caracteres · ~{duration(chars)} de audio
+            {chars.toLocaleString('es-MX')} caracteres · ~{duration(chars, language)} de audio
           </span>
         )}
       </div>
@@ -127,9 +132,9 @@ const StopNarrationEditor = ({ stop, language, item, isLoading, onChange }: Stop
               </>
             ) : (
               <span className="text-gray-500">
-                {language === 'es'
+                {language === source.code
                   ? 'Escribe la narrativa del área en la pestaña Contenido para generar la narración.'
-                  : 'Escribe la narrativa en inglés (pestaña Contenido) o personaliza el guion para tener narración en inglés.'}
+                  : 'Escribe la narrativa en este idioma (pestaña Contenido) o personaliza el guion para tener narración en este idioma.'}
               </span>
             )}
           </div>

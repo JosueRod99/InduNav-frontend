@@ -1,3 +1,4 @@
+import { tourTitle } from '../../api/tourBuilder';
 import { confirmar } from '../../components/ui/ConfirmDialog';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -57,6 +58,7 @@ const CardAction = ({
 
 /** List rows include the v2 fields (PLAN_TOURS_REALES.md) on top of the legacy Tour type */
 type TourCard = Tour & {
+  source_language?: string;
   stops_count?: number | string;
   visits_30d?: number | string;
   status?: 'draft' | 'published' | 'archived';
@@ -251,8 +253,8 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
           {tours.map((tour) => {
             const badge = statusBadge(tour);
             const stopsCount = Number(tour.stops_count || 0);
-            const title = tour.title_translations?.es || tour.title;
-            const description = tour.description_translations?.es || tour.description;
+            const title = tourTitle(tour);
+            const description = tour.description_translations?.[tour.source_language || 'es'] || tour.description;
             return (
               <article key={tour.id} className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
                 <button
@@ -361,7 +363,7 @@ const ToursPage = ({ plantId }: PlantScopedProps = {}) => {
           isOpen
           onClose={() => setShareTour(null)}
           tourId={shareTour.id}
-          tourTitle={shareTour.title_translations?.es || shareTour.title}
+          tourTitle={tourTitle(shareTour)}
         />
       )}
 

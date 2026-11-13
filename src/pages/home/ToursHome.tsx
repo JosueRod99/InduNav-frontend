@@ -1,3 +1,4 @@
+import { tourTitle } from '../../api/tourBuilder';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -5,6 +6,7 @@ import { getTours } from '../../api/tours';
 import { getPlants } from '../../api/plants';
 import { getOrganizationPublications } from '../../api/organizations';
 import Badge from '../../components/ui/Badge';
+import { useTranslationAlerts } from '../../hooks/useTranslationAlerts';
 import { AttentionList, FigureCards, plural, PlantCards, type Figure } from '../../components/ui/SummaryParts';
 
 // "Inicio" of whoever works with the tours (creator) or only looks at them (read-only).
@@ -14,6 +16,7 @@ interface HomeTour {
   id: string;
   title: string;
   title_translations?: Record<string, string> | null;
+  source_language?: string;
   status: string;
   has_unpublished_changes?: boolean;
   plant_name?: string;
@@ -22,7 +25,7 @@ interface HomeTour {
   updated_at: string;
 }
 
-const titleOf = (tour: HomeTour) => tour.title_translations?.es || tour.title;
+const titleOf = (tour: HomeTour) => tourTitle(tour);
 const LIST_LIMIT = 8;
 
 const ToursHome = ({ organizationId, readOnly = false }: { organizationId?: string; readOnly?: boolean }) => {
@@ -35,6 +38,7 @@ const ToursHome = ({ organizationId, readOnly = false }: { organizationId?: stri
     queryFn: () => getOrganizationPublications(organizationId!),
     enabled: !!organizationId && !readOnly,
   });
+  const translationAlerts = useTranslationAlerts(organizationId);
   const { data: plantsData } = useQuery({
     queryKey: ['plants', 'home', organizationId ?? 'mine'],
     queryFn: () => getPlants({ limit: 100, organization_id: organizationId }),
@@ -68,6 +72,7 @@ const ToursHome = ({ organizationId, readOnly = false }: { organizationId?: stri
       ];
 
   const attention = [
+    ...translationAlerts,
     ...tours.filter((t) => t.status === 'published' && t.has_unpublished_changes).map((t) => ({ text: `${titleOf(t)}: cambios sin publicar`, to: `/tours/${t.id}/edit` })),
     ...tours.filter((t) => t.status !== 'published' && Number(t.stops_count ?? 0) === 0).map((t) => ({ text: `${titleOf(t)}: sin paradas`, to: `/tours/${t.id}/edit` })),
   ];

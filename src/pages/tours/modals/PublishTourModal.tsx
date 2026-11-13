@@ -6,22 +6,25 @@ import Modal from '../../../components/ui/Modal';
 import Button from '../../../components/ui/Button';
 import { getPublishEstimate, publishTour, type PublishResult, type TourBuilderData } from '../../../api/tourBuilder';
 import { getTourPreview, tr } from '../../../api/tourView';
+import { narrationSeconds } from '../../../utils/narrationDuration';
 
 interface PublishTourModalProps {
   isOpen: boolean;
   onClose: () => void;
   builder: TourBuilderData;
   beforePublish: () => Promise<unknown>; // save pending edits first
+  pendingTranslations: Record<string, number>; // texts missing or outdated, per language
+  onTranslate: () => Promise<unknown>;
   onPublished: (result: PublishResult) => void;
 }
 
 /** Summary + warnings before publishing. Publishing without audio does not use a monthly credit. */
-const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished }: PublishTourModalProps) => {
+const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, pendingTranslations, onTranslate, onPublished }: PublishTourModalProps) => {
   const { tour, stops, publications } = builder;
   const [isPublishing, setIsPublishing] = useState(false);
 
   // The preview tells which areas would show nothing; the estimate, what happens with the narration
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, refetch } = useQuery({
     queryKey: ['tour-publish-check', tour.id],
     queryFn: async () => {
       await beforePublish();
@@ -37,19 +40,26 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
   const preview = checks?.preview;
   const estimate = checks?.estimate;
   const keepPreviousAudio = !!estimate && estimate.limit_reached && estimate.to_generate > 0;
-  const minutes = estimate ? Math.max(1, Math.round(estimate.characters_to_generate / 900)) : 0;
+  const seconds = (estimate?.items ?? [])
+    .filter((item) => item.script && !item.audio_url)
+    .reduce((sum, item) => sum + narrationSeconds(item.characters, item.language), 0);
+  const minutes = Math.max(1, Math.round(seconds / 60));
   const resetsOn = estimate
     ? new Date(`${String(estimate.usage.resets_on).slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
     : '';
 
   const emptyStops = (preview?.stops || []).filter((s) => s.sections.length === 0);
-  const untranslated = tour.languages.includes('en')
-    ? stops.filter(
-        (s) =>
-          (s.title_translations.es && !s.title_translations.en) ||
-          (s.content.narrative?.es && !s.content.narrative?.en)
-      )
-    : [];
+  const source = tour.source_language;
+  const sourceName = builder.available_languages?.find((l) => l.code === source)?.name.toLowerCase() || source;
+  const languageName = (code: string) => builder.available_languages?.find((l) => l.code === code)?.name.toLowerCase() || code;
+  const untranslated = Object.entries(pendingTranslations).filter(([, count]) => count > 0);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const translateNow = async () => {
+    setIsTranslating(true);
+    await onTranslate();
+    setIsTranslating(false);
+    refetch(); // translated texts may need new narration
+  };
   const nextVersion = (publications.latest_version ?? 0) + 1;
   const isRepublish = tour.status !== 'draft';
 
@@ -183,15 +193,20 @@ const PublishTourModal = ({ isOpen, onClose, builder, beforePublish, onPublished
             </p>
             {emptyStops.length > 0 && (
               <p>
-                Sin contenido visible: {emptyStops.map((s) => tr(s.title, 'es')).join(', ')}. Los visitantes solo verán el
+                Sin contenido visible: {emptyStops.map((s) => tr(s.title, source)).join(', ')}. Los visitantes solo verán el
                 título.
               </p>
             )}
             {untranslated.length > 0 && (
-              <p>
-                Falta traducir al inglés en: {untranslated.map((s) => s.title_translations.es).join(', ')}. Se mostrará en
-                español.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>
+                  Textos sin traducir o desactualizados:{' '}
+                  {untranslated.map(([code, count]) => `${count} en ${languageName(code)}`).join(', ')}. Se mostrarán en {sourceName}.
+                </p>
+                <Button size="sm" variant="outline" isLoading={isTranslating} onClick={translateNow}>
+                  Traducir ahora
+                </Button>
+              </div>
             )}
           </div>
         )}

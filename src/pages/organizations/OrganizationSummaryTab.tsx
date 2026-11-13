@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { getOrganizationSummary } from '../../api/organizations';
 import SectionHeader from '../../components/ui/SectionHeader';
+import { useTranslationAlerts } from '../../hooks/useTranslationAlerts';
 import { AttentionList, FigureCards, plural, PlantCards, visitsTrend, type Figure } from '../../components/ui/SummaryParts';
 
 // Summary of an organization: key figures, what needs attention and its plants. It is its page's
@@ -13,6 +14,7 @@ const OrganizationSummaryTab = ({ organizationId, showHeader = true }: { organiz
     queryKey: ['organization-summary', organizationId],
     queryFn: () => getOrganizationSummary(organizationId),
   });
+  const translationAlerts = useTranslationAlerts(organizationId);
 
   if (isLoading) {
     return (
@@ -35,6 +37,7 @@ const OrganizationSummaryTab = ({ organizationId, showHeader = true }: { organiz
   const noPlan = data.plants_list.filter((p) => p.is_active && !p.has_plan);
   const nearLimit = data.publications_limit > 0 && data.publications_used / data.publications_limit >= data.near_limit_ratio;
   const attention = [
+    ...translationAlerts,
     ...(data.certifications_alert ? [{ text: `${plural(data.certifications_alert, 'certificación', 'certificaciones')} de la empresa vencida o por vencer`, to: `${base}/documentos` }] : []),
     ...(data.people_certification_alerts
       ? [{ text: `${plural(data.people_certification_alerts, 'persona', 'personas')} con certificaciones vencidas o por vencer`, to: `${base}/plantas` }]

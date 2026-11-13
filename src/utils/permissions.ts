@@ -17,7 +17,7 @@ export const PERMISSIONS = [
   'users.read', 'users.create', 'users.update', 'users.delete',
   'reports.visits', 'reports.personnel', 'reports.certifications', 'reports.documents',
   'files.upload', 'files.delete',
-  'system.home', 'system.audit', 'system.narration', 'system.maintenance',
+  'system.home', 'system.audit', 'system.narration', 'system.maintenance', 'system.languages',
   'roles.manage',
 ] as const;
 
@@ -67,6 +67,7 @@ export const ACTION_LABELS: Record<string, string> = {
   home: 'Inicio de plataforma',
   audit: 'Auditoría',
   narration: 'Narración',
+  languages: 'Idiomas',
   maintenance: 'Mantenimiento',
   manage: 'Administrar',
 };

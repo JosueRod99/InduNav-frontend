@@ -57,6 +57,8 @@ export interface TourViewStop {
   content: StopContent;
   sections: TourSection[]; // visible, non-empty, in order
   audio: Partial<Record<TourLanguage, string | null>>;
+  machine_translated?: TourLanguage[]; // languages in which some text came from the translator
+  live_notes?: LiveNotes; // set by the viewer when it translates the live data (tourViewer/liveTexts.ts)
   live: {
     personnel: { id: string; name: string; position: string | null; avatar_url: string | null; is_primary: boolean }[];
     headcount?: { position: string; quantity: number; shift: string | null }[]; // unnamed staff by position
@@ -153,18 +155,38 @@ export interface TourCompanyProfile {
   plant_cover_url: string | null;
 }
 
+export interface TourLanguageInfo {
+  code: TourLanguage;
+  native_name: string;
+  ui_texts: Record<string, string>; // fixed texts of the viewer; empty in Spanish and English (in code)
+}
+
+/** What the viewer tells the visitor about the translation of the live data of a stop */
+export interface LiveNotes {
+  machine: boolean; // some text comes from the translator
+  safety_machine: boolean; // ... in the safety section
+  original: boolean; // some text has no translation and is shown in the original language
+}
+
+/** language -> original text -> translation, only the texts of this tour */
+export type LiveTranslations = Record<string, Record<string, { text: string; auto: boolean }>>;
+
 export interface TourView {
   tour: {
     id: string;
     title: Translations;
     description: Translations;
     languages: TourLanguage[];
+    source_language: TourLanguage;
+    language_options: TourLanguageInfo[];
     cover_image_url: string | null;
     plant_name: string;
     organization: { name: string | null; logo_url: string | null; profile: TourCompanyProfile | null };
     status: 'draft' | 'published' | 'archived';
     public_code: string | null;
     version: number | null;
+    live_language?: TourLanguage; // live data (safety, positions...) is written in the organization's language
+    live_translations?: LiveTranslations;
   };
   plant_layout: TourViewPlantLayout | null; // ground floor
   plant_layouts?: TourViewPlantLayout[]; // every floor, ground floor first
@@ -204,6 +226,6 @@ export const resolveStopQr = async (qrCode: string): Promise<{ tour_code: string
   return data;
 };
 
-/** Text in the requested language, falling back to Spanish */
-export const tr = (text: Translations | undefined | null, language: TourLanguage): string =>
-  (text?.[language] || text?.es || '').trim();
+/** Text in the requested language, else the one it was written in, else any it has */
+export const tr = (text: Translations | undefined | null, language: TourLanguage, sourceLanguage?: TourLanguage): string =>
+  (text?.[language] || (sourceLanguage && text?.[sourceLanguage]) || text?.es || Object.values(text || {}).find(Boolean) || '').trim();

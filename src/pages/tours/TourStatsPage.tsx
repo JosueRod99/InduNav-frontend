@@ -1,3 +1,4 @@
+import { tourTitle } from '../../api/tourBuilder';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -42,7 +43,7 @@ const TourStatsPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  const title = builder?.tour.title_translations?.es || builder?.tour.title || 'Tour';
+  const title = builder ? tourTitle(builder.tour) : 'Tour';
   const totals = stats?.totals;
   const maxDay = Math.max(1, ...(stats?.by_day.map((d) => d.visits) || [1]));
   const maxStopViews = Math.max(1, ...(stats?.stops.map((s) => s.views) || [1]));

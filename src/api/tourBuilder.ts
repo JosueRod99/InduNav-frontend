@@ -1,13 +1,22 @@
 import apiClient from './client';
+import type { TranslationMeta } from '../utils/translationState';
 import type { CustomSectionIcon } from '../components/tours/customSectionIcons';
 
 // Tours v2 builder (PLAN_TOURS_REALES.md). The tour/stops rows are the draft; visitors see the
 // latest published snapshot.
 
-export type TourLanguage = 'es' | 'en';
+export type TourLanguage = string; // a code of the catalog: es, ja, pt-BR
 export type Translations = Partial<Record<TourLanguage, string>>;
 
-export const TOUR_LANGUAGE_LABELS: Record<TourLanguage, string> = { es: 'Español', en: 'English' };
+export interface TourLanguageOption {
+  code: string;
+  name: string;
+  native_name: string;
+}
+
+// Lists show the title in the language the tour was written in
+export const tourTitle = (tour: { title: string; title_translations?: Translations | null; source_language?: string }) =>
+  tour.title_translations?.[tour.source_language || 'es'] || tour.title;
 
 export type TourSectionKey =
   | 'summary'
@@ -121,6 +130,7 @@ export interface BuilderStop {
   image_url: string | null;
   qr_short_code: string | null;
   updated_at: string;
+  translation_meta?: TranslationMeta; // which texts came from the translator
   area_name: string | null;
   area_code: string | null;
   area_color: string | null;
@@ -130,6 +140,7 @@ export interface BuilderStop {
 
 export interface BuilderTour {
   id: string;
+  source_language: string;
   plant_id: string;
   plant_name: string;
   organization_id: string;
@@ -146,6 +157,7 @@ export interface BuilderTour {
   default_sections: TourSection[];
   max_publications_per_month: number;
   has_unpublished_changes: boolean;
+  translation_meta?: TranslationMeta;
 }
 
 export interface PublicationUsage {
@@ -161,6 +173,8 @@ export interface TourBuilderData {
   tour: BuilderTour;
   stops: BuilderStop[];
   publications: PublicationUsage;
+  available_languages?: TourLanguageOption[]; // those of the company
+  translation?: { used: number; limit: number; provider: string }; // characters this month, whole company
   narration_test_mode?: boolean; // TTS_TEST_MODE: only the first sentence of each script is synthesized
 }
 
@@ -252,7 +266,7 @@ export interface NarrationItem {
   stop_id: string;
   stop_title: string;
   language: TourLanguage;
-  script: string | null; // null = nothing to narrate in this language (visitors hear Spanish)
+  script: string | null; // null = nothing to narrate in this language (visitors hear the source language)
   synth_text: string | null; // text actually synthesized (first sentence in test mode)
   characters: number;
   text_hash: string | null;
@@ -321,4 +335,77 @@ export interface TourStats {
 export const getTourStats = async (tourId: string, days: number): Promise<TourStats> => {
   const { data } = await apiClient.get(`/tours/${tourId}/stats`, { params: { days } });
   return data.stats;
+};
+
+export interface TranslateResult {
+  translated: number; // texts written
+  characters: number; // sent to the translator
+  languages: Record<string, number>;
+}
+
+/** Translate automatically what is missing or outdated; answers with the whole editor data */
+export const translateTour = async (tourId: string, languages?: string[]): Promise<{ result: TranslateResult; builder: TourBuilderData }> => {
+  const { data } = await apiClient.post(`/tours/${tourId}/translate`, languages ? { languages } : {});
+  return data;
+};
+
+/** Where a live text comes from (backend services/liveTranslationService.ts) */
+export type LiveField =
+  | 'area_name'
+  | 'area_description'
+  | 'map_area'
+  | 'position'
+  | 'shift'
+  | 'process_name'
+  | 'process_step'
+  | 'process_description'
+  | 'process_activity'
+  | 'product_description'
+  | 'product_step'
+  | 'safety_ppe'
+  | 'safety_hazard'
+  | 'safety_assembly_point'
+  | 'safety_access'
+  | 'safety_instructions'
+  | 'industry'
+  | 'plant_description';
+
+export interface LiveText {
+  text: string;
+  field: LiveField;
+}
+
+export interface LiveTranslation {
+  text: string;
+  auto: boolean; // came from the translator and nobody changed it
+}
+
+/** Live data the draft shows, in the organization's language, with its translations */
+export interface TourLiveTexts {
+  live_language: string;
+  tour: LiveText[]; // company and plant map: the whole tour
+  stops: Record<string, LiveText[]>;
+  translations: Record<string, Record<string, LiveTranslation>>; // language -> original -> translation
+}
+
+export const getLiveTexts = async (tourId: string): Promise<TourLiveTexts> => (await apiClient.get(`/tours/${tourId}/live-texts`)).data;
+
+/** A translation written by a person, shared by every tour of the organization; empty removes it */
+export const saveLiveTranslation = async (tourId: string, language: string, source: string, text: string): Promise<LiveTranslation | null> =>
+  (await apiClient.put(`/tours/${tourId}/live-translations`, { language, source, text })).data.translation;
+
+/** Published tour whose live data the hourly review translated since the user last opened it */
+export interface TranslationAlert {
+  tour_id: string;
+  tour_title: string;
+  texts: number; // different texts
+  last_at: string;
+}
+
+export const getTranslationAlerts = async (organizationId?: string): Promise<TranslationAlert[]> =>
+  (await apiClient.get('/tours/translation-alerts', { params: organizationId ? { organization_id: organizationId } : undefined })).data.alerts;
+
+/** Opening the tour in the editor turns off its alert for this user */
+export const markTranslationsSeen = async (tourId: string) => {
+  await apiClient.put(`/tours/${tourId}/translations-seen`);
 };

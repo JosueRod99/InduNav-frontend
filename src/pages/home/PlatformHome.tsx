@@ -72,7 +72,7 @@ const PlatformHome = () => {
     { label: 'Plantas', value: data.plants, to: '/plants' },
     { label: 'Tours publicados', value: data.tours_published, to: '/tours' },
     { label: 'Visitas en 30 días', value: data.visits_30d, hint: visitsTrend(data.visits_30d, data.visits_prev_30d) },
-    { label: 'Publicaciones del mes', value: data.publications_used, hint: 'de todas las empresas', to: '/admin/narration-usage' },
+    { label: 'Publicaciones del mes', value: data.publications_used, hint: 'de todas las empresas', to: '/admin/usage?tab=narration' },
   ];
 
   const logo = (org: Org) =>

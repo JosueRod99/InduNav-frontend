@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Pause, Play, RotateCcw, RotateCw } from 'lucide-react';
+import { useViewerTexts } from '../useViewerTexts';
 
 // Narration player of the real tour viewer, shown in the header like the demo tour: play/pause,
 // time, a seek bar to jump to any part of the audio, ±10 s and playback speed (these two from sm up).
@@ -8,8 +9,7 @@ import { Pause, Play, RotateCcw, RotateCw } from 'lucide-react';
 
 interface NarrationPlayerProps {
   src: string;
-  language: 'es' | 'en';
-  isFallback?: boolean; // no narration in the selected language: the Spanish one plays
+  fallbackLanguage?: string | null; // no narration in the selected language: this one plays
   onListen?: (seconds: number) => void; // seconds of real playback (visit stats)
 }
 
@@ -22,7 +22,7 @@ const format = (seconds: number, round: (n: number) => number = Math.floor) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
-const NarrationPlayer = ({ src, language, isFallback = false, onListen }: NarrationPlayerProps) => {
+const NarrationPlayer = ({ src, fallbackLanguage = null, onListen }: NarrationPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const lastTime = useRef(0);
@@ -30,7 +30,7 @@ const NarrationPlayer = ({ src, language, isFallback = false, onListen }: Narrat
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1);
-  const tr = (es: string, en: string) => (language === 'es' ? es : en);
+  const { t, languageName } = useViewerTexts();
 
   // New area or language: stop and start over
   useEffect(() => {
@@ -74,7 +74,7 @@ const NarrationPlayer = ({ src, language, isFallback = false, onListen }: Narrat
   return (
     <div
       className="flex min-w-0 flex-1 items-center gap-1 rounded-lg sm:flex-none border border-slate-200 bg-slate-50 px-1.5 py-1 sm:gap-1.5 sm:px-2"
-      title={isFallback ? 'Narration available in Spanish only' : undefined}
+      title={fallbackLanguage ? t('narration_only_in', { language: languageName(fallbackLanguage) }) : undefined}
     >
       <audio
         ref={audioRef}
@@ -99,7 +99,7 @@ const NarrationPlayer = ({ src, language, isFallback = false, onListen }: Narrat
       <button
         onClick={toggle}
         className="flex-shrink-0 rounded-full p-1 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
-        aria-label={isPlaying ? tr('Pausar narración', 'Pause narration') : tr('Reproducir narración', 'Play narration')}
+        aria-label={isPlaying ? t('pause_narration') : t('play_narration')}
       >
         {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
       </button>
@@ -107,8 +107,8 @@ const NarrationPlayer = ({ src, language, isFallback = false, onListen }: Narrat
       <button
         onClick={() => seek(current - 10)}
         className={iconButton}
-        aria-label={tr('Retroceder 10 segundos', 'Back 10 seconds')}
-        title={tr('Retroceder 10 s', 'Back 10 s')}
+        aria-label={t('back_10_seconds')}
+        title={t('back_10_seconds')}
       >
         <RotateCcw className="h-3.5 w-3.5" />
       </button>
@@ -140,7 +140,7 @@ const NarrationPlayer = ({ src, language, isFallback = false, onListen }: Narrat
           value={current}
           onChange={(e) => seek(Number(e.target.value))}
           disabled={!duration}
-          aria-label={tr('Posición de la narración', 'Narration position')}
+          aria-label={t('narration_position')}
           aria-valuetext={`${format(current)} / ${format(duration, Math.ceil)}`}
           className="peer pointer-events-none absolute inset-0 h-full w-full opacity-0"
         />
@@ -156,8 +156,8 @@ const NarrationPlayer = ({ src, language, isFallback = false, onListen }: Narrat
       <button
         onClick={() => seek(current + 10)}
         className={iconButton}
-        aria-label={tr('Adelantar 10 segundos', 'Forward 10 seconds')}
-        title={tr('Adelantar 10 s', 'Forward 10 s')}
+        aria-label={t('forward_10_seconds')}
+        title={t('forward_10_seconds')}
       >
         <RotateCw className="h-3.5 w-3.5" />
       </button>
@@ -165,15 +165,18 @@ const NarrationPlayer = ({ src, language, isFallback = false, onListen }: Narrat
       <button
         onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
         className="hidden flex-shrink-0 rounded px-1 font-mono text-[11px] font-semibold text-slate-600 hover:bg-slate-200 sm:block"
-        aria-label={tr(`Velocidad ${speed}x, cambiar`, `Speed ${speed}x, change`)}
-        title={tr('Velocidad de reproducción', 'Playback speed')}
+        aria-label={t('speed_change', { speed })}
+        title={t('playback_speed')}
       >
         {speed}x
       </button>
 
-      {isFallback && (
-        <span className="flex-shrink-0 rounded bg-slate-200 px-1 text-[9px] font-semibold text-slate-600" aria-label="Narration in Spanish">
-          ES
+      {fallbackLanguage && (
+        <span
+          className="flex-shrink-0 rounded bg-slate-200 px-1 text-[9px] font-semibold text-slate-600"
+          aria-label={t('narration_in', { language: languageName(fallbackLanguage) })}
+        >
+          {fallbackLanguage.toUpperCase()}
         </span>
       )}
     </div>

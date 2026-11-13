@@ -15,10 +15,11 @@ import UsersPage from './pages/users/UsersPage';
 import PlantsPage from './pages/plants/PlantsPage';
 import ToursPage from './pages/tours/ToursPage';
 import TourEditorPage from './pages/tours/TourEditorPage';
-import NarrationUsagePage from './pages/admin/NarrationUsagePage';
+import ServiceUsagePage from './pages/admin/ServiceUsagePage';
 import RolesPage from './pages/admin/RolesPage';
 import RoleEditorPage from './pages/admin/RoleEditorPage';
 import AuditLogPage from './pages/admin/AuditLogPage';
+import LanguagesPage from './pages/admin/LanguagesPage';
 import TourStatsPage from './pages/tours/TourStatsPage';
 import PlantWorkspacePage from './pages/plants/PlantWorkspacePage';
 import LegacyPlantRedirect from './pages/plants/LegacyPlantRedirect';
@@ -26,7 +27,6 @@ import OrganizationWorkspacePage from './pages/organizations/OrganizationWorkspa
 import TourViewerRealPage from './pages/tourViewer/TourViewerRealPage';
 import PublicTourPage, { StopQrRedirect } from './pages/tourViewer/PublicTourPage';
 import TourQrSheetPage from './pages/tours/TourQrSheetPage';
-import StopsPage from './pages/stops/StopsPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AreaDetailPage from './pages/areas/AreaDetailPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
@@ -176,13 +176,23 @@ function App() {
               />
             ))}
             <Route
-              path="admin/narration-usage"
+              path="admin/languages"
               element={
-                <PermissionRoute anyOf={['system.narration']}>
-                  <NarrationUsagePage />
+                <PermissionRoute anyOf={['system.languages']}>
+                  <LanguagesPage />
                 </PermissionRoute>
               }
             />
+            <Route
+              path="admin/usage"
+              element={
+                <PermissionRoute anyOf={['system.narration']}>
+                  <ServiceUsagePage />
+                </PermissionRoute>
+              }
+            />
+            {/* Former address of the page, when it only showed narration */}
+            <Route path="admin/narration-usage" element={<Navigate to="/admin/usage?tab=narration" replace />} />
             <Route
               path="tours/:tourId/edit"
               element={
@@ -211,14 +221,6 @@ function App() {
                 }
               />
             ))}
-            <Route
-              path="stops"
-              element={
-                <PermissionRoute anyOf={['tours.update']}>
-                  <StopsPage />
-                </PermissionRoute>
-              }
-            />
             {/* Old section pages: now tabs of each plant (redirect keeps old links working) */}
             <Route path="layouts" element={<LegacyPlantRedirect tab="layout" />} />
             <Route path="employees" element={<LegacyPlantRedirect tab="personal" />} />
