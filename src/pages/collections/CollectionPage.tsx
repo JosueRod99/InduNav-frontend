@@ -98,21 +98,25 @@ const CollectionPage = () => {
               const tourDescription = tourText(tour.description_translations, tour, language);
               return (
                 <li key={tour.public_code} className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-                  <div className="relative aspect-video bg-gradient-to-br from-blue-600 to-slate-800">
+                  {/* Same size for every card: the photo fills a 3:2 box and never stretches it */}
+                  <div className="relative aspect-[3/2] overflow-hidden bg-gradient-to-br from-blue-600 to-slate-800">
                     {tour.cover_image_url ? (
-                      <img src={tour.cover_image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      <img src={tour.cover_image_url} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
                     ) : (
                       <Building2 className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 text-white/40" />
                     )}
                   </div>
                   <div className="flex flex-1 flex-col p-4">
-                    <p className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                    <p className="flex h-5 items-center gap-2 text-xs font-medium text-slate-500">
                       {tour.organization_logo_url && <img src={tour.organization_logo_url} alt="" className="h-5 w-5 rounded object-contain" />}
                       <span className="truncate">{tour.organization_name}</span>
                     </p>
-                    <h2 className="mt-1 text-lg font-bold text-slate-900">{tourTitle}</h2>
-                    {tourDescription && <p className="mt-1 line-clamp-3 text-sm text-slate-600">{tourDescription}</p>}
-                    <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <h2 className="mt-1 truncate text-lg font-bold text-slate-900" title={tourTitle}>
+                      {tourTitle}
+                    </h2>
+                    {/* Always three lines tall, with or without text, so the rows line up */}
+                    <p className="mt-1 line-clamp-3 h-[3.75rem] text-sm leading-5 text-slate-600">{tourDescription}</p>
+                    <p className="mt-3 flex items-center gap-x-3 truncate text-xs text-slate-500">
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="h-3.5 w-3.5" /> {t.areas(tour.stops_count)}
                       </span>
