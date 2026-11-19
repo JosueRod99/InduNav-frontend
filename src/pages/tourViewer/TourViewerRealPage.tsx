@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
   Eye,
   FileText,
   Image as ImageIcon,
+  LayoutGrid,
   Loader2,
   MapPin,
   Package,
@@ -177,9 +178,10 @@ interface TourExperienceProps {
   onExit?: () => void; // preview only: back to the editor
   initialStopIndex?: number | null; // open directly at a stop (stop QR codes, ?stop=N)
   source?: VisitSource; // how the visitor arrived (visit stats)
+  collection?: string | null; // slug of the collection page it was opened from: shows the way back
 }
 
-export const TourExperience = ({ view: original, onExit = () => {}, initialStopIndex = null, source = 'link' }: TourExperienceProps) => {
+export const TourExperience = ({ view: original, onExit = () => {}, initialStopIndex = null, source = 'link', collection = null }: TourExperienceProps) => {
   const validInitialStop =
     initialStopIndex !== null && initialStopIndex >= 0 && initialStopIndex < original.stops.length ? initialStopIndex : null;
   const progress = useMemo(() => tourProgress(original.tour.id, !!original.is_preview), [original.tour.id, original.is_preview]);
@@ -300,12 +302,16 @@ export const TourExperience = ({ view: original, onExit = () => {}, initialStopI
   const audioUrl = stop?.audio?.[language] || stop?.audio?.[view.tour.source_language] || null;
   const audioFallback = audioUrl && !stop?.audio?.[language] ? view.tour.source_language : null;
 
+  // Back to the collection page, in the language the visitor is using
+  const collectionPath = collection ? `/c/${collection}?lang=${encodeURIComponent(language)}` : '';
+
   // Anonymous visit stats (published tours only, never the editor preview)
   const { onNarration } = useVisitTracking({
     enabled: !view.is_preview,
     tourId: view.tour.id,
     publicCode: view.tour.public_code,
     source,
+    collection,
     entryStopId: source === 'qr' && validInitialStop !== null ? stops[validInitialStop]?.id ?? null : null,
     language,
     stopId: started && !finished ? stop?.id ?? null : null,
@@ -371,6 +377,17 @@ export const TourExperience = ({ view: original, onExit = () => {}, initialStopI
               <button onClick={onExit} className="rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Volver al editor">
                 <ArrowLeft className="h-5 w-5" />
               </button>
+            )}
+            {collection && (
+              <Link
+                to={collectionPath}
+                className="flex items-center gap-1 rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                aria-label={t('back_to_collection')}
+                title={t('back_to_collection')}
+              >
+                <ArrowLeft className="h-5 w-5" />
+                <LayoutGrid className="h-4 w-4" />
+              </Link>
             )}
             {view.tour.organization.logo_url && (
               <img src={view.tour.organization.logo_url} alt="" className="hidden h-8 w-8 rounded object-contain sm:block" />
@@ -525,6 +542,15 @@ export const TourExperience = ({ view: original, onExit = () => {}, initialStopI
                 <button onClick={onExit} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                   {t('back_to_editor')}
                 </button>
+              )}
+              {collection && (
+                <Link
+                  to={collectionPath}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  {t('back_to_collection')}
+                </Link>
               )}
             </div>
           </section>

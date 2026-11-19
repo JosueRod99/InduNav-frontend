@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 import type { InputHTMLAttributes } from 'react';
 import { clsx } from 'clsx';
 
@@ -10,10 +10,13 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, helperText, type = 'text', ...props }, ref) => {
+    // The label names its field (screen readers, clicking the label); an id passed in wins
+    const fallbackId = useId();
+    const id = props.id ?? fallbackId;
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1.5">
             {label}
             {props.required && <span className="text-red-500 ml-1">*</span>}
           </label>
@@ -33,6 +36,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
           ref={ref}
           {...props}
+          id={id}
         />
 
         {error && (

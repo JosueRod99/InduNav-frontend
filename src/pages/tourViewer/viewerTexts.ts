@@ -40,6 +40,7 @@ const EN = {
   areas_visited: 'Areas you visited',
   back_to_start: 'Start over',
   back_to_editor: 'Back to editor',
+  back_to_collection: 'More tours',
   in_charge: 'In charge',
   no_content: 'This area has no visible content yet.',
 
@@ -166,6 +167,7 @@ const ES: Record<ViewerTextKey, string> = {
   areas_visited: 'Áreas que visitaste',
   back_to_start: 'Volver al inicio',
   back_to_editor: 'Volver al editor',
+  back_to_collection: 'Más tours',
   in_charge: 'Responsable',
   no_content: 'Esta área todavía no tiene contenido visible.',
 

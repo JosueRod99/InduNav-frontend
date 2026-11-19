@@ -36,6 +36,7 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
         logo_url: organization.logo_url || undefined,
         tour_publications_per_month: organization.tour_publications_per_month ?? DEFAULT_TOUR_PUBLICATIONS,
         translation_characters_per_month: organization.translation_characters_per_month ?? null,
+        is_demo: organization.is_demo ?? false,
       });
     } else {
       setFormData({
@@ -203,6 +204,22 @@ const OrganizationModal = ({ isOpen, onClose, organization }: OrganizationModalP
             caracteres por tour y por idioma) y bájalo después. Se reinicia el día 1 de cada mes (hora de México).
           </p>
         </div>
+
+        <label className="flex items-start gap-2 text-sm text-gray-800">
+          <input
+            type="checkbox"
+            checked={!!formData.is_demo}
+            onChange={(e) => setFormData((prev) => ({ ...prev, is_demo: e.target.checked }))}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300"
+          />
+          <span>
+            <span className="font-medium">Empresa demo</span>
+            <span className="block text-xs text-gray-500">
+              Sus tours publicados se pueden mostrar en Colecciones, la página pública para ventas. Úsalo solo con empresas de demostración,
+              no con clientes reales.
+            </span>
+          </span>
+        </label>
 
         <div>
           <label htmlFor="logo_url" className="block text-sm font-medium text-gray-700 mb-1">

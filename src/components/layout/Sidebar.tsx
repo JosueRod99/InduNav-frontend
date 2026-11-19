@@ -4,6 +4,7 @@ import { getPlants } from '../../api/plants';
 import { useEffect, useMemo } from 'react';
 import {
   AudioLines,
+  LayoutGrid,
   Languages,
   ScrollText,
   Building2,
@@ -45,6 +46,7 @@ const adminItems: NavItem[] = [
   { to: '/admin/roles', icon: Shield, label: 'Roles y permisos', activePrefix: '/admin/roles', anyOf: ['roles.manage'] },
   { to: '/admin/languages', icon: Languages, label: 'Idiomas', anyOf: ['system.languages'] },
   { to: '/admin/audit', icon: ScrollText, label: 'Auditoría', anyOf: ['system.audit'] },
+  { to: '/admin/collections', icon: LayoutGrid, label: 'Colecciones', activePrefix: '/admin/collections', anyOf: ['system.collections'] },
   { to: '/admin/usage', icon: AudioLines, label: 'Consumo de servicios', anyOf: ['system.narration'] },
 ];
 

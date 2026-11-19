@@ -9,6 +9,7 @@ export interface CreateOrganizationRequest {
   settings?: Record<string, any>;
   tour_publications_per_month?: number; // tour publications with narration audio per month
   translation_characters_per_month?: number | null; // automatic translation per month; null: the general limit
+  is_demo?: boolean; // its published tours can be shown in collections
 }
 
 export interface UpdateOrganizationRequest {
@@ -20,6 +21,7 @@ export interface UpdateOrganizationRequest {
   settings?: Record<string, any>;
   tour_publications_per_month?: number;
   translation_characters_per_month?: number | null;
+  is_demo?: boolean;
 }
 
 export interface GetOrganizationsParams {

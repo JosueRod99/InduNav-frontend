@@ -16,6 +16,9 @@ import PlantsPage from './pages/plants/PlantsPage';
 import ToursPage from './pages/tours/ToursPage';
 import TourEditorPage from './pages/tours/TourEditorPage';
 import ServiceUsagePage from './pages/admin/ServiceUsagePage';
+import CollectionsPage from './pages/admin/collections/CollectionsPage';
+import CollectionEditorPage from './pages/admin/collections/CollectionEditorPage';
+import CollectionPage from './pages/collections/CollectionPage';
 import RolesPage from './pages/admin/RolesPage';
 import RoleEditorPage from './pages/admin/RoleEditorPage';
 import AuditLogPage from './pages/admin/AuditLogPage';
@@ -82,6 +85,8 @@ function App() {
           <Route path="/t/:code" element={<PublicTourPage />} />
           <Route path="/t/:orgSlug/:tourSlug" element={<PublicTourPage />} />
           <Route path="/s/:qrCode" element={<StopQrRedirect />} />
+          {/* Collection of tours of demo companies, public (sales) */}
+          <Route path="/c/:slug" element={<CollectionPage />} />
 
           {/* Printable QR sheet of a tour (full page, for printing) */}
           <Route
@@ -188,6 +193,22 @@ function App() {
               element={
                 <PermissionRoute anyOf={['system.narration']}>
                   <ServiceUsagePage />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="admin/collections"
+              element={
+                <PermissionRoute anyOf={['system.collections']}>
+                  <CollectionsPage />
+                </PermissionRoute>
+              }
+            />
+            <Route
+              path="admin/collections/:id"
+              element={
+                <PermissionRoute anyOf={['system.collections']}>
+                  <CollectionEditorPage />
                 </PermissionRoute>
               }
             />

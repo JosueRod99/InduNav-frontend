@@ -60,6 +60,7 @@ export interface Organization {
   settings: Record<string, any>;
   tour_publications_per_month?: number;
   translation_characters_per_month?: number | null; // null: the general limit
+  is_demo?: boolean; // its published tours can be shown in collections
   // Figures of the organizations list
   plants_count?: number;
   users_count?: number;

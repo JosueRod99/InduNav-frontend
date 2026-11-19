@@ -7,13 +7,14 @@ import type { TourLanguage } from '../../api/tourBuilder';
 // one at the end screen, and at most one every 2 minutes while moving between areas.
 // No personal data: the session id is random and kept only in this tab (sessionStorage).
 
-export type VisitSource = 'link' | 'slug' | 'qr';
+export type VisitSource = 'link' | 'slug' | 'qr' | 'collection';
 
 interface Options {
   enabled: boolean; // false in the editor preview
   tourId: string;
   publicCode: string | null;
   source: VisitSource;
+  collection?: string | null; // slug of the collection the visitor came from (source 'collection')
   entryStopId: string | null;
   language: TourLanguage;
   stopId: string | null; // area on screen (null on the cover and the end screen)
@@ -48,7 +49,7 @@ const sessionIdFor = (tourId: string) => {
   }
 };
 
-export const useVisitTracking = ({ enabled, tourId, publicCode, source, entryStopId, language, stopId, finished }: Options) => {
+export const useVisitTracking = ({ enabled, tourId, publicCode, source, collection = null, entryStopId, language, stopId, finished }: Options) => {
   const sessionId = useRef<string | null>(null);
   const pending = useRef(new Map<string, StopStats>());
   const completed = useRef(false);
@@ -90,6 +91,7 @@ export const useVisitTracking = ({ enabled, tourId, publicCode, source, entrySto
       session_id: sessionId.current,
       language: languageRef.current,
       source,
+      collection: collection ?? undefined,
       entry_stop_id: entryStopId,
       completed: completed.current || undefined,
       stops,
@@ -104,7 +106,7 @@ export const useVisitTracking = ({ enabled, tourId, publicCode, source, entrySto
       body,
       keepalive: true,
     }).catch(() => {});
-  }, [active, accumulate, tourId, publicCode, source, entryStopId]);
+  }, [active, accumulate, tourId, publicCode, source, collection, entryStopId]);
 
   // The visit counts as soon as the tour opens
   useEffect(() => {

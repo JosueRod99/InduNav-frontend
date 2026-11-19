@@ -11,7 +11,7 @@ const PERIODS = [7, 30, 90] as const;
 
 const LABELS: Record<string, Record<string, string>> = {
   languages: { es: 'Español', en: 'Inglés' },
-  sources: { link: 'Link corto', slug: 'Link con nombre', qr: 'QR de un área' },
+  sources: { link: 'Link corto', slug: 'Link con nombre', qr: 'QR de un área', collection: 'Colección (demostración)' },
   devices: { mobile: 'Celular', tablet: 'Tablet', desktop: 'Computadora' },
 };
 

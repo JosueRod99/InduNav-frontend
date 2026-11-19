@@ -18,7 +18,10 @@ const PublicTourPage = () => {
   const [searchParams] = useSearchParams();
   const stopParam = Number(searchParams.get('stop'));
   const initialStopIndex = Number.isInteger(stopParam) && stopParam > 0 ? stopParam - 1 : null;
-  const source: VisitSource = searchParams.get('src') === 'qr' ? 'qr' : code ? 'link' : 'slug';
+  // ?c=<slug>: opened from a collection page (sales), which the viewer offers to go back to
+  const collectionParam = searchParams.get('c');
+  const collection = collectionParam && /^[a-z0-9-]{1,80}$/.test(collectionParam) ? collectionParam : null;
+  const source: VisitSource = collection ? 'collection' : searchParams.get('src') === 'qr' ? 'qr' : code ? 'link' : 'slug';
 
   const { data: view, isLoading, error } = useQuery({
     queryKey: ['public-tour', code, orgSlug, tourSlug],
@@ -64,7 +67,7 @@ const PublicTourPage = () => {
     );
   }
 
-  return <TourExperience view={view} initialStopIndex={initialStopIndex} source={source} />;
+  return <TourExperience view={view} initialStopIndex={initialStopIndex} source={source} collection={collection} />;
 };
 
 /** /s/:qrCode → opens the tour at that stop */
